@@ -1,0 +1,75 @@
+/******************************************************************************
+This file is part of the Newcastle Vulkan Tutorial Series
+
+Author:Rich Davison
+Contact:richgdavison@gmail.com
+License: MIT (see LICENSE file at the top of the source tree)
+*//////////////////////////////////////////////////////////////////////////////
+#include "Precompiled.h"
+#include "../../Common/Window.h"
+#include "BasicDescriptorRenderer.h"
+#include "BasicTexturingRenderer.h"
+#include "BasicGeometryRenderer.h"
+#include "BasicPushConstantRenderer.h"
+#include "BasicUniformBufferRenderer.h"
+#include "BasicMultiPipelineRenderer.h"
+#include "PrerecordedCmdListRenderer.h"
+
+#include "MultiViewportExample.h"
+
+#include "BasicComputeUsage.h"
+
+#include "PostProcessingExample.h"
+#include "ShadowMappingExample.h"
+
+#include "LightingExample.h"
+#include "DeferredExample.h"
+#include "TestRayTrace.h"
+#include "GLTFExample.h"
+
+#include "BasicSkinningExample.h"
+
+#include "CubeMapRenderer.h"
+
+using namespace NCL;
+
+int main() {
+	Window* w = Window::CreateGameWindow("Welcome to Vulkan!", 1120, 768);
+
+	if (!w->HasInitialised()) {
+		return -1;
+	}
+
+	w->SetConsolePosition(2000, 200);
+
+	//BasicGeometryRenderer* renderer = new BasicGeometryRenderer(*w);	
+	//BasicPushConstantRenderer* renderer = new BasicPushConstantRenderer(*w);
+	//BasicDescriptorRenderer* renderer = new BasicDescriptorRenderer(*w);
+	//BasicTexturingRenderer* renderer = new BasicTexturingRenderer(*w);
+	//BasicUniformBufferRenderer* renderer = new BasicUniformBufferRenderer(*w);
+	//PostProcessingExample* renderer = new PostProcessingExample(*w);
+	//ShadowMappingExample* renderer = new ShadowMappingExample(*w);
+	//LightingExample* renderer = new LightingExample(*w);
+	DeferredExample* renderer = new DeferredExample(*w);
+	//GLTFExample* renderer = new GLTFExample(*w);
+	//PrerecordedCmdListRenderer* renderer = new PrerecordedCmdListRenderer(*w);
+	//BasicMultiPipelineRenderer* renderer = new BasicMultiPipelineRenderer(*w);
+	//BasicComputeUsage * renderer = new BasicComputeUsage(*w);
+	//TestRayTrace* renderer = new TestRayTrace(*w);
+	//BasicSkinningExample* renderer = new BasicSkinningExample(*w);
+	//MultiViewportExample* renderer = new MultiViewportExample(*w);
+	//CubeMapRenderer* renderer = new CubeMapRenderer(*w);
+
+	w->LockMouseToWindow(true);
+	w->ShowOSPointer(false);
+
+	while (w->UpdateWindow() && !Window::GetKeyboard()->KeyDown(KeyboardKeys::ESCAPE)) {
+		float time = w->GetTimer()->GetTimeDeltaSeconds();
+		renderer->Update(time);
+		renderer->Render();
+	}
+
+	delete renderer;
+
+	Window::DestroyGameWindow();
+}
