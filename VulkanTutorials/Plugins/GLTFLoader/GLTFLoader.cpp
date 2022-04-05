@@ -1,10 +1,3 @@
-/******************************************************************************
-This file is part of the Newcastle Vulkan Tutorial Series
-
-Author:Rich Davison
-Contact:richgdavison@gmail.com
-License: MIT (see LICENSE file at the top of the source tree)
-*//////////////////////////////////////////////////////////////////////////////
 #include "GLTFLoader.h"
 #define TINYGLTF_IMPLEMENTATION
 #define TINYGLTF_USE_CPP14
@@ -15,10 +8,19 @@ License: MIT (see LICENSE file at the top of the source tree)
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #include "tiny_gltf.h"
 
-#include "../../Common/TextureLoader.h"
-
-#include "../../Common/Matrix4.h"
 #include "../../Common/Quaternion.h"
+
+#include "../../Common/Vector2.h"
+#include "../../Common/Vector3.h"
+#include "../../Common/Vector4.h"
+
+#include "../../Common/Maths.h"
+
+#include "../../Common/TextureLoader.h"
+#include "../../Common/TextureBase.h"
+
+#include "../../Common/MeshAnimation.h"
+#include "../../Common/MeshGeometry.h"
 
 #include <filesystem>
 #include <cmath>
@@ -26,8 +28,8 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace tinygltf;
 using namespace NCL;
-using namespace Maths;
-using namespace Rendering;
+using namespace NCL::Maths;
+using namespace NCL::Rendering;
 
 const std::string GLTFAttributeTags[] = {
 	"POSITION",
@@ -179,6 +181,9 @@ GLTFLoader::GLTFLoader(const std::string& filename, GLTFLoader::MeshConstruction
 
 GLTFLoader::~GLTFLoader() {
 	for (MeshGeometry* m : outMeshes) {
+		delete m;
+	}
+	for (MeshAnimation* m : outAnims) {
 		delete m;
 	}
 	for (NCL::Rendering::TextureBase* t : outTextures) {
@@ -560,6 +565,6 @@ void GLTFLoader::LoadAnimationData(tinygltf::Model& model, MeshGeometry* mesh, G
 			allMatrices[i] = skinData.globalTransformInverse * allMatrices[i];
 		}
 
-		outAnims.push_back(MeshAnimation((unsigned int)jointCount, frameCount, frameRate, allMatrices));
+		outAnims.push_back(new MeshAnimation((unsigned int)jointCount, frameCount, frameRate, allMatrices));
 	}
 }

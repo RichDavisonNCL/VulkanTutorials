@@ -7,6 +7,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #include "Precompiled.h"
 #include "BasicSkinningExample.h"
+#include "../../Common/MeshAnimation.h"
 
 using namespace NCL;
 using namespace Rendering;
@@ -127,14 +128,14 @@ void BasicSkinningExample::Update(float dt) {
 	frameTime -= dt;
 
 	if (frameTime <= 0.0f) {
-		currentFrame = (currentFrame + 1) % loader.outAnims[0].GetFrameCount();
-		frameTime += loader.outAnims[0].GetFrameRate();
+		currentFrame = (currentFrame + 1) % loader.outAnims[0]->GetFrameCount();
+		frameTime += loader.outAnims[0]->GetFrameRate();
 	}
 
 	vector<Matrix4> bindPose = loader.outMeshes[0]->GetBindPose();
 	vector<Matrix4> invBindPos = loader.outMeshes[0]->GetInverseBindPose();
 
-	const Matrix4* frameMats = loader.outAnims[0].GetJointData(currentFrame);
+	const Matrix4* frameMats = loader.outAnims[0]->GetJointData(currentFrame);
 
 	vector<Matrix4> testData;
 
