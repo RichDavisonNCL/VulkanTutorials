@@ -99,7 +99,6 @@ set(Source_Files
     "TestRayTrace.cpp"
     "VulkanMain.cpp"
     "VulkanTutorialRenderer.cpp"
-	"Test.cpp"
 )
 source_group("Source Files" FILES ${Source_Files})
 
