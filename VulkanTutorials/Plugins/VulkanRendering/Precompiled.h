@@ -5,3 +5,12 @@
 #define VULKAN_HPP_ASSERT
 #include "vulkan/vulkan.hpp"
 #include <string>
+#include "../../Common/Matrix2.h"
+#include "../../Common/Matrix3.h"
+#include "../../Common/Matrix4.h"
+
+#include "../../Common/Vector2.h"
+#include "../../Common/Vector3.h"
+#include "../../Common/Vector4.h"
+
+#include "../../Common/Quaternion.h"

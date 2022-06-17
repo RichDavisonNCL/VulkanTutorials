@@ -6,21 +6,19 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "../../Plugins/VulkanRendering/VulkanRenderer.h"
-#include "../../Plugins/VulkanRendering/VulkanPipeline.h"
+#include "VulkanTutorialRenderer.h"
+
 namespace NCL::Rendering {
-	class BasicGeometryRenderer : public VulkanRenderer	{
+	class BasicGeometryRenderer : public VulkanTutorialRenderer	{
 	public:
 		BasicGeometryRenderer(Window& window);
-		~BasicGeometryRenderer();
+		~BasicGeometryRenderer() {} //Nothing to delete in this one!
 
 	protected:
 		virtual void RenderFrame();
 
-		void	BuildPipeline();
-
-		std::shared_ptr<VulkanMesh>		triMesh;
-		std::shared_ptr<VulkanShader>	shader;
-		VulkanPipeline	basicPipeline;
+		UniqueVulkanMesh 	triMesh;
+		UniqueVulkanShader	shader;
+		VulkanPipeline		basicPipeline;
 	};
 }

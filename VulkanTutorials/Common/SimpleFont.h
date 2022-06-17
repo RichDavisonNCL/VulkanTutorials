@@ -9,7 +9,6 @@ https://research.ncl.ac.uk/game/
 #pragma once
 #include <string>
 #include <vector>
-#include "TextureBase.h"
 
 namespace NCL {
 	namespace Maths {
@@ -18,8 +17,9 @@ namespace NCL {
 		class Vector4;
 	}
 	namespace Rendering {
-		class SimpleFont
-		{
+		class TextureBase;
+
+		class SimpleFont	{
 		public:
 			SimpleFont(const std::string&fontName, const std::string&texName);
 			~SimpleFont();

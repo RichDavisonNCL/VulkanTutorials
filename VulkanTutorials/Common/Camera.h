@@ -1,3 +1,11 @@
+/*
+Part of Newcastle University's Game Engineering source code.
+
+Use as you see fit!
+
+Comments and queries to: richard-gordon.davison AT ncl.ac.uk
+https://research.ncl.ac.uk/game/
+*/
 #pragma once
 #include "Matrix4.h"
 #include "Vector3.h"
@@ -69,7 +77,7 @@ namespace NCL {
 		//to a vertex shader (i.e it's already an 'inverse camera matrix').
 		Matrix4 BuildViewMatrix() const;
 
-		Matrix4 BuildProjectionMatrix(float currentAspect = 1.0f) const;
+		Matrix4 BuildProjectionMatrix(float aspectRatio = 1.0f) const;
 
 		//Gets position in world space
 		Vector3 GetPosition() const { return position; }

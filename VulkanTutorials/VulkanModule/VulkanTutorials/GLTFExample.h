@@ -14,7 +14,7 @@ namespace NCL::Rendering {
 	{
 	public:
 		GLTFExample(Window& window);
-		~GLTFExample();
+		~GLTFExample() {}
 
 		void RenderFrame()		override;
 	protected:

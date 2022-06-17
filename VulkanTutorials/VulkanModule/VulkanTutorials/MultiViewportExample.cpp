@@ -5,39 +5,35 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "MultiViewportExample.h"
 
 using namespace NCL;
 using namespace Rendering;
 
 MultiViewportExample::MultiViewportExample(Window& window) : VulkanTutorialRenderer(window) {
-	triMesh = MakeSmartMesh(MeshGeometry::GenerateTriangle(new VulkanMesh()));
-	triMesh->UploadToGPU(this);
+	triMesh = GenerateTriangle();
 
-	shader = VulkanShaderBuilder()
+	shader = VulkanShaderBuilder("Basic Shader!")
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-		.WithDebugName("Basic Shader!")
 	.BuildUnique(device);
 
-	basicPipeline = VulkanPipelineBuilder()
-		.WithVertexSpecification(triMesh->GetVertexSpecification())
+	pipeline = VulkanPipelineBuilder("Test Pipeline")
+		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShaderState(shader.get())
-		.WithPass(defaultRenderPass)
-		.WithDepthState(vk::CompareOp::eAlways, false, false, false)
-		.WithRaster(vk::CullModeFlagBits::eNone)
+		.WithShader(shader)
 	.Build(device, pipelineCache);
 }
 
-MultiViewportExample::~MultiViewportExample() {
-}
-
 void MultiViewportExample::RenderFrame() {
-	BeginDefaultRenderPass(defaultCmdBuffer);
+	TransitionSwapchainForRendering(defaultCmdBuffer);
 
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline.pipeline.get());
+	VulkanDynamicRenderBuilder()
+		.WithColourAttachment(swapChainList[currentSwap]->view)
+		.WithRenderArea(defaultScreenRect)
+	.Begin(defaultCmdBuffer);
+
+	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
 	for (int i = 0; i < 4; ++i) {
 		float xOffset = (float)(i % 2);
 		float yOffset = (float)(i / 2);
@@ -47,7 +43,8 @@ void MultiViewportExample::RenderFrame() {
 
 		vk::Viewport viewport = vk::Viewport(xSize * xOffset, ySize * yOffset, xSize, ySize, 0.0f, 1.0f);
 		defaultCmdBuffer.setViewport(0, 1, &viewport);
-		SubmitDrawCall(triMesh.get(), defaultCmdBuffer);
+		SubmitDrawCall(*triMesh, defaultCmdBuffer);
 	}
-	defaultCmdBuffer.endRenderPass();
+
+	EndRendering(defaultCmdBuffer);
 }

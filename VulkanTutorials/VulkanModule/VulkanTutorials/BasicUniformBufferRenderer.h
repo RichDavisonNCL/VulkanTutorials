@@ -6,15 +6,14 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "../../Plugins/VulkanRendering/VulkanRenderer.h"
-#include "../../Plugins/VulkanRendering/VulkanPipeline.h"
+#include "VulkanTutorialRenderer.h"
 #include "../../Common/Camera.h"
 
 namespace NCL::Rendering {
-	class BasicUniformBufferRenderer : public VulkanRenderer	{
+	class BasicUniformBufferRenderer : public VulkanTutorialRenderer {
 	public:
 		BasicUniformBufferRenderer(Window& window);
-		~BasicUniformBufferRenderer();
+		~BasicUniformBufferRenderer() {}
 
 		void RenderFrame()		override;
 		void Update(float dt)	override;
@@ -23,11 +22,9 @@ namespace NCL::Rendering {
 		void	BuildPipeline();
 		void	UpdateCameraUniform();
 
-		void	WriteDescriptorSet(vk::DescriptorSet s);
-
-		std::shared_ptr<VulkanMesh>		triMesh;
-		std::shared_ptr<VulkanShader>	defaultShader;
-		VulkanPipeline	basicPipeline;
+		UniqueVulkanMesh 		triMesh;
+		UniqueVulkanShader	shader;
+		VulkanPipeline	pipeline;
 
 		vk::UniqueDescriptorSet	descriptorSet;
 

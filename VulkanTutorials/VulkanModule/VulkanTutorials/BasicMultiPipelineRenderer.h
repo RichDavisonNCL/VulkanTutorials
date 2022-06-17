@@ -20,12 +20,12 @@ namespace NCL::Rendering {
 
 		VulkanPipeline	solidColourPipeline;
 		VulkanPipeline	texturedPipeline;
-		VulkanMesh*		triangleMesh;
+		UniqueVulkanMesh	triangleMesh;
 
-		std::shared_ptr<VulkanTexture>	textures[2];
+		UniqueVulkanTexture	textures[2];
 
-		VulkanShader* texturingShader;
-		VulkanShader* solidColourShader;
+		UniqueVulkanShader texturingShader;
+		UniqueVulkanShader solidColourShader;
 
 		vk::DescriptorSet		textureDescriptorSetA;
 		vk::DescriptorSet		textureDescriptorSetB;

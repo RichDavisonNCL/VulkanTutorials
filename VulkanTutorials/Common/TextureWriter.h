@@ -10,8 +10,7 @@ https://research.ncl.ac.uk/game/
 #include <string>
 
 namespace NCL {
-	class TextureWriter
-	{
+	class TextureWriter	{
 	public:
 		static void WritePNG(const std::string& filename, char* data, int width, int height, int channels);
 	};

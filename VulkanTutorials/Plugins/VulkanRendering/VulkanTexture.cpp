@@ -84,13 +84,13 @@ int VulkanTexture::CalculateMipCount(int width, int height) {
 	 copyInfo.bufferOffset = 0;
 
 	 //Copy from staging buffer to image memory...
-	 cmdBuffer.copyBufferToImage(stagingBuffer, outTex->image.get(), vk::ImageLayout::eTransferDstOptimal, copyInfo);
+	 cmdBuffer.copyBufferToImage(stagingBuffer, *outTex->image, vk::ImageLayout::eTransferDstOptimal, copyInfo);
 
 	 if (outTex->mipCount > 1) {
 		 outTex->GenerateMipMaps(cmdBuffer, vk::ImageLayout::eShaderReadOnlyOptimal, vk::PipelineStageFlagBits::eFragmentShader);
 	 }
 	 else {
-		 vkRenderer->ImageTransitionBarrier(cmdBuffer, outTex->image.get(), vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, outTex->aspectType, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader);
+		 vkRenderer->ImageTransitionBarrier(cmdBuffer, *outTex->image, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, outTex->aspectType, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader);
 		 outTex->defaultView = outTex->GenerateDefaultView(outTex->aspectType);
 	 }
 
@@ -103,11 +103,11 @@ int VulkanTexture::CalculateMipCount(int width, int height) {
 }
  //Compatability func
  TextureBase* VulkanTexture::TextureFromFilenameLoader(const std::string& name) {
-	 VulkanTexture* tex = TextureFromFilename(name);
-	 return tex;
+	 UniqueVulkanTexture tex = TextureFromFile(name);
+	 return tex.release();
  }
 
- VulkanTexture* VulkanTexture::TextureFromFilename(const std::string& name) {
+ UniqueVulkanTexture VulkanTexture::TextureFromFile(const std::string& name) {
 	char* texData	= nullptr;
 	int width		= 0;
 	int height		= 0;
@@ -122,25 +122,10 @@ int VulkanTexture::CalculateMipCount(int width, int height) {
 
 	VulkanTexture* texture = GenerateTextureFromDataInternal(width, height, channels, false, { texData }, name);
 	delete texData;
-	return texture;
+	return UniqueVulkanTexture(texture);
 };
 
- std::shared_ptr<VulkanTexture> VulkanTexture::VulkanCubemapPtrFromFilename(
-	 const std::string& negativeXFile, const std::string& positiveXFile,
-	 const std::string& negativeYFile, const std::string& positiveYFile,
-	 const std::string& negativeZFile, const std::string& positiveZFile,
-	 const std::string& debugName) {
-
-	 return std::shared_ptr<VulkanTexture>
-	 (VulkanCubemapFromFilename(
-			 negativeXFile, positiveXFile,
-			 negativeYFile, positiveYFile,
-			 negativeZFile, positiveZFile,
-			 debugName)
-	 );
- }
-
-VulkanTexture* VulkanTexture::VulkanCubemapFromFilename(
+UniqueVulkanTexture VulkanTexture::VulkanCubemapFromFiles(
 	const std::string& negativeXFile, const std::string& positiveXFile,
 	const std::string& negativeYFile, const std::string& positiveYFile,
 	const std::string& negativeZFile, const std::string& positiveZFile,
@@ -163,11 +148,13 @@ VulkanTexture* VulkanTexture::VulkanCubemapFromFilename(
 			}
 			return nullptr;
 		}
-	}
-
-	if (width[0] == 0 || height[0] == 0) {
-		std::cout << __FUNCTION__ << " can't load cubemap " << negativeXFile << "\n";
-		return nullptr;
+		if (width[i] == 0 || height[i] == 0) {
+			std::cout << __FUNCTION__ << " can't load cubemap " << *allFiles[i] << "\n";
+			for (int i = 0; i < 6; ++i) {
+				delete texData[i];
+			}
+			return nullptr;
+		}
 	}
 
 	VulkanTexture* cubeTex = GenerateTextureFromDataInternal(width[0], height[0], channels[0], true, texData, debugName);
@@ -177,11 +164,11 @@ VulkanTexture* VulkanTexture::VulkanCubemapFromFilename(
 		delete texData[i];
 	}
 
-	return cubeTex;
+	return UniqueVulkanTexture(cubeTex);
 }
 
 void	VulkanTexture::InitTextureDeviceMemory(VulkanTexture& img) {
-	vk::MemoryRequirements memReqs = vkRenderer->GetDevice().getImageMemoryRequirements(img.image.get());
+	vk::MemoryRequirements memReqs = vkRenderer->GetDevice().getImageMemoryRequirements(*img.image);
 
 	img.allocInfo = vk::MemoryAllocateInfo(memReqs.size);
 
@@ -189,7 +176,7 @@ void	VulkanTexture::InitTextureDeviceMemory(VulkanTexture& img) {
 
 	img.deviceMem = vkRenderer->GetDevice().allocateMemory(img.allocInfo);
 
-	vkRenderer->GetDevice().bindImageMemory(img.image.get(), img.deviceMem, 0);
+	vkRenderer->GetDevice().bindImageMemory(*img.image, img.deviceMem, 0);
 }
 
 VulkanTexture* VulkanTexture::GenerateTextureInternal(int width, int height, int mipcount, bool isCubemap, const std::string& debugName, vk::Format format, vk::ImageAspectFlags aspect, vk::ImageUsageFlags usage, vk::ImageLayout outLayout, vk::PipelineStageFlags pipeType) {
@@ -230,32 +217,20 @@ VulkanTexture* VulkanTexture::GenerateTextureInternal(int width, int height, int
 	return tex;
 }
 
-VulkanTexture* VulkanTexture::GenerateDepthTexture(int width, int height, const std::string& debugName, bool hasStencil, bool useMips) {
+UniqueVulkanTexture VulkanTexture::CreateDepthTexture(int width, int height, const std::string& debugName, bool hasStencil, bool useMips) {
 	vk::Format			 format		= hasStencil ? vk::Format::eD24UnormS8Uint : vk::Format::eD32Sfloat;
 	vk::ImageAspectFlags aspect		= hasStencil ? vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil : vk::ImageAspectFlagBits::eDepth;
 	vk::ImageLayout		 layout		= hasStencil ? vk::ImageLayout::eDepthStencilAttachmentOptimal : vk::ImageLayout::eDepthAttachmentOptimal;	
 	vk::ImageUsageFlags  usage		= vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled;
-	return GenerateTextureInternal(width, height, 1, false, debugName, format, aspect, usage, layout, vk::PipelineStageFlagBits::eEarlyFragmentTests);
+	return UniqueVulkanTexture(GenerateTextureInternal(width, height, 1, false, debugName, format, aspect, usage, layout, vk::PipelineStageFlagBits::eEarlyFragmentTests));
 }
 
-VulkanTexture* VulkanTexture::GenerateColourTexture(int width, int height, const std::string& debugName, bool isFloat, bool useMips) {
+UniqueVulkanTexture VulkanTexture::CreateColourTexture(int width, int height, const std::string& debugName, bool isFloat, bool useMips) {
 	vk::Format			 format		= isFloat ? vk::Format::eR32G32B32A32Sfloat : vk::Format::eB8G8R8A8Unorm;
 	vk::ImageAspectFlags aspect		= vk::ImageAspectFlagBits::eColor;
 	vk::ImageLayout		 layout		= vk::ImageLayout::eColorAttachmentOptimal;	
 	vk::ImageUsageFlags  usage		= vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled;
-	return GenerateTextureInternal(width, height, 1, false, debugName, format, aspect, usage, layout, vk::PipelineStageFlagBits::eColorAttachmentOutput);
-}
-
-std::shared_ptr<VulkanTexture> VulkanTexture::TexturePtrFromFilename(const std::string& name) {
-	return std::shared_ptr<VulkanTexture>(TextureFromFilename(name));
-}
-
-std::shared_ptr<VulkanTexture> VulkanTexture::GenerateDepthTexturePtr(int width, int height, const std::string& debugName, bool hasStencil, bool mips) {
-	return std::shared_ptr<VulkanTexture>(GenerateDepthTexture(width, height, debugName, hasStencil, mips));
-}
-
-std::shared_ptr<VulkanTexture> VulkanTexture::GenerateColourTexturePtr(int width, int height, const std::string& debugName, bool isFloat, bool mips) {
-	return std::shared_ptr<VulkanTexture>(GenerateColourTexture(width, height, debugName, isFloat, mips));
+	return UniqueVulkanTexture(GenerateTextureInternal(width, height, 1, false, debugName, format, aspect, usage, layout, vk::PipelineStageFlagBits::eColorAttachmentOutput));
 }
 
 vk::UniqueImageView  VulkanTexture::GenerateDefaultView(vk::ImageAspectFlags type) {
@@ -263,7 +238,7 @@ vk::UniqueImageView  VulkanTexture::GenerateDefaultView(vk::ImageAspectFlags typ
 		.setViewType(layerCount == 6 ? vk::ImageViewType::eCube : vk::ImageViewType::e2D)
 		.setFormat(format)
 		.setSubresourceRange(vk::ImageSubresourceRange(type, 0, mipCount, 0, layerCount))
-		.setImage(image.get());
+		.setImage(*image);
 	return vkRenderer->GetDevice().createImageViewUnique(createInfo);
 }
 
@@ -298,14 +273,14 @@ void VulkanTexture::GenerateMipMaps(vk::CommandBuffer  buffer, vk::ImageLayout e
 			blitData.dstOffsets[1].z = 1;
 
 			vkRenderer->ImageTransitionBarrier(buffer, this, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, aspectType, vk::PipelineStageFlagBits::eHost, vk::PipelineStageFlagBits::eTransfer, mip, layer);
-			buffer.blitImage(image.get(), vk::ImageLayout::eTransferSrcOptimal, image.get(), vk::ImageLayout::eTransferDstOptimal, blitData, vk::Filter::eLinear);
-			vkRenderer->ImageTransitionBarrier(buffer, this->image.get(), vk::ImageLayout::eTransferSrcOptimal, endLayout, aspectType, vk::PipelineStageFlagBits::eTransfer, endFlags, mip - 1, layer);
+			buffer.blitImage(*image, vk::ImageLayout::eTransferSrcOptimal, *image, vk::ImageLayout::eTransferDstOptimal, blitData, vk::Filter::eLinear);
+			vkRenderer->ImageTransitionBarrier(buffer, *image, vk::ImageLayout::eTransferSrcOptimal, endLayout, aspectType, vk::PipelineStageFlagBits::eTransfer, endFlags, mip - 1, layer);
 
 			if (mip < this->mipCount - 1) {
-				vkRenderer->ImageTransitionBarrier(buffer, this->image.get(), vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eTransferSrcOptimal, aspectType, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, mip, layer);
+				vkRenderer->ImageTransitionBarrier(buffer, *image, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eTransferSrcOptimal, aspectType, vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, mip, layer);
 			}
 			else {
-				vkRenderer->ImageTransitionBarrier(buffer, this->image.get(), vk::ImageLayout::eTransferDstOptimal, endLayout, aspectType, vk::PipelineStageFlagBits::eTransfer, endFlags, mip, layer);
+				vkRenderer->ImageTransitionBarrier(buffer, *image, vk::ImageLayout::eTransferDstOptimal, endLayout, aspectType, vk::PipelineStageFlagBits::eTransfer, endFlags, mip, layer);
 			}
 		}
 	}

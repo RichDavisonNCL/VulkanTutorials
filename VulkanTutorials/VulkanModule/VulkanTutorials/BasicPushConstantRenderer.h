@@ -12,17 +12,15 @@ namespace NCL::Rendering {
 	class BasicPushConstantRenderer : public VulkanTutorialRenderer {
 	public:
 		BasicPushConstantRenderer(Window& window);
-		~BasicPushConstantRenderer();
+		~BasicPushConstantRenderer() {}
 
 		void RenderFrame()		override;
 
 	protected:
-		void	BuildPipeline();
+		UniqueVulkanMesh	triMesh;
+		UniqueVulkanShader	shader;
 
-		VulkanMesh* triMesh;
-		VulkanShader* basicShader;
-
-		VulkanPipeline	basicPipeline;
+		VulkanPipeline	pipeline;
 
 		Vector4	colourUniform;
 		Vector3 positionUniform;

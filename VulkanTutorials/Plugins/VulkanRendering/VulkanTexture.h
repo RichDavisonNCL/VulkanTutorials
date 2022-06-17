@@ -7,38 +7,29 @@ License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../../Common/TextureBase.h"
+#include "SmartTypes.h"
 
 namespace NCL::Rendering {
 	class VulkanRenderer;
+
 	class VulkanTexture : public TextureBase	{
 		friend class VulkanRenderer;
 	public:
 
-		static std::shared_ptr<VulkanTexture> VulkanCubemapPtrFromFilename(
-			const std::string& negativeXFile, const std::string& positiveXFile,
-			const std::string& negativeYFile, const std::string& positiveYFile,
-			const std::string& negativeZFile, const std::string& positiveZFile,
-			const std::string& debugName = "CubeMap");
-
-		static VulkanTexture* VulkanCubemapFromFilename(
+		static UniqueVulkanTexture VulkanCubemapFromFiles(
 			const std::string& negativeXFile, const std::string& positiveXFile, 
 			const std::string& negativeYFile, const std::string& positiveYFile,
 			const std::string& negativeZFile, const std::string& positiveZFile,
 			const std::string& debugName = "CubeMap");
 
-		static TextureBase* TextureFromFilenameLoader(const std::string& name);
+		static TextureBase* TextureFromFilenameLoader(const std::string& name);//Compatability function with old course modules
 
-		static std::shared_ptr<VulkanTexture> TexturePtrFromFilename(const std::string& name);
-		static std::shared_ptr<VulkanTexture> GenerateDepthTexturePtr(int width, int height, const std::string& debugName = "DefaultDepth", bool hasStencil = true, bool mips = false);
-		static std::shared_ptr<VulkanTexture> GenerateColourTexturePtr(int width, int height, const std::string& debugName = "DefaultColour", bool isFloat = false, bool mips = false);
-
-
-		static VulkanTexture* TextureFromFilename(const std::string& name);
-		static VulkanTexture* GenerateDepthTexture(int width, int height, const std::string& debugName = "DefaultDepth", bool hasStencil = true, bool mips = false);
-		static VulkanTexture* GenerateColourTexture(int width, int height, const std::string& debugName = "DefaultColour", bool isFloat = false, bool mips = false);
+		static UniqueVulkanTexture TextureFromFile(const std::string& name);
+		static UniqueVulkanTexture CreateDepthTexture(int width, int height, const std::string& debugName = "DefaultDepth", bool hasStencil = true, bool mips = false);
+		static UniqueVulkanTexture CreateColourTexture(int width, int height, const std::string& debugName = "DefaultColour", bool isFloat = false, bool mips = false);
 
 		vk::ImageView GetDefaultView() const {
-			return defaultView.get();
+			return *defaultView;
 		}
 
 		vk::Format GetFormat() const {
@@ -46,7 +37,7 @@ namespace NCL::Rendering {
 		}
 
 		vk::Image GetImage() const {
-			return image.get();
+			return *image;
 		}
 
 		~VulkanTexture();
@@ -61,14 +52,12 @@ namespace NCL::Rendering {
 
 		static VulkanTexture* GenerateTextureFromDataInternal(int width, int height, int channelCount, bool isCube, std::vector<char*>dataSrcs, const std::string& debugName);
 
-
 		vk::UniqueImageView  GenerateDefaultView(vk::ImageAspectFlags type);
 
 		static int CalculateMipCount(int width, int height);
 
 		vk::UniqueImageView		defaultView;
 		vk::UniqueImage			image;
-		//vk::ImageLayout			layout;
 
 		vk::DeviceMemory		deviceMem;
 

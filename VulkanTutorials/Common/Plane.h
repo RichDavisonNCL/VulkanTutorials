@@ -17,11 +17,11 @@ namespace NCL::Maths {
 		~Plane(void) {};
 
 		//Sets the planes normal, which should be UNIT LENGTH!!!
-		void	SetNormal(const Vector3 &normal) { this->normal = normal; }
+		Plane&	SetNormal(const Vector3 &normal) { this->normal = normal; return *this;}
 		//Gets the planes normal.
 		Vector3 GetNormal() const { return normal; }
 		//Sets the planes distance from the origin
-		void	SetDistance(float dist) { distance = dist; }
+		Plane&  SetDistance(float dist) { distance = dist; return *this; }
 		//Gets the planes distance from the origin
 		float	GetDistance() const { return distance; }
 		//Performs a simple sphere / plane test

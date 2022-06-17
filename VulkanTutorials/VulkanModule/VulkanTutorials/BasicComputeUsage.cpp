@@ -5,7 +5,6 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "BasicComputeUsage.h"
 
 using namespace NCL;
@@ -14,7 +13,7 @@ using namespace Rendering;
 const int PARTICLE_COUNT = 32 * 10;
 
 BasicComputeUsage::BasicComputeUsage(Window& window) : VulkanTutorialRenderer(window)	{
-	particleMesh = std::shared_ptr<VulkanMesh>(new VulkanMesh());
+	particleMesh = UniqueVulkanMesh(new VulkanMesh());
 	particleMesh->SetPrimitiveType(NCL::GeometryPrimitive::Points);
 	particleMesh->SetVertexPositions(std::vector<Vector3>(PARTICLE_COUNT));
 	particleMesh->UploadToGPU(this);
@@ -27,69 +26,54 @@ BasicComputeUsage::BasicComputeUsage(Window& window) : VulkanTutorialRenderer(wi
 	BuildRasterPipeline();
 }
 
-BasicComputeUsage::~BasicComputeUsage()	{
-	//DestroyBuffer(particlePositions);
-}
-
 void	BasicComputeUsage::BuildRasterPipeline() {
-	rasterShader = VulkanShaderBuilder()
+	rasterShader = VulkanShaderBuilder("Shader using compute data!")
 		.WithVertexBinary("BasicCompute.vert.spv")
 		.WithFragmentBinary("BasicCompute.frag.spv")
-		.WithDebugName("Shader using compute data!")
 	.BuildUnique(device);
 
-	vk::DescriptorSetLayout dataLayout = VulkanDescriptorSetLayoutBuilder()
+	vk::DescriptorSetLayout dataLayout = VulkanDescriptorSetLayoutBuilder("Compute Data")
 		.WithStorageBuffers(1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eCompute)
-		.WithDebugName("Compute Data")
 	.Build(device); //Get our camera matrices...
 
-	basicPipeline = VulkanPipelineBuilder()
-		.WithVertexSpecification(particleMesh->GetVertexSpecification())
+	basicPipeline = VulkanPipelineBuilder("Raster Pipeline")
+		.WithVertexInputState(particleMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::ePointList)
 		.WithDescriptorSetLayout(dataLayout)
-		.WithShaderState(rasterShader.get())
-		.WithPass(defaultRenderPass)
-		.WithDebugName("Raster Pipeline")
+		.WithShader(rasterShader)
 	.Build(device, pipelineCache);
 
 	device.destroyDescriptorSetLayout(dataLayout);
 }
 
 void	BasicComputeUsage::BuildComputePipeline() {
-	computeShader = std::shared_ptr<VulkanCompute>(new VulkanCompute(device, "BasicCompute.comp.spv"));
+	computeShader = UniqueVulkanCompute(new VulkanCompute(device, "BasicCompute.comp.spv"));
 
-	vk::DescriptorSetLayout dataLayout = VulkanDescriptorSetLayoutBuilder()
+	vk::DescriptorSetLayout dataLayout = VulkanDescriptorSetLayoutBuilder("Compute Data")
 		.WithStorageBuffers(1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eCompute)
-		.WithDebugName("Compute Data")
 	.Build(device); //Get our camera matrices...
 
-	computePipeline = VulkanComputePipelineBuilder()
-		.WithComputeState(computeShader.get())
+	computePipeline = VulkanComputePipelineBuilder("Compute Pipeline")
+		.WithComputeState(&*computeShader)
 		.WithDescriptorSetLayout(dataLayout)
 		.WithPushConstant(vk::ShaderStageFlagBits::eCompute, 0, sizeof(float))
-		.WithDebugName("Compute Pipeline")
 	.Build(device, pipelineCache);
 
 	bufferDescriptor = BuildDescriptorSet(dataLayout);
 
-	vk::WriteDescriptorSet descriptorWrites = vk::WriteDescriptorSet()
-		.setDescriptorType(vk::DescriptorType::eStorageBuffer)
-		.setDstSet(bufferDescriptor)
-		.setDstBinding(0)
-		.setDescriptorCount(1)
-		.setPBufferInfo(&particlePositions.descriptorInfo);
+	UpdateBufferDescriptor(bufferDescriptor, particlePositions, 0, vk::DescriptorType::eStorageBuffer);
 
-	device.updateDescriptorSets(1, &descriptorWrites, 0, nullptr);
 	device.destroyDescriptorSetLayout(dataLayout);
 }
 
 void BasicComputeUsage::RenderFrame() {
+	TransitionSwapchainForRendering(defaultCmdBuffer);
 	//Compute goes outside of a render pass...
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, computePipeline.pipeline.get());
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, computePipeline.layout.get(), 0, 1, &bufferDescriptor, 0, nullptr);
-	defaultCmdBuffer.pushConstants(computePipeline.layout.get(), vk::ShaderStageFlagBits::eCompute, 0, sizeof(float), (void*)&runTime);
+	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, *computePipeline.pipeline);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *computePipeline.layout, 0, 1, &bufferDescriptor, 0, nullptr);
+	defaultCmdBuffer.pushConstants(*computePipeline.layout, vk::ShaderStageFlagBits::eCompute, 0, sizeof(float), (void*)&runTime);
 
-	DispatchCompute(defaultCmdBuffer, PARTICLE_COUNT / 32, 1, 1); //Bit a pointless function?
+	DispatchCompute(defaultCmdBuffer, PARTICLE_COUNT / 32, 1, 1);
 
 	defaultCmdBuffer.pipelineBarrier(
 		vk::PipelineStageFlagBits::eComputeShader, 
@@ -97,9 +81,14 @@ void BasicComputeUsage::RenderFrame() {
 		vk::DependencyFlags(), 0, nullptr, 0, nullptr, 0, nullptr
 	);
 
-	BeginDefaultRenderPass(defaultCmdBuffer);
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline.pipeline.get());
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, basicPipeline.layout.get(), 0, 1, &bufferDescriptor, 0, nullptr);
-	SubmitDrawCall(particleMesh.get(), defaultCmdBuffer);
-	defaultCmdBuffer.endRenderPass();
+	VulkanDynamicRenderBuilder()
+		.WithColourAttachment(swapChainList[currentSwap]->view)
+		.WithRenderArea(defaultScreenRect)
+		.Begin(defaultCmdBuffer);
+
+	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *basicPipeline.pipeline);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *basicPipeline.layout, 0, 1, &bufferDescriptor, 0, nullptr);
+	SubmitDrawCall(*particleMesh, defaultCmdBuffer);
+
+	EndRendering(defaultCmdBuffer);
 }

@@ -5,44 +5,35 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "BasicGeometryRenderer.h"
 
 using namespace NCL;
 using namespace Rendering;
 
-BasicGeometryRenderer::BasicGeometryRenderer(Window& window) : VulkanRenderer(window)	{
-	triMesh = std::shared_ptr<VulkanMesh>((VulkanMesh*)MeshGeometry::GenerateTriangle(new VulkanMesh()));
-	triMesh->UploadToGPU(this);
+BasicGeometryRenderer::BasicGeometryRenderer(Window& window) : VulkanTutorialRenderer(window)	{
+	triMesh = GenerateTriangle();
 
-	shader = VulkanShaderBuilder()
+	shader = VulkanShaderBuilder("Basic Shader!")
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-		.WithDebugName("Basic Shader!")
 	.BuildUnique(device);
 
-	BuildPipeline();
-}
-
-BasicGeometryRenderer::~BasicGeometryRenderer()	{
-}
-
-void	BasicGeometryRenderer::BuildPipeline() {
-	basicPipeline = VulkanPipelineBuilder()
-		.WithVertexSpecification(triMesh->GetVertexSpecification())
+	basicPipeline = VulkanPipelineBuilder("Basic Pipeline")
+		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShaderState(shader.get())
-		//.WithPass(defaultRenderPass)
-		.WithDepthState(vk::CompareOp::eAlways, false, false, false)
-		.WithRaster(vk::CullModeFlagBits::eNone)
+		.WithShader(shader)
 	.Build(device, pipelineCache);
 }
 
 void BasicGeometryRenderer::RenderFrame() {
 	TransitionSwapchainForRendering(defaultCmdBuffer);
-	BeginDefaultRendering(defaultCmdBuffer);
 
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline.pipeline.get());
-	SubmitDrawCall(triMesh.get(), defaultCmdBuffer);
+	VulkanDynamicRenderBuilder()
+		.WithColourAttachment(swapChainList[currentSwap]->view)
+		.WithRenderArea(defaultScreenRect)
+	.Begin(defaultCmdBuffer);
+
+	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *basicPipeline.pipeline);
+	SubmitDrawCall(*triMesh, defaultCmdBuffer);
 	EndRendering(defaultCmdBuffer);
 }

@@ -5,21 +5,18 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "PrerecordedCmdListRenderer.h"
 
 using namespace NCL;
 using namespace Rendering;
 
-PrerecordedCmdListRenderer::PrerecordedCmdListRenderer(Window& window) : VulkanRenderer(window)	{
-	triMesh = (VulkanMesh*)MeshGeometry::GenerateTriangle(new VulkanMesh());
-	triMesh->UploadToGPU(this);
+PrerecordedCmdListRenderer::PrerecordedCmdListRenderer(Window& window) : VulkanTutorialRenderer(window)	{
+	triMesh = GenerateTriangle();
 
-	shader = VulkanShaderBuilder()
+	shader = VulkanShaderBuilder("Basic Shader!")
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-		.WithDebugName("Basic Shader!")
-	.Build(device);
+	.BuildUnique(device);
 	 
 	BuildPipeline();
 
@@ -32,31 +29,34 @@ PrerecordedCmdListRenderer::PrerecordedCmdListRenderer(Window& window) : VulkanR
 	inheritance.setRenderPass(defaultRenderPass);
 	vk::CommandBufferBeginInfo bufferBegin = vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eRenderPassContinue, &inheritance);
 	recordedBuffer.begin(bufferBegin);
-	recordedBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline.get());
+	recordedBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
 	recordedBuffer.setViewport(0, 1, &defaultViewport);
 	recordedBuffer.setScissor(0, 1, &defaultScissor);
-	SubmitDrawCall(triMesh, recordedBuffer);
+	SubmitDrawCall(*triMesh, recordedBuffer);
 	recordedBuffer.end();
 }
 
 PrerecordedCmdListRenderer::~PrerecordedCmdListRenderer()	{
-	delete triMesh;
-	delete shader;
+
 }
 
 void PrerecordedCmdListRenderer::BuildPipeline() {
 	pipeline = VulkanPipelineBuilder()
-		.WithVertexSpecification(triMesh->GetVertexSpecification())
+		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShaderState(shader)
-		.WithPass(defaultRenderPass)
-		.WithDepthState(vk::CompareOp::eAlways, false, false, false)
-		.WithRaster(vk::CullModeFlagBits::eNone)
+		.WithShader(shader)
 	.Build(device, pipelineCache);
 }
 
 void PrerecordedCmdListRenderer::RenderFrame() {
-	defaultCmdBuffer.beginRenderPass(defaultBeginInfo, vk::SubpassContents::eSecondaryCommandBuffers);
+	TransitionSwapchainForRendering(defaultCmdBuffer);
+	VulkanDynamicRenderBuilder()
+		.WithColourAttachment(swapChainList[currentSwap]->view)
+		.WithRenderArea(defaultScreenRect)
+		.WithSecondaryBuffers()
+		.Begin(defaultCmdBuffer);
+
 	defaultCmdBuffer.executeCommands(1, &recordedBuffer);
-	defaultCmdBuffer.endRenderPass();
+
+	EndRendering(defaultCmdBuffer);
 }

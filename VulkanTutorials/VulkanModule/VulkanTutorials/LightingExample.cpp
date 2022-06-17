@@ -5,7 +5,6 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "LightingExample.h"
 
 using namespace NCL;
@@ -15,12 +14,12 @@ LightingExample::LightingExample(Window& window) : VulkanTutorialRenderer(window
 	cameraUniform.camera.SetPitch(-20.0f);
 	cameraUniform.camera.SetPosition(Vector3(0, 75.0f, 200));
 
-	cubeMesh = MakeSmartMesh(LoadMesh("Cube.msh"));
+	cubeMesh = LoadMesh("Cube.msh");
 
-	boxObject.mesh		= cubeMesh.get();
+	boxObject.mesh		= &*cubeMesh;
 	boxObject.transform = Matrix4::Translation(Vector3(-50, 10, -50)) * Matrix4::Scale(Vector3(10.0f, 10.0f, 10.0f));
 
-	floorObject.mesh		= cubeMesh.get();
+	floorObject.mesh		= &*cubeMesh;
 	floorObject.transform	= Matrix4::Scale(Vector3(100.0f, 1.0f, 100.0f));
 
 	lightingShader = VulkanShaderBuilder()
@@ -36,14 +35,11 @@ LightingExample::LightingExample(Window& window) : VulkanTutorialRenderer(window
 
 	UploadBufferData(lightUniform, &testLight, sizeof(testLight));
 
-	allTextures[0] = VulkanTexture::TexturePtrFromFilename("rust_diffuse.png");
-	allTextures[1] = VulkanTexture::TexturePtrFromFilename("rust_bump.png");
-	allTextures[2] = VulkanTexture::TexturePtrFromFilename("concrete_diffuse.png");
-	allTextures[3] = VulkanTexture::TexturePtrFromFilename("concrete_bump.png");
+	allTextures[0] = VulkanTexture::TextureFromFile("rust_diffuse.png");
+	allTextures[1] = VulkanTexture::TextureFromFile("rust_bump.png");
+	allTextures[2] = VulkanTexture::TextureFromFile("concrete_diffuse.png");
+	allTextures[3] = VulkanTexture::TextureFromFile("concrete_bump.png");
 	BuildPipeline();
-}
-
-LightingExample::~LightingExample() {
 }
 
 void LightingExample::Update(float dt) {
@@ -54,39 +50,30 @@ void LightingExample::Update(float dt) {
 }
 
 void	LightingExample::BuildPipeline() {
-	vk::PushConstantRange modelMatrixConstant = vk::PushConstantRange()
-		.setStageFlags(vk::ShaderStageFlagBits::eVertex)
-		.setOffset(0) //we can only have one push constant per stage...
-		.setSize(sizeof(Matrix4)); //We need a model matrix as usual, but also the light matrix!
-
-	texturesLayout = VulkanDescriptorSetLayoutBuilder()
+	texturesLayout = VulkanDescriptorSetLayoutBuilder("Object Textures")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-		.WithDebugName("Object Textures")
 	.BuildUnique(device);
 
-	lightLayout = VulkanDescriptorSetLayoutBuilder()
+	lightLayout = VulkanDescriptorSetLayoutBuilder("Active Light")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-		.WithDebugName("Active Light")
 	.BuildUnique(device); //Get our camera matrices...
 
-	cameraPosLayout = VulkanDescriptorSetLayoutBuilder()
+	cameraPosLayout = VulkanDescriptorSetLayoutBuilder("Camera Position")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-		.WithDebugName("Camera Position")
 	.BuildUnique(device); //Get our camera matrices...
 
-	pipeline = VulkanPipelineBuilder()
-		.WithVertexSpecification(cubeMesh->GetVertexSpecification())
+	pipeline = VulkanPipelineBuilder("Lighting Pipeline")
+		.WithVertexInputState(cubeMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShaderState(lightingShader.get())
-		.WithPass(defaultRenderPass)		
+		.WithShader(lightingShader)	
 		.WithDepthState(vk::CompareOp::eLessOrEqual, true, true)
-		.WithPushConstant(modelMatrixConstant)
-		.WithDescriptorSetLayout(cameraLayout.get())		//Camera is set 0
-		.WithDescriptorSetLayout(lightLayout.get())		//Light is set 1
-		.WithDescriptorSetLayout(texturesLayout.get())	//Textures are set 2
-		.WithDescriptorSetLayout(cameraPosLayout.get())	//Cam Pos is set 3
-		.WithDebugName("Lighting Pipeline")
+		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4))
+		.WithDepthFormat(depthBuffer->GetFormat())
+		.WithDescriptorSetLayout(*cameraLayout)		//Camera is set 0
+		.WithDescriptorSetLayout(*lightLayout)		//Light is set 1
+		.WithDescriptorSetLayout(*texturesLayout)	//Textures are set 2
+		.WithDescriptorSetLayout(*cameraPosLayout)	//Cam Pos is set 3
 	.Build(device, pipelineCache);
 
 	lightDescriptor			= BuildUniqueDescriptorSet(*lightLayout);
@@ -99,27 +86,28 @@ void	LightingExample::BuildPipeline() {
 
 	UpdateImageDescriptor(*floorObject.objectDescriptorSet, 0, allTextures[2]->GetDefaultView(), *defaultSampler);
 	UpdateImageDescriptor(*floorObject.objectDescriptorSet, 1, allTextures[3]->GetDefaultView(), *defaultSampler);
+
+	UpdateBufferDescriptor(*cameraDescriptor	, cameraUniform.cameraData, 0, vk::DescriptorType::eUniformBuffer);
+	UpdateBufferDescriptor(*lightDescriptor		, lightUniform, 0, vk::DescriptorType::eUniformBuffer);
+	UpdateBufferDescriptor(*cameraPosDescriptor	, camPosUniform, 0, vk::DescriptorType::eUniformBuffer);
 }
 
 void LightingExample::RenderFrame() {
 	TransitionSwapchainForRendering(defaultCmdBuffer);
-	BeginDefaultRendering(defaultCmdBuffer);
 
-	//defaultCmdBuffer.beginRenderPass(defaultBeginInfo, vk::SubpassContents::eInline);
+	VulkanDynamicRenderBuilder()
+		.WithColourAttachment(swapChainList[currentSwap]->view)
+		.WithDepthAttachment(depthBuffer->GetDefaultView())
+		.WithRenderArea(defaultScreenRect)
+	.Begin(defaultCmdBuffer);
 
-	UpdateUniformBufferDescriptor(cameraDescriptor.get()	, cameraUniform.cameraData, 0);
-	UpdateUniformBufferDescriptor(lightDescriptor.get()	, lightUniform, 0);
-	UpdateUniformBufferDescriptor(cameraPosDescriptor.get(), camPosUniform, 0);
-
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline.get());
-
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.layout.get(), 0, 1, &cameraDescriptor.get(), 0, nullptr);
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.layout.get(), 1, 1, &lightDescriptor.get(), 0, nullptr);
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.layout.get(), 3, 1, &cameraPosDescriptor.get(), 0, nullptr);
+	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 1, 1, &*lightDescriptor, 0, nullptr);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 3, 1, &*cameraPosDescriptor, 0, nullptr);
 
 	RenderSingleObject(boxObject	, defaultCmdBuffer, pipeline, 2);
 	RenderSingleObject(floorObject	, defaultCmdBuffer, pipeline, 2);
 
-//	defaultCmdBuffer.endRenderPass();
 	EndRendering(defaultCmdBuffer);
 }

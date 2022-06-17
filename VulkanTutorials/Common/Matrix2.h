@@ -21,16 +21,18 @@ namespace NCL::Maths {
 
 		void ToZero();
 
-		void SetRow(unsigned int row, const Vector2 &val) {
+		Matrix2& SetRow(unsigned int row, const Vector2 &val) {
 			assert(row < 2);
 			array[0][row] = val.x;
 			array[1][row] = val.y;
+			return *this;
 		}
 
-		void SetColumn(unsigned int column, const Vector2 &val) {
+		Matrix2& SetColumn(unsigned int column, const Vector2 &val) {
 			assert(column < 2);
 			array[column][0] = val.x;
 			array[column][1] = val.y;
+			return *this;
 		}
 
 		Vector2 GetRow(unsigned int row) const {
@@ -65,8 +67,6 @@ namespace NCL::Maths {
 
 		//Handy string output for the matrix. Can get a bit messy, but better than nothing!
 		inline friend std::ostream& operator<<(std::ostream& o, const Matrix2& m);
-
-
 	};
 
 	//Handy string output for the matrix. Can get a bit messy, but better than nothing!

@@ -12,7 +12,7 @@ namespace NCL::Rendering {
 		vk::UniqueBuffer			buffer;
 		vk::MemoryAllocateInfo		allocInfo;
 		vk::UniqueDeviceMemory		deviceMem;
-		vk::DescriptorBufferInfo	descriptorInfo;
+		size_t						requestedSize;
 	};
 
 	struct VulkanAccelerationStructure : public VulkanBuffer {

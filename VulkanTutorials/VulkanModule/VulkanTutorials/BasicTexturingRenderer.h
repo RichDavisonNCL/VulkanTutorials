@@ -12,7 +12,6 @@ namespace NCL::Rendering {
 	class BasicTexturingRenderer : public VulkanTutorialRenderer	{
 	public:
 		BasicTexturingRenderer(Window& window);
-		~BasicTexturingRenderer();
 
 		void RenderFrame() override;
 
@@ -21,9 +20,9 @@ namespace NCL::Rendering {
 
 		VulkanPipeline	texturePipeline;
 
-		std::shared_ptr<VulkanShader>	defaultShader;
-		std::shared_ptr<VulkanMesh>		defaultMesh;
-		std::shared_ptr<VulkanTexture>	textures[2];
+		UniqueVulkanShader	defaultShader;
+		UniqueVulkanMesh 		defaultMesh;
+		UniqueVulkanTexture	textures[2];
 
 		vk::UniqueDescriptorSet			descriptorSets[2];
 		vk::UniqueDescriptorSetLayout	descriptorLayout;

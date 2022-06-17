@@ -5,53 +5,46 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "BasicPushConstantRenderer.h"
 
 using namespace NCL;
 using namespace Rendering;
 
 BasicPushConstantRenderer::BasicPushConstantRenderer(Window& window) : VulkanTutorialRenderer(window)	{
-	positionUniform = Vector3(0.0, 0.0, 0.0f);
-	colourUniform	= Vector4(1, 1, 0, 1);
+	positionUniform = Vector3(0.0f, 0.0f, 0.0f);
+	colourUniform	= Vector4(1.0f, 1.0f, 0.0f, 1.0f);
 
-	triMesh = (VulkanMesh*)MeshGeometry::GenerateTriangle(new VulkanMesh());
-	triMesh->UploadToGPU(this);
+	triMesh = GenerateTriangle();
 
-	basicShader = VulkanShaderBuilder()
+	shader = VulkanShaderBuilder("Testing push constants!")
 		.WithVertexBinary("BasicPushConstant.vert.spv")
 		.WithFragmentBinary("BasicPushConstant.frag.spv")
-		.WithDebugName("Testing push constants!")
-	.Build(device);
+	.BuildUnique(device);
 
-	BuildPipeline();
-}
-
-BasicPushConstantRenderer::~BasicPushConstantRenderer()	{
-	delete basicShader;
-	delete triMesh;
-}
-
-void	BasicPushConstantRenderer::BuildPipeline() {
-	basicPipeline = VulkanPipelineBuilder()
-		.WithVertexSpecification(triMesh->GetVertexSpecification())
+	pipeline = VulkanPipelineBuilder("Basic Push Constant Pipeline")
+		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShaderState(basicShader)
-		.WithPass(defaultRenderPass)
+		.WithShader(shader)
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(positionUniform))
 		.WithPushConstant(vk::ShaderStageFlagBits::eFragment, sizeof(Vector4), sizeof(colourUniform))
-		.WithDebugName("BasicPushConstantRenderer Pipeline")
 	.Build(device, pipelineCache);
 }
 
 void BasicPushConstantRenderer::RenderFrame() {
+	TransitionSwapchainForRendering(defaultCmdBuffer);
+
+	VulkanDynamicRenderBuilder()
+		.WithColourAttachment(swapChainList[currentSwap]->view)
+		.WithRenderArea(defaultScreenRect)
+	.Begin(defaultCmdBuffer);
+
 	positionUniform.x = sin(runTime);
-	BeginDefaultRenderPass(defaultCmdBuffer);
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline.pipeline.get());
+	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
 
-	defaultCmdBuffer.pushConstants(basicPipeline.layout.get(), vk::ShaderStageFlagBits::eVertex, 0, sizeof(positionUniform), (void*)&positionUniform);
-	defaultCmdBuffer.pushConstants(basicPipeline.layout.get(), vk::ShaderStageFlagBits::eFragment, sizeof(Vector4), sizeof(colourUniform), (void*)&colourUniform);
+	defaultCmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(positionUniform), (void*)&positionUniform);
+	defaultCmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eFragment, sizeof(Vector4), sizeof(colourUniform), (void*)&colourUniform);
 
-	SubmitDrawCall(triMesh, defaultCmdBuffer);
-	defaultCmdBuffer.endRenderPass();
+	SubmitDrawCall(*triMesh, defaultCmdBuffer);
+
+	EndRendering(defaultCmdBuffer);
 }

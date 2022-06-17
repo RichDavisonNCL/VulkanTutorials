@@ -10,11 +10,11 @@ https://research.ncl.ac.uk/game/
 #include <map>
 #include <functional>
 #include <string>
-using std::map;
-
-#include "TextureBase.h"
 
 namespace NCL {
+	namespace Rendering {
+		class TextureBase;
+	}
 
 	typedef std::function<bool(const std::string& filename, char*& outData, int& width, int &height, int &channels, int&flags)> TextureLoadFunction;
 

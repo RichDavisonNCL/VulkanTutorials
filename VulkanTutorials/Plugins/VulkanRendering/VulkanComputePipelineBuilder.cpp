@@ -62,12 +62,12 @@ VulkanPipeline	VulkanComputePipelineBuilder::Build(vk::Device device, vk::Pipeli
 
 	output.layout = device.createPipelineLayoutUnique(pipeLayoutCreate);
 
-	pipelineCreate.setLayout(output.layout.get());
+	pipelineCreate.setLayout(*output.layout);
 
 	output.pipeline = device.createComputePipelineUnique(cache, pipelineCreate).value;
 
 	if (!debugName.empty()) {
-		Vulkan::SetDebugName(device, vk::ObjectType::ePipeline, (uint64_t)(VkPipeline)output.pipeline.get(), debugName);
+		Vulkan::SetDebugName(device, vk::ObjectType::ePipeline, (uint64_t)(VkPipeline)*output.pipeline, debugName);
 	}
 
 	return output;

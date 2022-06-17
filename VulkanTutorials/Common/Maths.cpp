@@ -26,15 +26,21 @@ namespace NCL {
 			return (area >> 1);
 		}
 
-		float FloatAreaOfTri(const Vector3 &a, const Vector3 &b, const Vector3 & c) {
+		float Areaof2DTri(const Vector3 &a, const Vector3 &b, const Vector3 & c) {
 			float area = ((a.x * b.y) + (b.x * c.y) + (c.x * a.y)) -
 				((b.x * a.y) + (c.x * b.y) + (a.x * c.y));
 			return (area * 0.5f);
 		}
 
-		float CrossAreaOfTri(const Vector3 &a, const Vector3 &b, const Vector3 & c) {
+		float AreaofTri3D(const Vector3 &a, const Vector3 &b, const Vector3 & c) {
 			Vector3 area = Vector3::Cross(a - b, a - c);
 			return area.Length() * 0.5f;
+		}
+
+		float RandomValue(float min, float max) {
+			float floatValue = rand() / (float)RAND_MAX;
+			float range = max - min;
+			return min + (range * floatValue);
 		}
 	}
 }

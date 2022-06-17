@@ -6,6 +6,7 @@
 #include <string>
 
 using namespace NCL;
+using namespace NCL::Maths;
 
 MeshAnimation::MeshAnimation() {
 	jointCount	= 0;

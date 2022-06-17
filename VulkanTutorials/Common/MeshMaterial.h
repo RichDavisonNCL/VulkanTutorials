@@ -1,3 +1,11 @@
+/*
+Part of Newcastle University's Game Engineering source code.
+
+Use as you see fit!
+
+Comments and queries to: richard-gordon.davison AT ncl.ac.uk
+https://research.ncl.ac.uk/game/
+*/
 #pragma once
 #include <string>
 #include <vector>
@@ -8,7 +16,6 @@ using std::vector;
 using std::map;
 
 namespace NCL {
-
 	namespace Rendering {
 		class TextureBase;
 	}
@@ -36,8 +43,7 @@ namespace NCL {
 		std::map<string, std::pair<string, Rendering::TextureBase*>> entries;
 	};
 
-	class MeshMaterial
-	{
+	class MeshMaterial	{
 		MeshMaterial(const std::string& filename);
 		~MeshMaterial() {}
 		const MeshMaterialEntry* GetMaterialForLayer(int i) const;

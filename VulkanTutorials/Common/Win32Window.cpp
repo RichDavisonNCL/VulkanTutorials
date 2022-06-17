@@ -1,9 +1,13 @@
 #include "Win32Window.h"
 #ifdef _WIN32
 #include "Windowsx.h"
-
+#include <fcntl.h>
+#include <stdio.h>
+#include <io.h>
 using namespace NCL;
 using namespace Win32Code;
+
+#define WINDOWCLASS "WindowClass"
 
 Win32Window::Win32Window(const std::string& title, int sizeX, int sizeY, bool fullScreen, int offsetX, int offsetY)	{
 	forceQuit		= false;

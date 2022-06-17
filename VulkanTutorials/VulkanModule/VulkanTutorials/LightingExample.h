@@ -12,7 +12,7 @@ namespace NCL::Rendering {
 	class LightingExample : public VulkanTutorialRenderer {
 	public:
 		LightingExample(Window& window);
-		~LightingExample();
+		~LightingExample() {}
 
 		void RenderFrame()		override;
 		void Update(float dt)	override;
@@ -22,8 +22,8 @@ namespace NCL::Rendering {
 
 		VulkanPipeline pipeline;
 
-		std::shared_ptr<VulkanShader>	lightingShader;
-		std::shared_ptr<VulkanMesh>		cubeMesh;
+		UniqueVulkanShader	lightingShader;
+		UniqueVulkanMesh	cubeMesh;
 
 		vk::UniqueDescriptorSet			lightDescriptor;
 		vk::UniqueDescriptorSetLayout	lightLayout;
@@ -39,6 +39,6 @@ namespace NCL::Rendering {
 		RenderObject boxObject;
 		RenderObject floorObject;
 
-		std::shared_ptr<VulkanTexture> allTextures[4];
+		UniqueVulkanTexture allTextures[4];
 	};
 }

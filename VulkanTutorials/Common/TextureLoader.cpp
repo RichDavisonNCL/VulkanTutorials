@@ -8,16 +8,12 @@ https://research.ncl.ac.uk/game/
 */
 #include "TextureLoader.h"
 #include <iostream>
+#include <filesystem>
 #define STB_IMAGE_IMPLEMENTATION
 
 #include "./stb/stb_image.h"
 
 #include "Assets.h"
-
-#ifdef WIN32
-#include <filesystem>
-using namespace std::experimental::filesystem::v1;
-#endif
 
 using namespace NCL;
 using namespace Rendering;
@@ -29,13 +25,16 @@ bool TextureLoader::LoadTexture(const std::string& filename, char*& outData, int
 	if (filename.empty()) {
 		return false;
 	}
-	std::string extension = GetFileExtension(filename);
 
-	bool isRelative = filename.find("..") != std::string::npos;
+	std::filesystem::path path(filename);
+	
+	std::string extension = path.extension().string();
+
+	bool isAbsolute = path.is_absolute();
 
 	auto it = fileHandlers.find(extension);
 
-	std::string realPath = isRelative ? filename : Assets::TEXTUREDIR + filename;
+	std::string realPath = isAbsolute ? filename : Assets::TEXTUREDIR + filename;
 
 	if (it != fileHandlers.end()) {
 		//There's a custom handler function for this, just use that

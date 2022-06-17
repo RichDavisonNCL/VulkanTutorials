@@ -14,7 +14,7 @@ namespace NCL::Rendering {
 	class BasicDescriptorRenderer : public VulkanTutorialRenderer	{
 	public:
 		BasicDescriptorRenderer(Window& window);
-		~BasicDescriptorRenderer();
+		~BasicDescriptorRenderer() {}
 
 		void RenderFrame() override;
 
@@ -23,8 +23,8 @@ namespace NCL::Rendering {
 
 		VulkanPipeline	pipeline;
 
-		std::shared_ptr<VulkanMesh>		triMesh;
-		std::shared_ptr<VulkanShader>	shader;
+		UniqueVulkanMesh 		triMesh;
+		UniqueVulkanShader	shader;
 
 		VulkanBuffer	uniformData[2];
 

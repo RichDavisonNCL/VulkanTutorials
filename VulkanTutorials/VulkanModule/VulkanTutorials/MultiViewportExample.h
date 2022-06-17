@@ -13,14 +13,14 @@ namespace NCL::Rendering {
     {
     public:
         MultiViewportExample(Window& window);
-        ~MultiViewportExample();
+        ~MultiViewportExample() {}
 
     protected:
         virtual void RenderFrame();
 
-        std::shared_ptr<VulkanMesh>     triMesh;
-        std::shared_ptr<VulkanShader>   shader;
-        VulkanPipeline	basicPipeline;
+        UniqueVulkanMesh    triMesh;
+        UniqueVulkanShader  shader;
+        VulkanPipeline	    pipeline;
     };
 }
 

@@ -54,20 +54,16 @@ namespace NCL::Rendering {
 
 	class VulkanTutorialRenderer : public VulkanRenderer	{
 	public:
-		VulkanTutorialRenderer(Window& window);
+		VulkanTutorialRenderer(Window& window, VulkanInitInfo info = VulkanInitInfo());
 		~VulkanTutorialRenderer();
 
 		virtual void Update(float dt) {
 			runTime += dt;
 			UpdateCamera(dt);
 			UploadCameraUniform();
-
 		}
 
 	protected:
-		std::shared_ptr<VulkanMesh> MakeSmartMesh(VulkanMesh* vk);
-		std::shared_ptr<VulkanMesh> MakeSmartMesh(MeshGeometry* vk);
-
 		void BuildCamera();
 		void UpdateCamera(float dt);
 		void UploadCameraUniform();
@@ -86,9 +82,11 @@ namespace NCL::Rendering {
 		void TransitionSamplerToColour(VulkanTexture* t, vk::CommandBuffer  buffer);
 		void TransitionSamplerToDepth(VulkanTexture* t, vk::CommandBuffer  buffer, bool doStencil = false);
 
-		VulkanMesh* LoadMesh(const string& filename);
-		VulkanMesh* GenerateQuad();
-		VulkanMesh* GenerateGrid();
+		UniqueVulkanMesh LoadMesh(const string& filename);
+
+		UniqueVulkanMesh GenerateTriangle();
+		UniqueVulkanMesh GenerateQuad();
+		UniqueVulkanMesh GenerateGrid();
 
 		CameraUniform cameraUniform;
 		vk::UniqueDescriptorSet			cameraDescriptor;

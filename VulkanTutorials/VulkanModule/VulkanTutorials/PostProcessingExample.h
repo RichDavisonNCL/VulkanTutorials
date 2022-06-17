@@ -12,22 +12,20 @@ namespace NCL::Rendering {
 	class PostProcessingExample : public VulkanTutorialRenderer {
 	public:
 		PostProcessingExample(Window& window);
-		~PostProcessingExample();
+		~PostProcessingExample() {}
 
 		void RenderFrame()		override;	
 	protected:
 		void	BuildMainPipeline();
 		void	BuildProcessPipeline();
 
-		void	LoadShaders();
+		UniqueVulkanMesh gridMesh;
+		UniqueVulkanMesh quadMesh;
 
-		std::shared_ptr<VulkanMesh> gridMesh;
-		std::shared_ptr<VulkanMesh> quadMesh;
+		UniqueVulkanTexture postTexture;
 
-		VulkanFrameBuffer sceneBuffer;
-
-		std::shared_ptr<VulkanShader> gridShader;
-		std::shared_ptr<VulkanShader> invertShader;
+		UniqueVulkanShader gridShader;
+		UniqueVulkanShader invertShader;
 
 		vk::UniqueSampler	sceneSampler;
 		vk::UniqueSampler	processSampler;

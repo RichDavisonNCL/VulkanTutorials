@@ -1,59 +1,53 @@
-/******************************************************************************
-Class:RendererBase
-Implements:
-Author:Rich Davison
-Description:TODO
+/*
+Part of Newcastle University's Game Engineering source code.
 
--_-_-_-_-_-_-_,------,
-_-_-_-_-_-_-_-|   /\_/\   NYANYANYAN
--_-_-_-_-_-_-~|__( ^ .^) /
-_-_-_-_-_-_-_-""  ""
+Use as you see fit!
 
-*//////////////////////////////////////////////////////////////////////////////
+Comments and queries to: richard-gordon.davison AT ncl.ac.uk
+https://research.ncl.ac.uk/game/
+*/
 #pragma once
 #include "Window.h"
 
-namespace NCL {
-	namespace Rendering {
-		enum class VerticalSyncState {
-			VSync_ON,
-			VSync_OFF,
-			VSync_ADAPTIVE
-		};
-		class RendererBase {
-		public:
-			friend class NCL::Window;
+namespace NCL::Rendering {
+	enum class VerticalSyncState {
+		VSync_ON,
+		VSync_OFF,
+		VSync_ADAPTIVE
+	};
+	class RendererBase {
+	public:
+		friend class NCL::Window;
 
-			RendererBase(Window& w);
-			virtual ~RendererBase();
+		RendererBase(Window& w);
+		virtual ~RendererBase();
 
-			virtual bool HasInitialised() const {return true;}
+		virtual bool HasInitialised() const {return true;}
 
-			virtual void Update(float dt) {}
+		virtual void Update(float dt) {}
 
-			void Render() {
-				BeginFrame();
-				RenderFrame();
-				EndFrame();
-				SwapBuffers();
-			}
+		void Render() {
+			BeginFrame();
+			RenderFrame();
+			EndFrame();
+			SwapBuffers();
+		}
 
-			virtual bool SetVerticalSync(VerticalSyncState s) {
-				return false;
-			}
+		virtual bool SetVerticalSync(VerticalSyncState s) {
+			return false;
+		}
 
-		protected:
-			virtual void OnWindowResize(int w, int h) = 0;
-			virtual void OnWindowDetach() {}; //Most renderers won't care about this
+	protected:
+		virtual void OnWindowResize(int w, int h) = 0;
+		virtual void OnWindowDetach() {}; //Most renderers won't care about this
 			
-			virtual void BeginFrame()	= 0;
-			virtual void RenderFrame()	= 0;
-			virtual void EndFrame()		= 0;
-			virtual void SwapBuffers()	= 0;
-			Window& hostWindow;
+		virtual void BeginFrame()	= 0;
+		virtual void RenderFrame()	= 0;
+		virtual void EndFrame()		= 0;
+		virtual void SwapBuffers()	= 0;
+		Window& hostWindow;
 
-			int windowWidth;
-			int windowHeight;
-		};
-	}
+		int windowWidth;
+		int windowHeight;
+	};
 }

@@ -5,67 +5,62 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "BasicDescriptorRenderer.h"
 
 using namespace NCL;
 using namespace Rendering;
 
 BasicDescriptorRenderer::BasicDescriptorRenderer(Window& window) : VulkanTutorialRenderer(window)	{	
-	triMesh = std::shared_ptr<VulkanMesh>((VulkanMesh*)MeshGeometry::GenerateTriangle(new VulkanMesh()));
-	triMesh->UploadToGPU(this);
+	triMesh = GenerateTriangle();
 
-	shader = VulkanShaderBuilder()
+	shader = VulkanShaderBuilder("Basic Descriptor Shader!")
 		.WithVertexBinary("BasicDescriptor.vert.spv")
 		.WithFragmentBinary("BasicDescriptor.frag.spv")
-		.WithDebugName("Basic Descriptor Shader!")
 	.BuildUnique(device);
 
 	BuildPipeline();
 }
 
-BasicDescriptorRenderer::~BasicDescriptorRenderer()	{
-}
-
 void BasicDescriptorRenderer::BuildPipeline() {
-	descriptorLayout = VulkanDescriptorSetLayoutBuilder()
+	descriptorLayout = VulkanDescriptorSetLayoutBuilder("Uniform Data")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-		.WithDebugName("UniformData")
-	.BuildUnique(device); //Get our camera matrices...
+	.BuildUnique(device);
 
 	pipeline = VulkanPipelineBuilder()
-		.WithVertexSpecification(triMesh->GetVertexSpecification())
+		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShaderState(shader.get())
-		.WithPass(defaultRenderPass)
-		.WithDescriptorSetLayout(descriptorLayout.get())
-		.WithDepthState(vk::CompareOp::eAlways, false, false, false)
-		.WithRaster(vk::CullModeFlagBits::eNone)
+		.WithShader(shader)
+		.WithDescriptorSetLayout(*descriptorLayout)
 	.Build(device, pipelineCache);
 
-	descriptorSet = BuildUniqueDescriptorSet(descriptorLayout.get());
+	descriptorSet = BuildUniqueDescriptorSet(*descriptorLayout);
 
 	uniformData[0] = CreateBuffer(sizeof(positionUniform), vk::BufferUsageFlagBits::eUniformBuffer,vk::MemoryPropertyFlagBits::eHostVisible);
 	uniformData[1] = CreateBuffer(sizeof(colourUniform), vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible);
 
-	UpdateUniformBufferDescriptor(descriptorSet.get(), uniformData[0], 0);
-	UpdateUniformBufferDescriptor(descriptorSet.get(), uniformData[1], 1);
+	UpdateBufferDescriptor(*descriptorSet, uniformData[0], 0, vk::DescriptorType::eUniformBuffer);
+	UpdateBufferDescriptor(*descriptorSet, uniformData[1], 1, vk::DescriptorType::eUniformBuffer);
 }
 
 void BasicDescriptorRenderer::RenderFrame() {
+	TransitionSwapchainForRendering(defaultCmdBuffer);
+
 	Vector3 positionUniform = Vector3(sin(runTime), 0.0, 0.0f);
 	Vector4 colourUniform	= Vector4(sin(runTime), 0, 1, 1);
 
-	BeginDefaultRenderPass(defaultCmdBuffer);
+	VulkanDynamicRenderBuilder()
+		.WithColourAttachment(swapChainList[currentSwap]->view)
+		.WithRenderArea(defaultScreenRect)
+	.Begin(defaultCmdBuffer);
 
 	UploadBufferData(uniformData[0], (void*)&positionUniform, sizeof(positionUniform));
 	UploadBufferData(uniformData[1], (void*)&colourUniform  , sizeof(colourUniform));
 
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline.get());
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.layout.get(), 0, 1, &descriptorSet.get(), 0, nullptr);
+	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*descriptorSet, 0, nullptr);
 
-	SubmitDrawCall(triMesh.get(), defaultCmdBuffer);
+	SubmitDrawCall(*triMesh, defaultCmdBuffer);
 
-	defaultCmdBuffer.endRenderPass();
+	EndRendering(defaultCmdBuffer);
 }

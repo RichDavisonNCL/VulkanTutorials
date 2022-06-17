@@ -21,6 +21,7 @@ set(Header_Files
     "VulkanShader.h"
     "VulkanShaderBuilder.h"
     "VulkanTexture.h"
+	"SmartTypes.h"
 )
 source_group("Header Files" FILES ${Header_Files})
 

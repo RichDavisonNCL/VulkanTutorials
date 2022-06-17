@@ -5,7 +5,6 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "BasicTexturingRenderer.h"
 #include "../../Plugins/VulkanRendering/Vulkan.h"
 
@@ -13,57 +12,54 @@ using namespace NCL;
 using namespace Rendering;
 
 BasicTexturingRenderer::BasicTexturingRenderer(Window& window) : VulkanTutorialRenderer(window)	{
-	textures[0] = VulkanTexture::TexturePtrFromFilename("Vulkan.png");
-	textures[1] = VulkanTexture::TexturePtrFromFilename("Doge.png");
+	textures[0] = VulkanTexture::TextureFromFile("Vulkan.png");
+	textures[1] = VulkanTexture::TextureFromFile("Doge.png");
 
-	defaultMesh = std::shared_ptr<VulkanMesh>((VulkanMesh*)MeshGeometry::GenerateTriangle(new VulkanMesh()));
-	defaultMesh->UploadToGPU(this);
+	defaultMesh = GenerateTriangle();
 
-	defaultShader = VulkanShaderBuilder()
+	defaultShader = VulkanShaderBuilder("Texturing Shader!")
 		.WithVertexBinary("BasicTexturing.vert.spv")
 		.WithFragmentBinary("BasicTexturing.frag.spv")
-		.WithDebugName("Texturing Shader!")
 	.BuildUnique(device);
 
 	BuildPipeline();
 }
 
-BasicTexturingRenderer::~BasicTexturingRenderer()	{
-
-}
-
 void	BasicTexturingRenderer::BuildPipeline() {
-	descriptorLayout = VulkanDescriptorSetLayoutBuilder()
+	descriptorLayout = VulkanDescriptorSetLayoutBuilder("Texture Layout A")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-		.WithDebugName("Texture Layout A")
 	.BuildUnique(device);
 
-	texturePipeline = VulkanPipelineBuilder()
-		.WithVertexSpecification(defaultMesh->GetVertexSpecification())
+	texturePipeline = VulkanPipelineBuilder("Texturing Pipeline")
+		.WithVertexInputState(defaultMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShaderState(&*defaultShader)
+		.WithShader(defaultShader)
 		.WithDescriptorSetLayout(*descriptorLayout) //Two separate descriptor sets!
 		.WithDescriptorSetLayout(*descriptorLayout)
 		.WithColourFormats({ surfaceFormat })
-		.WithDepthStencilFormat(depthBuffer->GetFormat())
-		.WithDebugName("TexturingPipeline")
+		.WithDepthFormat(depthBuffer->GetFormat())
 	.Build(device, pipelineCache);
 
 	for (int i = 0; i < 2; ++i) {
-		descriptorSets[i] = BuildUniqueDescriptorSet(descriptorLayout.get());
+		descriptorSets[i] = BuildUniqueDescriptorSet(*descriptorLayout);
 		UpdateImageDescriptor(*descriptorSets[i], 0, textures[i]->GetDefaultView(), *defaultSampler);
 	}
 }
 
 void BasicTexturingRenderer::RenderFrame() {
 	TransitionSwapchainForRendering(defaultCmdBuffer);
-	BeginDefaultRendering(defaultCmdBuffer);
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, texturePipeline.GetPipeline());
 
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, texturePipeline.GetLayout(), 0, 1, &*descriptorSets[0], 0, nullptr);
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, texturePipeline.GetLayout(), 1, 1, &*descriptorSets[1], 0, nullptr);
+	VulkanDynamicRenderBuilder()
+		.WithColourAttachment(swapChainList[currentSwap]->view)
+		.WithRenderArea(defaultScreenRect)
+	.Begin(defaultCmdBuffer);
 
-	SubmitDrawCall(defaultMesh.get(), defaultCmdBuffer);
+	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *texturePipeline.pipeline);
+
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *texturePipeline.layout, 0, 1, &*descriptorSets[0], 0, nullptr);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *texturePipeline.layout, 1, 1, &*descriptorSets[1], 0, nullptr);
+
+	SubmitDrawCall(*defaultMesh, defaultCmdBuffer);
 
 	EndRendering(defaultCmdBuffer);
 }

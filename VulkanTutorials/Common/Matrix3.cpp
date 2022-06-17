@@ -13,6 +13,7 @@ https://research.ncl.ac.uk/game/
 #include "Maths.h"
 #include "Vector3.h"
 #include "Quaternion.h"
+#include <assert.h>
 
 using namespace NCL;
 using namespace NCL::Maths;
@@ -227,11 +228,12 @@ Vector3 Matrix3::GetRow(unsigned int row) const {
 	);
 }
 
-void Matrix3::SetRow(unsigned int row, const Vector3 &val) {
+Matrix3& Matrix3::SetRow(unsigned int row, const Vector3 &val) {
 	assert(row < 3);
 	array[0][row] = val.x;
 	array[1][row] = val.y;
 	array[2][row] = val.z;
+	return *this;
 }
 
 Vector3 Matrix3::GetColumn(unsigned int column) const {
@@ -243,11 +245,12 @@ Vector3 Matrix3::GetColumn(unsigned int column) const {
 	);
 }
 
-void Matrix3::SetColumn(unsigned int column, const Vector3 &val) {
+Matrix3& Matrix3::SetColumn(unsigned int column, const Vector3 &val) {
 	assert(column < 3);
 	array[column][0] = val.x;
 	array[column][1] = val.y;
 	array[column][2] = val.z;
+	return *this;
 }
 
 Vector3 Matrix3::GetDiagonal() const {

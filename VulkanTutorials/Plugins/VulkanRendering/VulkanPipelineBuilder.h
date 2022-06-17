@@ -11,6 +11,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 namespace NCL::Rendering {
 	class VulkanRenderer;
 	class VulkanShader;
+	using UniqueVulkanShader = std::unique_ptr<VulkanShader>;
 
 	struct VulkanVertexSpecification;
 
@@ -25,12 +26,12 @@ namespace NCL::Rendering {
 
 		VulkanPipelineBuilder& WithRaster(vk::CullModeFlagBits cullMode, vk::PolygonMode polyMode = vk::PolygonMode::eFill);
 
-		VulkanPipelineBuilder& WithVertexSpecification(const vk::PipelineVertexInputStateCreateInfo& spec);
+		VulkanPipelineBuilder& WithVertexInputState(const vk::PipelineVertexInputStateCreateInfo& spec);
 
 		VulkanPipelineBuilder& WithTopology(vk::PrimitiveTopology topology);
 
-		VulkanPipelineBuilder& WithShaderState(const VulkanShader* shader);
-		VulkanPipelineBuilder& WithShaderState(const std::unique_ptr<VulkanShader>& shader);
+		VulkanPipelineBuilder& WithShader(const VulkanShader& shader);
+		VulkanPipelineBuilder& WithShader(const UniqueVulkanShader& shader);
 
 		VulkanPipelineBuilder& WithLayout(vk::PipelineLayout layout);
 
@@ -44,7 +45,8 @@ namespace NCL::Rendering {
 
 		VulkanPipelineBuilder& WithDebugName(const std::string& name);
 
-		VulkanPipelineBuilder& WithDepthStencilFormat(vk::Format depthFormat, vk::Format stencilFormat = vk::Format::eUndefined);
+		VulkanPipelineBuilder& WithDepthStencilFormat(vk::Format combinedFormat);
+		VulkanPipelineBuilder& WithDepthFormat(vk::Format depthFormat);
 		VulkanPipelineBuilder& WithColourFormats(const std::vector<vk::Format>& formats);
 
 		VulkanPipeline	Build(vk::Device device, vk::PipelineCache cache);

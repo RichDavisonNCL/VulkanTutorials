@@ -5,13 +5,12 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "VulkanTutorialRenderer.h"
 
 using namespace NCL;
 using namespace Rendering;
 
-VulkanTutorialRenderer::VulkanTutorialRenderer(Window& window) : VulkanRenderer(window) {
+VulkanTutorialRenderer::VulkanTutorialRenderer(Window& window, VulkanInitInfo info) : VulkanRenderer(window, info) {
 	BuildCamera();
 	defaultSampler = GetDevice().createSamplerUnique(
 		vk::SamplerCreateInfo()
@@ -23,13 +22,12 @@ VulkanTutorialRenderer::VulkanTutorialRenderer(Window& window) : VulkanRenderer(
 		.setMaxLod(80.0f)
 	);
 
-	cameraLayout = VulkanDescriptorSetLayoutBuilder()
+	cameraLayout = VulkanDescriptorSetLayoutBuilder("CameraMatrices")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-		.WithDebugName("CameraMatrices")
 		.BuildUnique(GetDevice()); //Get our camera matrices...
-	cameraDescriptor = BuildUniqueDescriptorSet(cameraLayout.get());
+	cameraDescriptor = BuildUniqueDescriptorSet(*cameraLayout);
 
-	UpdateUniformBufferDescriptor(cameraDescriptor.get(), cameraUniform.cameraData, 0);
+	UpdateBufferDescriptor(*cameraDescriptor, cameraUniform.cameraData, 0, vk::DescriptorType::eUniformBuffer);
 
 	runTime = 0.0f;
 }
@@ -38,18 +36,10 @@ VulkanTutorialRenderer::~VulkanTutorialRenderer() {
 	DestroyBuffer(cameraUniform.cameraData);
 }
 
-std::shared_ptr<VulkanMesh> VulkanTutorialRenderer::MakeSmartMesh(VulkanMesh* vk) {
-	return std::shared_ptr<VulkanMesh>(vk);
-}
-
-std::shared_ptr<VulkanMesh> VulkanTutorialRenderer::MakeSmartMesh(MeshGeometry* vk) {
-	return MakeSmartMesh((VulkanMesh*) vk);
-}
-
 void VulkanTutorialRenderer::BuildCamera() {
 	cameraUniform.camera		= Camera::BuildPerspectiveCamera(Vector3(0, 0, 1), 0, 0, 45.0f, 0.1f, 1000.0f);
 	cameraUniform.cameraData	= CreateBuffer(sizeof(Matrix4) * 2, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible);
-	cameraUniform.cameraMemory	= (Matrix4*)GetDevice().mapMemory(cameraUniform.cameraData.deviceMem.get(), 0, cameraUniform.cameraData.allocInfo.allocationSize);
+	cameraUniform.cameraMemory	= (Matrix4*)GetDevice().mapMemory(*cameraUniform.cameraData.deviceMem, 0, cameraUniform.cameraData.allocInfo.allocationSize);
 }
 
 void VulkanTutorialRenderer::UpdateCamera(float dt) {
@@ -61,7 +51,21 @@ void VulkanTutorialRenderer::UploadCameraUniform() {
 	cameraUniform.cameraMemory[1] = cameraUniform.camera.BuildProjectionMatrix(hostWindow.GetScreenAspect());
 }
 
-VulkanMesh* VulkanTutorialRenderer::GenerateQuad() {
+UniqueVulkanMesh VulkanTutorialRenderer::GenerateTriangle() {
+	VulkanMesh* triMesh = new VulkanMesh();
+	triMesh->SetVertexPositions({ Vector3(-1,-1,0), Vector3(1,-1,0), Vector3(0,1,0) });
+	triMesh->SetVertexColours({ Vector4(1,0,0,1), Vector4(0,1,0,1), Vector4(0,0,1,1) });
+	triMesh->SetVertexTextureCoords({ Vector2(0,0), Vector2(1,0), Vector2(0.5, 1) });
+	triMesh->SetVertexIndices({ 0,1,2 });
+
+	triMesh->SetDebugName("Triangle");
+	triMesh->SetPrimitiveType(NCL::GeometryPrimitive::TriangleStrip);
+	triMesh->UploadToGPU(this);
+
+	return UniqueVulkanMesh(triMesh);
+}
+
+UniqueVulkanMesh VulkanTutorialRenderer::GenerateQuad() {
 	VulkanMesh* quadMesh = new VulkanMesh();
 	quadMesh->SetVertexPositions({ Vector3(-1,-1,0), Vector3(1,-1,0), Vector3(1,1,0), Vector3(-1,1,0) });
 	quadMesh->SetVertexTextureCoords({ Vector2(0,0), Vector2(1,0), Vector2(1, 1), Vector2(0, 1) });
@@ -70,10 +74,10 @@ VulkanMesh* VulkanTutorialRenderer::GenerateQuad() {
 	quadMesh->SetPrimitiveType(NCL::GeometryPrimitive::TriangleStrip);
 	quadMesh->UploadToGPU(this);
 
-	return quadMesh;
+	return UniqueVulkanMesh(quadMesh);
 }
 
-VulkanMesh* VulkanTutorialRenderer::GenerateGrid() {
+UniqueVulkanMesh VulkanTutorialRenderer::GenerateGrid() {
 	VulkanMesh* gridMesh = new VulkanMesh();
 	gridMesh->SetVertexPositions({ Vector3(-1,-1,0), Vector3(1,-1,0), Vector3(1,1,0), Vector3(-1,1,0) });
 	gridMesh->SetVertexTextureCoords({ Vector2(0,0), Vector2(1,0), Vector2(1, 1), Vector2(0, 1) });
@@ -82,15 +86,15 @@ VulkanMesh* VulkanTutorialRenderer::GenerateGrid() {
 	gridMesh->SetPrimitiveType(NCL::GeometryPrimitive::TriangleStrip);
 	gridMesh->UploadToGPU(this);
 
-	return gridMesh;
+	return UniqueVulkanMesh(gridMesh);
 }
 
-VulkanMesh* VulkanTutorialRenderer::LoadMesh(const string& filename) {
+UniqueVulkanMesh VulkanTutorialRenderer::LoadMesh(const string& filename) {
 	VulkanMesh* newMesh = new VulkanMesh(filename);
 	newMesh->SetPrimitiveType(NCL::GeometryPrimitive::Triangles);
 	newMesh->SetDebugName(filename);
 	newMesh->UploadToGPU(this);
-	return newMesh;
+	return UniqueVulkanMesh(newMesh);
 }
 
 VulkanFrameBuffer VulkanTutorialRenderer::BuildFrameBuffer(vk::RenderPass& pass, int width, int height, vector<std::shared_ptr<VulkanTexture>> colourAttachments, std::shared_ptr<VulkanTexture> depthAttacment) {
@@ -128,12 +132,12 @@ VulkanFrameBuffer VulkanTutorialRenderer::BuildFrameBuffer(vk::RenderPass& pass,
 	vector<vk::ImageView> allViews;
 
 	for (uint32_t i = 0; i < colourCount; ++i) {
-		buffer.colourAttachments.emplace_back(VulkanTexture::GenerateColourTexture(width, height));
+		buffer.colourAttachments.emplace_back(VulkanTexture::CreateColourTexture(width, height));
 		allViews.emplace_back(buffer.colourAttachments.back()->GetDefaultView());
 	}
 
 	if (hasDepth) {
-		buffer.depthAttachment = VulkanTexture::GenerateDepthTexturePtr(width, height, "DefaultDepth", stencilDepth);
+		buffer.depthAttachment = VulkanTexture::CreateDepthTexture(width, height, "DefaultDepth", stencilDepth);
 		allViews.emplace_back(buffer.depthAttachment->GetDefaultView());
 	}
 
@@ -201,15 +205,15 @@ vk::RenderPass VulkanTutorialRenderer::BuildPassForFrameBuffer(VulkanFrameBuffer
 }
 
 void VulkanTutorialRenderer::RenderSingleObject(RenderObject& o, vk::CommandBuffer  toBuffer, VulkanPipeline& toPipeline, int descriptorSet) {
-	toBuffer.pushConstants(toPipeline.layout.get(), vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4), (void*)&o.transform);
-	toBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, toPipeline.layout.get(), descriptorSet, 1, &o.objectDescriptorSet.get(), 0, nullptr);
-
+	toBuffer.pushConstants(*toPipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4), (void*)&o.transform);
+	toBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *toPipeline.layout, descriptorSet, 1, &*o.objectDescriptorSet, 0, nullptr);
+	
 	if (o.mesh->GetSubMeshCount() == 0) {
-		SubmitDrawCall(o.mesh, toBuffer);
+		SubmitDrawCall(*o.mesh, toBuffer);
 	}
 	else {
 		for (unsigned int i = 0; i < o.mesh->GetSubMeshCount(); ++i) {
-			SubmitDrawCallLayer(o.mesh, i, toBuffer);
+			SubmitDrawCallLayer(*o.mesh, i, toBuffer);
 		}
 	}
 }

@@ -6,10 +6,10 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "../../Plugins/VulkanRendering/VulkanRenderer.h"
-#include "../../Plugins/VulkanRendering/VulkanPipeline.h"
+#include "VulkanTutorialRenderer.h"
+
 namespace NCL::Rendering {
-	class PrerecordedCmdListRenderer : public VulkanRenderer	{
+	class PrerecordedCmdListRenderer : public VulkanTutorialRenderer	{
 	public:
 		PrerecordedCmdListRenderer(Window& window);
 		~PrerecordedCmdListRenderer();
@@ -20,8 +20,8 @@ namespace NCL::Rendering {
 		void BuildPipeline();
 		VulkanPipeline		pipeline;
 
-		VulkanMesh*			triMesh;
-		VulkanShader*		shader;
+		UniqueVulkanMesh		triMesh;
+		UniqueVulkanShader		shader;
 
 		vk::CommandBuffer	recordedBuffer;
 	};

@@ -62,8 +62,12 @@ VulkanDynamicRenderBuilder& VulkanDynamicRenderBuilder::WithLayerCount(int count
 	return *this;
 }
 
+VulkanDynamicRenderBuilder& VulkanDynamicRenderBuilder::WithSecondaryBuffers() {
+	renderInfo.flags |= vk::RenderingFlagBits::eContentsSecondaryCommandBuffers;
+	return *this;
+}
+
 VulkanDynamicRenderBuilder& VulkanDynamicRenderBuilder::Begin(vk::CommandBuffer  buffer) {
-	vk::RenderingInfoKHR renderInfo;
 	renderInfo.setLayerCount(layerCount)
 		.setRenderArea(renderArea)
 		.setColorAttachments(colourAttachments)
@@ -72,8 +76,6 @@ VulkanDynamicRenderBuilder& VulkanDynamicRenderBuilder::Begin(vk::CommandBuffer 
 	if (usingStencil) {
 		renderInfo.setPStencilAttachment(&depthAttachment);
 	}
-
-	buffer.beginRenderingKHR(renderInfo, *NCL::Rendering::Vulkan::dispatcher);
-
+	buffer.beginRendering(renderInfo, *NCL::Rendering::Vulkan::dispatcher);
 	return *this;
 }

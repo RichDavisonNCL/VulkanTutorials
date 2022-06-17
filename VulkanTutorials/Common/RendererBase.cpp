@@ -1,4 +1,5 @@
 #include "RendererBase.h"
+
 using namespace NCL;
 using namespace Rendering;
 

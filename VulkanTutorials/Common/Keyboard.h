@@ -1,15 +1,11 @@
-/******************************************************************************
-Class:Keyboard
-Implements:
-Author:Rich Davison
-Description:
+/*
+Part of Newcastle University's Game Engineering source code.
 
--_-_-_-_-_-_-_,------,
-_-_-_-_-_-_-_-|   /\_/\   NYANYANYAN
--_-_-_-_-_-_-~|__( ^ .^) /
-_-_-_-_-_-_-_-""  ""
+Use as you see fit!
 
-*//////////////////////////////////////////////////////////////////////////////
+Comments and queries to: richard-gordon.davison AT ncl.ac.uk
+https://research.ncl.ac.uk/game/
+*/
 #pragma once
 
 namespace NCL {

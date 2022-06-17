@@ -1,44 +1,49 @@
+/*
+Part of Newcastle University's Game Engineering source code.
+
+Use as you see fit!
+
+Comments and queries to: richard-gordon.davison AT ncl.ac.uk
+https://research.ncl.ac.uk/game/
+*/
 #pragma once
 #include <vector>
 #include <string>
 
 namespace NCL {
-
-namespace Maths {
-	class Matrix4;
-}
-using namespace Maths;
-
-class MeshAnimation
-{
-public:
-	MeshAnimation();
-
-	MeshAnimation(unsigned int jointCount, unsigned int frameCount, float frameRate, std::vector<Matrix4>& frames);
-
-	MeshAnimation(const std::string& filename);
-	virtual ~MeshAnimation();
-
-	unsigned int GetJointCount() const {
-		return jointCount;
+	namespace Maths {
+		class Matrix4;
 	}
 
-	unsigned int GetFrameCount() const {
-		return frameCount;
-	}
+	class MeshAnimation	{
+	public:
+		MeshAnimation();
 
-	float GetFrameRate() const {
-		return frameRate;
-	}
+		MeshAnimation(unsigned int jointCount, unsigned int frameCount, float frameRate, std::vector<Maths::Matrix4>& frames);
 
-	const Matrix4* GetJointData(unsigned int frame) const;
+		MeshAnimation(const std::string& filename);
+		virtual ~MeshAnimation();
 
-protected:
-	unsigned int	jointCount;
-	unsigned int	frameCount;
-	float			frameRate;
+		unsigned int GetJointCount() const {
+			return jointCount;
+		}
 
-	std::vector<Matrix4>		allJoints;
-};
+		unsigned int GetFrameCount() const {
+			return frameCount;
+		}
+
+		float GetFrameRate() const {
+			return frameRate;
+		}
+
+		const Maths::Matrix4* GetJointData(unsigned int frame) const;
+
+	protected:
+		unsigned int	jointCount;
+		unsigned int	frameCount;
+		float			frameRate;
+
+		std::vector<Maths::Matrix4>		allJoints;
+	};
 }
 

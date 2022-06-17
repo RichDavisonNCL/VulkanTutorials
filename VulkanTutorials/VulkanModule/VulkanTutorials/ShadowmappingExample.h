@@ -26,20 +26,18 @@ namespace NCL::Rendering {
 
 		void DrawObjects(VulkanPipeline& toPipeline);
 
-		VulkanMesh*		cubeMesh;
+		UniqueVulkanMesh	cubeMesh;
 
-		std::unique_ptr<VulkanShader>	shadowFillShader;
-		std::unique_ptr<VulkanShader>	shadowUseShader;
+		UniqueVulkanShader	shadowFillShader;
+		UniqueVulkanShader	shadowUseShader;
 
 		VulkanPipeline	shadowPipeline;
 		VulkanPipeline	scenePipeline;
 
-		VulkanFrameBuffer shadowBuffer;
+		UniqueVulkanTexture shadowMap;
 
 		RenderObject	boxObject;
 		RenderObject	floorObject;
-
-		vk::RenderPass		shadowPass;
 
 		vk::UniqueDescriptorSetLayout shadowTexLayout;
 		vk::UniqueDescriptorSetLayout shadowMatrixLayout;
@@ -48,7 +46,7 @@ namespace NCL::Rendering {
 		vk::UniqueDescriptorSet	sceneShadowTexDescriptor;
 		vk::UniqueDescriptorSet shadowMatrixDescriptor;
 
-		VulkanBuffer shadowUniform;
+		VulkanBuffer shadowMatUniform;
 		Matrix4*	shadowMatrix;
 
 		vk::Viewport	shadowViewport;

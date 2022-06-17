@@ -82,6 +82,6 @@ VulkanShader* VulkanShaderBuilder::Build(vk::Device device) {
 	return newShader;
 }
 
-std::unique_ptr<VulkanShader> VulkanShaderBuilder::BuildUnique(vk::Device device) {
-	return std::unique_ptr<VulkanShader>(Build(device));
+UniqueVulkanShader VulkanShaderBuilder::BuildUnique(vk::Device device) {
+	return UniqueVulkanShader(Build(device));
 }

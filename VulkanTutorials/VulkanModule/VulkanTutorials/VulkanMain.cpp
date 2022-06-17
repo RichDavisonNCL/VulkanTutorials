@@ -5,7 +5,6 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "../../Common/Window.h"
 #include "BasicDescriptorRenderer.h"
 #include "BasicTexturingRenderer.h"
@@ -42,22 +41,29 @@ int main() {
 
 	w->SetConsolePosition(2000, 200);
 
+	/*
+	API Functionality Tutorials
+	*/
 	//BasicGeometryRenderer* renderer = new BasicGeometryRenderer(*w);	
 	//BasicPushConstantRenderer* renderer = new BasicPushConstantRenderer(*w);
 	//BasicDescriptorRenderer* renderer = new BasicDescriptorRenderer(*w);
 	//BasicTexturingRenderer* renderer = new BasicTexturingRenderer(*w);
 	//BasicUniformBufferRenderer* renderer = new BasicUniformBufferRenderer(*w);
+	//PrerecordedCmdListRenderer* renderer = new PrerecordedCmdListRenderer(*w);
+	//BasicMultiPipelineRenderer* renderer = new BasicMultiPipelineRenderer(*w);
+	//BasicComputeUsage * renderer = new BasicComputeUsage(*w);
+	//MultiViewportExample* renderer = new MultiViewportExample(*w);
+
+	/*
+	Rendering Technique Tutorials
+	*/
 	//PostProcessingExample* renderer = new PostProcessingExample(*w);
 	//ShadowMappingExample* renderer = new ShadowMappingExample(*w);
 	//LightingExample* renderer = new LightingExample(*w);
 	DeferredExample* renderer = new DeferredExample(*w);
 	//GLTFExample* renderer = new GLTFExample(*w);
-	//PrerecordedCmdListRenderer* renderer = new PrerecordedCmdListRenderer(*w);
-	//BasicMultiPipelineRenderer* renderer = new BasicMultiPipelineRenderer(*w);
-	//BasicComputeUsage * renderer = new BasicComputeUsage(*w);
 	//TestRayTrace* renderer = new TestRayTrace(*w);
 	//BasicSkinningExample* renderer = new BasicSkinningExample(*w);
-	//MultiViewportExample* renderer = new MultiViewportExample(*w);
 	//CubeMapRenderer* renderer = new CubeMapRenderer(*w);
 
 	w->LockMouseToWindow(true);

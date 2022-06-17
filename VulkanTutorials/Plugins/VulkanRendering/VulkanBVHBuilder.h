@@ -21,8 +21,7 @@ namespace NCL::Rendering {
 		//TODO
 	};
 
-	class VulkanBVHBuilder
-	{
+	class VulkanBVHBuilder	{
 	public:
 		VulkanBVHBuilder();
 		~VulkanBVHBuilder();

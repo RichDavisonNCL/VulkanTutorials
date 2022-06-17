@@ -13,22 +13,22 @@ namespace NCL::Rendering {
 	{
 	public:
 		CubeMapRenderer(Window& window);
-		~CubeMapRenderer();
+		~CubeMapRenderer() {}
 
 		void RenderFrame()		override;
 		void Update(float dt)	override;
 
 	protected:
-		VulkanMesh*		quadMesh;
-		VulkanMesh*		sphereMesh;
+		UniqueVulkanMesh		quadMesh;
+		UniqueVulkanMesh		sphereMesh;
 
-		std::unique_ptr<VulkanShader>	skyboxShader;
+		UniqueVulkanShader	skyboxShader;
 		VulkanPipeline	skyboxPipeline;
 
-		std::unique_ptr<VulkanShader>	objectShader;
+		UniqueVulkanShader	objectShader;
 		VulkanPipeline	objectPipeline;
 
-		std::shared_ptr<VulkanTexture>	cubeTex;
+		UniqueVulkanTexture	cubeTex;
 
 		vk::UniqueDescriptorSetLayout cubemapLayout;
 

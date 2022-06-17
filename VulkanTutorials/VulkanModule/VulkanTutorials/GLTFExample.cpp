@@ -5,7 +5,6 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "GLTFExample.h"
 
 using namespace NCL;
@@ -19,70 +18,62 @@ GLTFExample::GLTFExample(Window& window) : VulkanTutorialRenderer(window)
 	.SetPosition(Vector3(850, 840, -30))
 	.SetFarPlane(5000.0f);
 
-	//loader = GLTFLoader("Sponza/Sponza.gltf", [](void) ->  MeshGeometry* {return new VulkanMesh(); });
-
 	for (const auto& m : loader.outMeshes) {
 		VulkanMesh* loadedMesh = (VulkanMesh*)m;
 		loadedMesh->UploadToGPU(this);
 	}
 
-	textureLayout = VulkanDescriptorSetLayoutBuilder()
+	textureLayout = VulkanDescriptorSetLayoutBuilder("Object Textures")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-		.WithDebugName("Object Textures")
 	.BuildUnique(device);
 
 	for (const auto& m : loader.outMats) {	//Build descriptors for each mesh and its sublayers
 		layerDescriptors.push_back({});
 		vector<vk::UniqueDescriptorSet>& matSet = layerDescriptors.back();
 		for (const auto& l : m.allLayers) {
-			matSet.push_back(BuildUniqueDescriptorSet(textureLayout.get()));
-			UpdateImageDescriptor(matSet.back().get(), 0, ((VulkanTexture*)l.diffuse)->GetDefaultView(), *defaultSampler);
+			matSet.push_back(BuildUniqueDescriptorSet(*textureLayout));
+			UpdateImageDescriptor(*matSet.back(), 0, ((VulkanTexture*)l.diffuse)->GetDefaultView(), *defaultSampler);
 		}
 	}
 
-	shader = VulkanShaderBuilder()
+	shader = VulkanShaderBuilder("Texturing Shader")
 		.WithVertexBinary("SimpleVertexTransform.vert.spv")
 		.WithFragmentBinary("SingleTexture.frag.spv")
-		.WithDebugName("Texturing Shader")
 	.BuildUnique(device);
 
 	VulkanMesh* m = (VulkanMesh*)loader.outMeshes[0];
-	pipeline = VulkanPipelineBuilder()
+	pipeline = VulkanPipelineBuilder("Main Scene Pipeline")
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4))
-		.WithVertexSpecification(m->GetVertexSpecification())
+		.WithVertexInputState(m->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShaderState(shader.get())
+		.WithShader(*shader)
 		.WithBlendState(vk::BlendFactor::eOne, vk::BlendFactor::eOne, false)
 		.WithDepthState(vk::CompareOp::eLessOrEqual, true, true, false)
 		.WithColourFormats({ surfaceFormat })
 		.WithDepthStencilFormat(depthBuffer->GetFormat())
-		.WithDescriptorSetLayout(cameraLayout.get())	//Camera is set 0
-		.WithDescriptorSetLayout(textureLayout.get())	//Textures are set 1
-		.WithDebugName("Main Scene Pipeline")
+		.WithDescriptorSetLayout(*cameraLayout)		//Camera is set 0
+		.WithDescriptorSetLayout(*textureLayout)	//Textures are set 1
 	.Build(device, pipelineCache);
-}
-
-GLTFExample::~GLTFExample() {
 }
 
 void GLTFExample::RenderFrame() {
 	TransitionSwapchainForRendering(defaultCmdBuffer);
 	BeginDefaultRendering(defaultCmdBuffer);
 
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline.get());
+	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
 	Matrix4 identity;
-	defaultCmdBuffer.pushConstants(pipeline.layout.get(), vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4), (void*)&identity);
+	defaultCmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4), (void*)&identity);
 
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.layout.get(), 0, 1, &cameraDescriptor.get(), 0, nullptr);
-	UpdateUniformBufferDescriptor(cameraDescriptor.get(), cameraUniform.cameraData, 0);
-	for(int i = 0; i < loader.outMeshes.size(); ++i) {
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
+	UpdateBufferDescriptor(*cameraDescriptor, cameraUniform.cameraData, 0, vk::DescriptorType::eUniformBuffer);
+	for(size_t i = 0; i < loader.outMeshes.size(); ++i) {
 		VulkanMesh* loadedMesh = (VulkanMesh*)loader.outMeshes[i];
 		vector<vk::UniqueDescriptorSet>& set = layerDescriptors[i];
 
 		for (unsigned int j = 0; j < loadedMesh->GetSubMeshCount(); ++j) {
-			defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.layout.get(), 1, 1, &set[j].get(), 0, nullptr);
+			defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 1, 1, &*set[j], 0, nullptr);
 		
-			SubmitDrawCallLayer(loadedMesh, j, defaultCmdBuffer);
+			SubmitDrawCallLayer(*loadedMesh, j, defaultCmdBuffer);
 		}
 	}
 	EndRendering(defaultCmdBuffer);

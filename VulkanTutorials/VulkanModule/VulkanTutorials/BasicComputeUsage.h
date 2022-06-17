@@ -12,7 +12,7 @@ namespace NCL::Rendering {
 	class BasicComputeUsage : public VulkanTutorialRenderer {
 	public:
 		BasicComputeUsage(Window& window);
-		~BasicComputeUsage();
+		~BasicComputeUsage() {}
 
 	protected:
 		virtual void RenderFrame();
@@ -20,10 +20,10 @@ namespace NCL::Rendering {
 		void	BuildRasterPipeline();
 		void	BuildComputePipeline();
 
-		std::shared_ptr<VulkanMesh>		particleMesh;
+		UniqueVulkanMesh	particleMesh;
 
-		std::shared_ptr<VulkanShader>	rasterShader;
-		std::shared_ptr<VulkanCompute>	computeShader;
+		UniqueVulkanShader	rasterShader;
+		UniqueVulkanCompute	computeShader;
 
 		VulkanPipeline	basicPipeline;
 		VulkanPipeline	computePipeline;

@@ -34,7 +34,7 @@ VulkanPipelineBuilder::VulkanPipelineBuilder(const std::string& pipeName)	{
 		.setStencilTestEnable(false)
 		.setDepthBoundsTestEnable(false);
 
-	allColourRenderingFormats	= { vk::Format::eUndefined };
+	//allColourRenderingFormats	= { vk::Format::eUndefined };
 	depthRenderingFormat		= vk::Format::eUndefined;
 	stencilRenderingFormat		= vk::Format::eUndefined;
 
@@ -84,7 +84,7 @@ VulkanPipelineBuilder& VulkanPipelineBuilder::WithRaster(vk::CullModeFlagBits cu
 	return *this;
 }
 
-VulkanPipelineBuilder& VulkanPipelineBuilder::WithVertexSpecification(const vk::PipelineVertexInputStateCreateInfo& spec) {
+VulkanPipelineBuilder& VulkanPipelineBuilder::WithVertexInputState(const vk::PipelineVertexInputStateCreateInfo& spec) {
 	pipelineCreate.setPVertexInputState(&spec);
 	return *this;
 }
@@ -94,12 +94,12 @@ VulkanPipelineBuilder& VulkanPipelineBuilder::WithTopology(vk::PrimitiveTopology
 	return *this;
 }
 
-VulkanPipelineBuilder& VulkanPipelineBuilder::WithShaderState(const VulkanShader* shader) {
-	shader->FillShaderStageCreateInfo(pipelineCreate);
+VulkanPipelineBuilder& VulkanPipelineBuilder::WithShader(const VulkanShader& shader) {
+	shader.FillShaderStageCreateInfo(pipelineCreate);
 	return *this;
 }
 
-VulkanPipelineBuilder& VulkanPipelineBuilder::WithShaderState(const std::unique_ptr<VulkanShader>& shader) {
+VulkanPipelineBuilder& VulkanPipelineBuilder::WithShader(const UniqueVulkanShader& shader) {
 	shader->FillShaderStageCreateInfo(pipelineCreate);
 	return *this;
 }
@@ -125,11 +125,17 @@ VulkanPipelineBuilder& VulkanPipelineBuilder::WithPass(vk::RenderPass& renderPas
 	return *this;
 }
 
-VulkanPipelineBuilder& VulkanPipelineBuilder::WithDepthStencilFormat(vk::Format depthFormat, vk::Format stencilFormat) {
+VulkanPipelineBuilder& VulkanPipelineBuilder::WithDepthStencilFormat(vk::Format depthFormat) {
 	depthRenderingFormat	= depthFormat;
 	stencilRenderingFormat	= depthFormat;
 	return *this;
 }
+
+VulkanPipelineBuilder& VulkanPipelineBuilder::WithDepthFormat(vk::Format depthFormat) {
+	depthRenderingFormat = depthFormat;
+	return *this;
+}
+
 VulkanPipelineBuilder& VulkanPipelineBuilder::WithColourFormats(const std::vector<vk::Format>& formats) {
 	allColourRenderingFormats = formats;
 	return *this;
@@ -184,14 +190,14 @@ VulkanPipeline	VulkanPipelineBuilder::Build(vk::Device device, vk::PipelineCache
 		.setPInputAssemblyState(&inputAsmCreate)
 		.setPMultisampleState(&sampleCreate)
 		.setPRasterizationState(&rasterCreate)
-		.setLayout(output.layout.get());
+		.setLayout(*output.layout);
 	//We must be using dynamic rendering, better set it up!
 	vk::PipelineRenderingCreateInfoKHR			renderingCreate;
 	if (!allColourRenderingFormats.empty() || depthRenderingFormat != vk::Format::eUndefined) {
 		renderingCreate.depthAttachmentFormat		= depthRenderingFormat;
 		renderingCreate.stencilAttachmentFormat		= stencilRenderingFormat;
 
-		renderingCreate.colorAttachmentCount		= allColourRenderingFormats.size();
+		renderingCreate.colorAttachmentCount		= (uint32_t)allColourRenderingFormats.size();
 		renderingCreate.pColorAttachmentFormats		= allColourRenderingFormats.data();
 
 		pipelineCreate.pNext = &renderingCreate;
@@ -200,7 +206,7 @@ VulkanPipeline	VulkanPipelineBuilder::Build(vk::Device device, vk::PipelineCache
 	output.pipeline			= device.createGraphicsPipelineUnique(cache, pipelineCreate).value;
 
 	if (!debugName.empty()) {
-		Vulkan::SetDebugName(device, vk::ObjectType::ePipeline, (uint64_t)(VkPipeline)output.pipeline.get(), debugName);
+		Vulkan::SetDebugName(device, vk::ObjectType::ePipeline, (uint64_t)(VkPipeline)*output.pipeline, debugName);
 	}
 
 	return output;

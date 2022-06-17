@@ -7,7 +7,6 @@ Comments and queries to: richard-gordon.davison AT ncl.ac.uk
 https://research.ncl.ac.uk/game/
 */
 #pragma once
-
 #include <iostream>
 
 namespace NCL::Maths {
@@ -19,14 +18,12 @@ namespace NCL::Maths {
 	class Matrix4 {
 	public:
 		float	array[4][4];
-
 	public:
 		Matrix4(void);
 		Matrix4(float elements[16]);
 		Matrix4(const Matrix3& m3);
 		Matrix4(const Quaternion& quat);
 		~Matrix4(void) = default;
-
 
 		//Set all matrix values to zero
 		void	ToZero();

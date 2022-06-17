@@ -16,6 +16,8 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 #include "VulkanPipeline.h"
 
+#include "SmartTypes.h"
+
 #include <vector>
 #include <string>
 
@@ -28,7 +30,6 @@ namespace NCL::Rendering {
 	class VulkanTexture;
 	struct VulkanBuffer;
 	struct BufferedData;
-
 
 	struct VulkanInitInfo {
 		std::vector<const char*> extensions;
@@ -58,10 +59,6 @@ namespace NCL::Rendering {
 		VulkanRenderer(Window& window, VulkanInitInfo info = VulkanInitInfo());
 		~VulkanRenderer();
 
-		//vk::ClearColorValue ClearColour(const Vector4& v) {
-		//	return vk::ClearColorValue(std::array<float, 4>{v.x, v.y, v.z, v.w});
-		//}
-
 		vk::ClearColorValue ClearColour(float r, float g, float b, float a = 1.0f) {
 			return vk::ClearColorValue(std::array<float, 4>{r, g, b, a});
 		}
@@ -76,15 +73,15 @@ namespace NCL::Rendering {
 		virtual void	InitDefaultRenderPass();
 		virtual void	InitDefaultDescriptorPool();
 
-		void SubmitDrawCall(const VulkanMesh* m, vk::CommandBuffer  to);
-		void SubmitDrawCallLayer(const VulkanMesh* m, unsigned int layer, vk::CommandBuffer  to);
+		void SubmitDrawCall(const VulkanMesh& m, vk::CommandBuffer  to, int instanceCount = 1);
+		void SubmitDrawCallLayer(const VulkanMesh& m, unsigned int layer, vk::CommandBuffer  to, int instanceCount = 1);
 
 		void DispatchCompute(vk::CommandBuffer  to, unsigned int xCount, unsigned int yCount = 0, unsigned int zCount = 0);
 
 		vk::DescriptorSet		BuildDescriptorSet(vk::DescriptorSetLayout  layout);
 		vk::UniqueDescriptorSet BuildUniqueDescriptorSet(vk::DescriptorSetLayout  layout);
 
-		void	UpdateUniformBufferDescriptor(vk::DescriptorSet set, const VulkanBuffer& data, int bindingSlot);
+		void	UpdateBufferDescriptor(vk::DescriptorSet set, const VulkanBuffer& data, int bindingSlot, vk::DescriptorType bufferType);
 		void	UpdateImageDescriptor(vk::DescriptorSet set, int bindingNum, vk::ImageView view, vk::Sampler sampler, vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal);
 
 		void	ImageTransitionBarrier(vk::CommandBuffer  buffer, vk::Image i, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::ImageAspectFlags aspect, vk::PipelineStageFlags srcStage, vk::PipelineStageFlags dstStage, int mipLevel = 0, int layer = 0 );
@@ -126,24 +123,22 @@ namespace NCL::Rendering {
 		struct SwapChain {
 			vk::Image			image;
 			vk::ImageView		view;
+			vk::CommandBuffer	frameCmds;
 		};
+		std::vector<SwapChain*> swapChainList;	
+		uint32_t				currentSwap;
+		vk::Framebuffer*		frameBuffers;		
 
-		vk::CommandBuffer		defaultCmdBuffer;
 		vk::PipelineCache		pipelineCache;
-		vk::RenderPass			defaultRenderPass;
-		vk::RenderPassBeginInfo defaultBeginInfo;
 		vk::Device				device;		//Device handle	
 		
 		vk::ClearValue			defaultClearValues[2];
 		vk::Viewport			defaultViewport;
 		vk::Rect2D				defaultScissor;	
 		vk::Rect2D				defaultScreenRect;	
-
-		std::vector<SwapChain*> swapChainList;	
-		
-		uint32_t				currentSwap;
-
-		vk::Framebuffer*		frameBuffers;		
+		vk::CommandBuffer		defaultCmdBuffer;
+		vk::RenderPass			defaultRenderPass;
+		vk::RenderPassBeginInfo defaultBeginInfo;
 		
 		vk::DescriptorPool		defaultDescriptorPool;	//descriptor sets come from here!
 		vk::CommandPool			commandPool;			//Source Command Buffers from here
@@ -166,7 +161,7 @@ namespace NCL::Rendering {
 		vk::ColorSpaceKHR	surfaceSpace;
 
 		uint32_t			numFrameBuffers;
-		std::shared_ptr<VulkanTexture> 	depthBuffer;
+		UniqueVulkanTexture depthBuffer;
 
 		vk::SwapchainKHR	swapChain;
 
@@ -175,8 +170,6 @@ namespace NCL::Rendering {
 
 		vk::PhysicalDeviceProperties		deviceProperties;
 		vk::PhysicalDeviceMemoryProperties	deviceMemoryProperties;
-
-
 
 		vk::Queue			deviceQueue;
 		uint32_t			computeQueueIndex;

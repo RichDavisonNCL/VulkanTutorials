@@ -17,7 +17,7 @@ namespace NCL::Rendering {
 		VulkanMesh(const std::string& filename);
 		~VulkanMesh();
 
-		const vk::PipelineVertexInputStateCreateInfo& GetVertexSpecification() const {
+		const vk::PipelineVertexInputStateCreateInfo& GetVertexInputState() const {
 			return vertexInputState;
 		}
 

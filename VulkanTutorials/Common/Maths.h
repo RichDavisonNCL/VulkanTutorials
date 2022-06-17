@@ -7,13 +7,13 @@ Comments and queries to: richard-gordon.davison AT ncl.ac.uk
 https://research.ncl.ac.uk/game/
 */
 #pragma once
-#include <algorithm>
 
 namespace NCL::Maths {
 	class Vector2;
 	class Vector3;
 
-	struct Vector2i {
+	class Vector2i {
+	public:
 		int array[2];
 
 		Vector2i() {
@@ -29,7 +29,8 @@ namespace NCL::Maths {
 		}
 	};
 
-	struct Vector3i {
+	class Vector3i {
+	public:
 		int array[3];
 
 		Vector3i() {
@@ -46,7 +47,8 @@ namespace NCL::Maths {
 		}
 	};
 
-	struct Vector4i {
+	class Vector4i {
+	public:
 		int array[4];
 
 		Vector4i() {
@@ -80,16 +82,12 @@ namespace NCL::Maths {
 		return degs * PI / 180.0f;
 	};
 
-	inline float RandomValue(float min, float max) {
-		float floatValue = rand() / (float)RAND_MAX;
-		float range = max - min;
-		return min + (range * floatValue);
-	}
+	float RandomValue(float min, float max);
 
 	void ScreenBoxOfTri(const Vector3& v0, const Vector3& v1, const Vector3& v2, Vector2& topLeft, Vector2& bottomRight);
 
 	int ScreenAreaOfTri(const Vector3 &a, const Vector3 &b, const Vector3 & c);
-	float FloatAreaOfTri(const Vector3 &a, const Vector3 &b, const Vector3 & c);
+	float Areaof2DTri(const Vector3 &a, const Vector3 &b, const Vector3 & c);
 
-	float CrossAreaOfTri(const Vector3 &a, const Vector3 &b, const Vector3 & c);
+	float AreaofTri3D(const Vector3 &a, const Vector3 &b, const Vector3 & c);
 }

@@ -7,8 +7,6 @@ Comments and queries to: richard-gordon.davison AT ncl.ac.uk
 https://research.ncl.ac.uk/game/
 */
 #pragma once
-#include <assert.h>
-#include <algorithm>
 #include <iostream>
 
 namespace NCL::Maths {
@@ -32,11 +30,11 @@ namespace NCL::Maths {
 		//Set all matrix values to zero
 		void	ToZero();
 
-		Vector3 GetRow(unsigned int row) const;
-		void	SetRow(unsigned int row, const Vector3 &val);
+		Vector3		GetRow(unsigned int row) const;
+		Matrix3&	SetRow(unsigned int row, const Vector3 &val);
 
-		Vector3 GetColumn(unsigned int column) const;
-		void	SetColumn(unsigned int column, const Vector3 &val);
+		Vector3		GetColumn(unsigned int column) const;
+		Matrix3&	SetColumn(unsigned int column, const Vector3 &val);
 
 		Vector3 GetDiagonal() const;
 		void	SetDiagonal(const Vector3 &in);

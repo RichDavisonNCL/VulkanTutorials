@@ -29,9 +29,9 @@ namespace NCL::Rendering {
 		void	RenderLights();
 		void	CombineBuffers();
 
-		std::unique_ptr<VulkanShader> gBufferShader;
-		std::unique_ptr<VulkanShader> lightingShader;
-		std::unique_ptr<VulkanShader> combineShader;
+		UniqueVulkanShader gBufferShader;
+		UniqueVulkanShader lightingShader;
+		UniqueVulkanShader combineShader;
 
 		VulkanBuffer lightUniform;
 		VulkanBuffer lightStageUniform;
@@ -39,12 +39,12 @@ namespace NCL::Rendering {
 		RenderObject boxObject;
 		RenderObject floorObject;
 
-		std::shared_ptr<VulkanMesh> sphereMesh;
-		std::shared_ptr<VulkanMesh> cubeMesh;
-		std::shared_ptr<VulkanMesh> quadMesh;
+		UniqueVulkanMesh sphereMesh;
+		UniqueVulkanMesh cubeMesh;
+		UniqueVulkanMesh quadMesh;
 
-		std::shared_ptr<VulkanTexture> bufferTextures[5];
-		std::shared_ptr<VulkanTexture> objectTextures[4];
+		UniqueVulkanTexture bufferTextures[5];
+		UniqueVulkanTexture objectTextures[4];
 
 		vk::UniqueDescriptorSet			lightDescriptor;
 		vk::UniqueDescriptorSetLayout	lightLayout;

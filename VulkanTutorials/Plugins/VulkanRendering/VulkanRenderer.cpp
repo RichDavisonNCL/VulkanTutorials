@@ -39,11 +39,6 @@ VulkanRenderer::VulkanRenderer(Window& window, VulkanInitInfo info) : RendererBa
 	InitCommandPools();
 	InitDefaultDescriptorPool();
 
-	auto buffers = device.allocateCommandBuffers(vk::CommandBufferAllocateInfo(
-		commandPool, vk::CommandBufferLevel::ePrimary, 1));
-
-	defaultCmdBuffer = buffers[0];
-
 	VulkanTexture::SetRenderer(this);
 	TextureLoader::RegisterAPILoadFunction(VulkanTexture::TextureFromFilenameLoader);
 
@@ -51,6 +46,8 @@ VulkanRenderer::VulkanRenderer(Window& window, VulkanInitInfo info) : RendererBa
 	OnWindowResize((int)hostWindow.GetScreenSize().x, (int)hostWindow.GetScreenSize().y);
 
 	pipelineCache = device.createPipelineCache(vk::PipelineCacheCreateInfo());
+
+	defaultCmdBuffer = swapChainList[currentSwap]->frameCmds;
 }
 
 VulkanRenderer::~VulkanRenderer() {
@@ -128,6 +125,9 @@ bool VulkanRenderer::InitGPUDevice() {
 	extensionList.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 	extensionList.push_back("VK_KHR_dynamic_rendering");
 	extensionList.push_back("VK_KHR_maintenance4");
+
+	extensionList.push_back("VK_KHR_depth_stencil_resolve");
+	extensionList.push_back("VK_KHR_create_renderpass2");
 	layerList.push_back("VK_LAYER_LUNARG_standard_validation");
 
 	float queuePriority = 0.0f;
@@ -275,6 +275,11 @@ int VulkanRenderer::InitBufferChain(vk::CommandBuffer  cmdBuffer) {
 		chain->view = device.createImageView(viewCreate);
 
 		swapChainList.push_back(chain);
+
+		auto buffers = device.allocateCommandBuffers(vk::CommandBufferAllocateInfo(
+			commandPool, vk::CommandBufferLevel::ePrimary, 1));
+
+		chain->frameCmds = buffers[0];
 	}
 
 	return (int)images.size();
@@ -466,7 +471,7 @@ void VulkanRenderer::OnWindowResize(int width, int height) {
 	if (width == 0 && height == 0) {
 		return;
 	}
-	windowWidth	= width;
+	windowWidth		= width;
 	windowHeight	= height;
 
 	defaultScreenRect = vk::Rect2D({ 0,0 }, { (uint32_t)windowWidth, (uint32_t)windowHeight });
@@ -483,7 +488,7 @@ void VulkanRenderer::OnWindowResize(int width, int height) {
 	vkDeviceWaitIdle(device);
 
 	//delete depthBuffer;
-	depthBuffer = VulkanTexture::GenerateDepthTexturePtr((int)hostWindow.GetScreenSize().x, (int)hostWindow.GetScreenSize().y);
+	depthBuffer = VulkanTexture::CreateDepthTexture((int)hostWindow.GetScreenSize().x, (int)hostWindow.GetScreenSize().y);
 	
 	numFrameBuffers = InitBufferChain(cmds);
 
@@ -541,6 +546,8 @@ void VulkanRenderer::SwapBuffers() {
 		.setClearValueCount(sizeof(defaultClearValues) / sizeof(vk::ClearValue))
 		.setPClearValues(defaultClearValues);
 
+	defaultCmdBuffer = swapChainList[currentSwap]->frameCmds;
+
 	vk::Result waitResult = device.waitForFences(fence, true, ~0);
 	
 	device.destroySemaphore(presentSempaphore);
@@ -592,7 +599,7 @@ void	VulkanRenderer::InitDefaultRenderPass() {
 void	VulkanRenderer::PresentScreenImage() {
 	vk::CommandBuffer cmds = BeginCmdBuffer();
 	TransitionSwapchainForPresenting(cmds);
-	SubmitCmdBufferWait(cmds);
+	SubmitCmdBufferWait(cmds, true);
 }
 
 bool VulkanRenderer::CreateDefaultFrameBuffers() {
@@ -615,9 +622,9 @@ bool VulkanRenderer::CreateDefaultFrameBuffers() {
 		.setPAttachments(attachments)
 		.setRenderPass(defaultRenderPass);
 
-	for (unsigned int i = 0; i < numFrameBuffers; ++i) {
+	for (uint32_t i = 0; i < numFrameBuffers; ++i) {
 		attachments[0]	= swapChainList[i]->view;
-		attachments[1]	= depthBuffer->defaultView.get();
+		attachments[1]	= *depthBuffer->defaultView;
 		frameBuffers[i] = device.createFramebuffer(createInfo);
 	}
 
@@ -632,7 +639,7 @@ bool VulkanRenderer::CreateDefaultFrameBuffers() {
 }
 
 bool	VulkanRenderer::MemoryTypeFromPhysicalDeviceProps(vk::MemoryPropertyFlags requirements, uint32_t type, uint32_t& index) {
-	for (int i = 0; i < 32; ++i) {
+	for (uint32_t i = 0; i < 32; ++i) {
 		if ((type & 1) == 1) {	//We care about this requirement
 			if ((deviceMemoryProperties.memoryTypes[i].propertyFlags & requirements) == requirements) {
 				index = i;
@@ -648,7 +655,8 @@ void	VulkanRenderer::InitDefaultDescriptorPool() {
 	int maxSets = 128; //how many times can we ask the pool for a descriptor set?
 	vk::DescriptorPoolSize poolSizes[] = {
 		vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 128),
-		vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 128)
+		vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 128),
+		vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 128)
 	};
 
 	vk::DescriptorPoolCreateInfo poolCreate;
@@ -660,29 +668,13 @@ void	VulkanRenderer::InitDefaultDescriptorPool() {
 	defaultDescriptorPool = device.createDescriptorPool(poolCreate);
 }
 
-//void	VulkanRenderer::UpdateImageDescriptor(vk::DescriptorSet set, VulkanTexture* tex, vk::Sampler sampler, vk::ImageView forceView, int bindingNum, vk::ImageLayout forceLayout ) {
-//	vk::DescriptorImageInfo imageInfo = vk::DescriptorImageInfo()
-//		.setSampler(sampler)
-//		.setImageView(forceView)
-//		.setImageLayout(forceLayout);
-//
-//	vk::WriteDescriptorSet descriptorWrite = vk::WriteDescriptorSet()
-//		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
-//		.setDstSet(set)
-//		.setDstBinding(bindingNum)
-//		.setDescriptorCount(1)
-//		.setPImageInfo(&imageInfo);
-//
-//	device.updateDescriptorSets(1, &descriptorWrite, 0, nullptr);
-//}
-
 void	VulkanRenderer::UpdateImageDescriptor(vk::DescriptorSet set, int bindingNum, vk::ImageView view, vk::Sampler sampler, vk::ImageLayout layout) {
-	vk::DescriptorImageInfo imageInfo = vk::DescriptorImageInfo()
+	auto imageInfo = vk::DescriptorImageInfo()
 		.setSampler(sampler)
 		.setImageView(view)
 		.setImageLayout(layout);
 
-	vk::WriteDescriptorSet descriptorWrite = vk::WriteDescriptorSet()
+	auto descriptorWrite = vk::WriteDescriptorSet()
 		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
 		.setDstSet(set)
 		.setDstBinding(bindingNum)
@@ -692,34 +684,35 @@ void	VulkanRenderer::UpdateImageDescriptor(vk::DescriptorSet set, int bindingNum
 	device.updateDescriptorSets(1, &descriptorWrite, 0, nullptr);
 }
 
-void VulkanRenderer::UpdateUniformBufferDescriptor(vk::DescriptorSet set, const VulkanBuffer& data, int bindingSlot) {
-	vk::WriteDescriptorSet descriptorWrites[] = {
-		vk::WriteDescriptorSet()
-		.setDescriptorType(vk::DescriptorType::eUniformBuffer)
+void VulkanRenderer::UpdateBufferDescriptor(vk::DescriptorSet set, const VulkanBuffer& data, int bindingSlot, vk::DescriptorType bufferType) {
+	auto descriptorInfo = vk::DescriptorBufferInfo()
+		.setBuffer(*(data.buffer))
+		.setRange(data.requestedSize);
+	
+	auto descriptorWrites = vk::WriteDescriptorSet()
+		.setDescriptorType(bufferType)
 		.setDstSet(set)
 		.setDstBinding(bindingSlot)
 		.setDescriptorCount(1)
-		.setPBufferInfo(&data.descriptorInfo)
-	};
-	GetDevice().updateDescriptorSets(1, descriptorWrites, 0, nullptr);
+		.setPBufferInfo(&descriptorInfo);
+
+	device.updateDescriptorSets(1, &descriptorWrites, 0, nullptr);
 }
 
 VulkanBuffer VulkanRenderer::CreateBuffer(size_t size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
 	VulkanBuffer buffer;
+	buffer.requestedSize = size;
 
 	buffer.buffer = device.createBufferUnique(vk::BufferCreateInfo(vk::BufferCreateFlags(), size, usage));
 
-	vk::MemoryRequirements reqs = device.getBufferMemoryRequirements(buffer.buffer.get());
+	vk::MemoryRequirements reqs = device.getBufferMemoryRequirements(*buffer.buffer);
 	buffer.allocInfo = vk::MemoryAllocateInfo(reqs.size);
 
 	bool found = MemoryTypeFromPhysicalDeviceProps(properties, reqs.memoryTypeBits, buffer.allocInfo.memoryTypeIndex);
 
 	buffer.deviceMem = device.allocateMemoryUnique(buffer.allocInfo);
 
-	device.bindBufferMemory(buffer.buffer.get(), buffer.deviceMem.get(), 0);
-
-	buffer.descriptorInfo.buffer = buffer.buffer.get();
-	buffer.descriptorInfo.range  = size;
+	device.bindBufferMemory(*buffer.buffer, *buffer.deviceMem, 0);
 
 	return buffer;
 }
@@ -732,9 +725,9 @@ void VulkanRenderer::DestroyBuffer(VulkanBuffer& buffer) {
 }
 
 void VulkanRenderer::UploadBufferData(VulkanBuffer& uniform, void* data, int dataSize) {
-	void* mappedData = device.mapMemory(uniform.deviceMem.get(), 0, uniform.allocInfo.allocationSize);
+	void* mappedData = device.mapMemory(*uniform.deviceMem, 0, uniform.allocInfo.allocationSize);
 	memcpy(mappedData, data, dataSize);
-	device.unmapMemory(uniform.deviceMem.get());
+	device.unmapMemory(*uniform.deviceMem);
 }
 
 vk::DescriptorSet	VulkanRenderer::BuildDescriptorSet(vk::DescriptorSetLayout  layout) {
@@ -759,15 +752,14 @@ vk::UniqueDescriptorSet VulkanRenderer::BuildUniqueDescriptorSet(vk::DescriptorS
 	return set;
 }
 
-void VulkanRenderer::SubmitDrawCallLayer(const VulkanMesh* m, unsigned int layer, vk::CommandBuffer  to) {
+void VulkanRenderer::SubmitDrawCallLayer(const VulkanMesh& m, unsigned int layer, vk::CommandBuffer  to, int instanceCount) {
 	VkDeviceSize baseOffset = 0;
-	int instanceCount = 1;
 
-	const SubMesh* sm = m->GetSubMesh(layer);
+	const SubMesh* sm = m.GetSubMesh(layer);
 
-	m->BindToCommandBuffer(to);
+	m.BindToCommandBuffer(to);
 
-	if (m->GetIndexCount() > 0) {
+	if (m.GetIndexCount() > 0) {
 		to.drawIndexed(sm->count, instanceCount, sm->start, sm->base, 0);
 	}
 	else {
@@ -776,17 +768,16 @@ void VulkanRenderer::SubmitDrawCallLayer(const VulkanMesh* m, unsigned int layer
 }
 
 
-void VulkanRenderer::SubmitDrawCall(const VulkanMesh* m, vk::CommandBuffer  to) {
+void VulkanRenderer::SubmitDrawCall(const VulkanMesh& m, vk::CommandBuffer  to, int instanceCount) {
 	VkDeviceSize baseOffset = 0;
-	int instanceCount = 1;
 
-	m->BindToCommandBuffer(to);
+	m.BindToCommandBuffer(to);
 
-	if (m->GetIndexCount() > 0) {
-		to.drawIndexed(m->GetIndexCount(), instanceCount, 0, 0, 0);
+	if (m.GetIndexCount() > 0) {
+		to.drawIndexed(m.GetIndexCount(), instanceCount, 0, 0, 0);
 	}
 	else {
-		to.draw(m->GetVertexCount(), instanceCount, 0, 0);
+		to.draw(m.GetVertexCount(), instanceCount, 0, 0);
 	}
 }
 
@@ -854,9 +845,9 @@ void	VulkanRenderer::BeginDefaultRendering(vk::CommandBuffer  cmds) {
 
 	renderInfo.setRenderArea(defaultScreenRect);
 
-	cmds.beginRenderingKHR(renderInfo, *NCL::Rendering::Vulkan::dispatcher);
+	cmds.beginRendering(renderInfo, *NCL::Rendering::Vulkan::dispatcher);
 }
 
 void	VulkanRenderer::EndRendering(vk::CommandBuffer  cmds) {
-	cmds.endRenderingKHR(*NCL::Rendering::Vulkan::dispatcher);
+	cmds.endRendering(*NCL::Rendering::Vulkan::dispatcher);
 }

@@ -7,6 +7,7 @@ Comments and queries to: richard-gordon.davison AT ncl.ac.uk
 https://research.ncl.ac.uk/game/
 */
 #include "SimpleFont.h"
+#include "TextureBase.h"
 #include "TextureLoader.h"
 #include "Assets.h"
 #include <fstream>

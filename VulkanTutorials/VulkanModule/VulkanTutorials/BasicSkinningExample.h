@@ -14,17 +14,17 @@ namespace NCL::Rendering {
     {
     public:
         BasicSkinningExample(Window& window);
-        ~BasicSkinningExample();
+        ~BasicSkinningExample() {}
 
         void RenderFrame()		override;
         void Update(float dt)	override;
     protected:
-        VulkanShader* shader;
+        UniqueVulkanShader shader;
         GLTFLoader loader;
 
         VulkanBuffer		    jointsBuffer;
         vk::DescriptorSet		jointsDescriptor;
-        vk::DescriptorSetLayout jointsLayout;
+        vk::UniqueDescriptorSetLayout jointsLayout;
 
         vk::UniqueDescriptorSetLayout	textureLayout;
         vector<vector<vk::UniqueDescriptorSet>>	 layerDescriptors;

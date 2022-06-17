@@ -6,6 +6,8 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
+#include "../../Plugins/VulkanRendering/SmartTypes.h"
+
 #include "../../Plugins/VulkanRendering/VulkanRenderer.h"
 #include "../../Plugins/VulkanRendering/VulkanShader.h"
 #include "../../Plugins/VulkanRendering/VulkanShaderBuilder.h"

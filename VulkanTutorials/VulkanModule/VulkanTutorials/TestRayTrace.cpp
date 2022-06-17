@@ -5,7 +5,6 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "TestRayTrace.h"
 #include "GLTFLoader.h"
 using namespace NCL;
@@ -27,15 +26,15 @@ VulkanInitInfo info(
 	}
 );
 
-TestRayTrace::TestRayTrace(Window& window) : VulkanRenderer(window, info) {
+TestRayTrace::TestRayTrace(Window& window) : VulkanTutorialRenderer(window, info) {
 	EnableRayTracing();
 	//GLTFLoader::LoadGLTF("DamagedHelmet.gltf", [](void) ->  MeshGeometry* {return new VulkanMesh(); });
 
-	triMesh = (VulkanMesh*)MeshGeometry::GenerateTriangle(new VulkanMesh());
+	triMesh = GenerateTriangle();
 	triMesh->UploadToGPU(this);
 
 	sceneBVH = VulkanBVHBuilder()
-		.WithMesh(triMesh, Matrix4())
+		.WithMesh(&*triMesh, Matrix4())
 		.Build(*this);
 
 }

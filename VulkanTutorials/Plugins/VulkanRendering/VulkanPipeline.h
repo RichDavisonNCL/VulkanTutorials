@@ -10,11 +10,4 @@ License: MIT (see LICENSE file at the top of the source tree)
 struct VulkanPipeline {
 	vk::UniquePipeline			pipeline;
 	vk::UniquePipelineLayout	layout;
-
-	vk::Pipeline GetPipeline() {
-		return pipeline.get();
-	}
-	vk::PipelineLayout GetLayout() {
-		return layout.get();
-	}
 };

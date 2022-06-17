@@ -99,6 +99,7 @@ set(Source_Files
     "TestRayTrace.cpp"
     "VulkanMain.cpp"
     "VulkanTutorialRenderer.cpp"
+	"Test.cpp"
 )
 source_group("Source Files" FILES ${Source_Files})
 
@@ -203,9 +204,6 @@ foreach (file ${ALL_FILES})
     get_filename_component(file_name ${file} NAME)
 	get_filename_component(file_ext ${file} EXT)
 	
-	set(COMPILE_SHADER
-		FALSE
-	)
 	if(file_ext STREQUAL ".cpp" OR file_ext STREQUAL ".cpp")
 		continue()
 	endif()
@@ -225,12 +223,6 @@ foreach (file ${ALL_FILES})
 		file_ext STREQUAL  ".task" OR
 		file_ext STREQUAL  ".mesh"
 	)
-		set(COMPILE_SHADER
-			TRUE
-		)
-	endif()
-	
-	if(${COMPILE_SHADER})
 		message("Adding custom command to ${file}")
 		get_filename_component(file_dir ${file} ABSOLUTE)
         set(SPIRV_OUTPUT ${file_name}.spv)

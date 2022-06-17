@@ -5,57 +5,49 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "BasicUniformBufferRenderer.h"
 
 using namespace NCL;
 using namespace Rendering;
 
-BasicUniformBufferRenderer::BasicUniformBufferRenderer(Window& window) : VulkanRenderer(window)	{
-	camera				= Camera::BuildPerspectiveCamera(Vector3(0, 0, 1), 0, 0, 45.0f, 0.1f, 100.0f);
+BasicUniformBufferRenderer::BasicUniformBufferRenderer(Window& window) : VulkanTutorialRenderer(window)	{
+	camera	= Camera::BuildPerspectiveCamera(Vector3(0, 0, 10.0f), 0, 0, 45.0f, 1.0f, 100.0f);
 
-	triMesh = std::shared_ptr<VulkanMesh>((VulkanMesh*)MeshGeometry::GenerateTriangle(new VulkanMesh()));
-	triMesh->UploadToGPU(this);
+	triMesh = GenerateTriangle();
 
-	defaultShader = VulkanShaderBuilder()
+	shader = VulkanShaderBuilder("Basic Uniform Buffer Usage!")
 		.WithVertexBinary("BasicUniformBuffer.vert.spv")
 		.WithFragmentBinary("BasicUniformBuffer.frag.spv")
-		.WithDebugName("Basic Uniform Buffer Usage!")
 	.BuildUnique(device);
 
 	cameraData		= CreateBuffer(sizeof(Matrix4) * 2, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible);
-	cameraMemory	= (Matrix4*)device.mapMemory(cameraData.deviceMem.get(), 0, cameraData.allocInfo.allocationSize);
+	cameraMemory	= (Matrix4*)device.mapMemory(*cameraData.deviceMem, 0, cameraData.allocInfo.allocationSize);
 	
 	BuildPipeline();
 }
 
-BasicUniformBufferRenderer::~BasicUniformBufferRenderer()	{	
-}
-
-void BasicUniformBufferRenderer::Update(float msec) {
-	camera.UpdateCamera(msec);
+void BasicUniformBufferRenderer::Update(float dt) {
+	camera.UpdateCamera(dt);
 }
 
 void	BasicUniformBufferRenderer::BuildPipeline() {
-	vk::DescriptorSetLayout basicLayout = VulkanDescriptorSetLayoutBuilder()
+	vk::DescriptorSetLayout matrixLayout = VulkanDescriptorSetLayoutBuilder("Matrices")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-		.WithDebugName("Matrices")
 	.Build(device);
 
-	basicPipeline = VulkanPipelineBuilder()
-		.WithVertexSpecification(triMesh->GetVertexSpecification())
+	pipeline = VulkanPipelineBuilder("UBOPipeline")
+		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShaderState(defaultShader.get())
+		.WithShader(shader)
 		.WithColourFormats({ surfaceFormat })
-		.WithDepthStencilFormat(depthBuffer->GetFormat())
-		.WithDescriptorSetLayout(basicLayout)
-		.WithDebugName("UBOPipeline")
+		.WithDescriptorSetLayout(matrixLayout)
 	.Build(device, pipelineCache);
 
-	descriptorSet = BuildUniqueDescriptorSet(basicLayout);
-	WriteDescriptorSet(descriptorSet.get());
+	descriptorSet = BuildUniqueDescriptorSet(matrixLayout);
 
-	device.destroyDescriptorSetLayout(basicLayout);
+	UpdateBufferDescriptor(*descriptorSet, cameraData, 0, vk::DescriptorType::eUniformBuffer);
+
+	device.destroyDescriptorSetLayout(matrixLayout);
 }
 
 void BasicUniformBufferRenderer::RenderFrame() {
@@ -63,32 +55,18 @@ void BasicUniformBufferRenderer::RenderFrame() {
 
 	VulkanDynamicRenderBuilder rendering = VulkanDynamicRenderBuilder()
 		.WithColourAttachment(swapChainList[currentSwap]->view, vk::ImageLayout::eColorAttachmentOptimal, true, ClearColour(0.2f, 0.2f, 0.2f, 1.0f))
-		.WithDepthAttachment(depthBuffer->GetDefaultView(), vk::ImageLayout::eDepthAttachmentOptimal, true, { 1.0f }, false)
-		.WithRenderArea(defaultScreenRect);
+		.WithRenderArea(defaultScreenRect)
+	.Begin(defaultCmdBuffer);
 
-	rendering.Begin(defaultCmdBuffer);
-
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline.pipeline.get());
+	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
 
 	UpdateCameraUniform();
 
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, basicPipeline.layout.get(), 0, 1, &descriptorSet.get(), 0, nullptr);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*descriptorSet, 0, nullptr);
 
-	SubmitDrawCall(triMesh.get(), defaultCmdBuffer);
+	SubmitDrawCall(*triMesh, defaultCmdBuffer);
 
 	EndRendering(defaultCmdBuffer);
-}
-
-void BasicUniformBufferRenderer::WriteDescriptorSet(vk::DescriptorSet set)	{
-	vk::WriteDescriptorSet descriptorWrites[1] = {
-		vk::WriteDescriptorSet()
-			.setDescriptorType(vk::DescriptorType::eUniformBuffer)
-			.setDstSet(set)
-			.setDstBinding(0)
-			.setDescriptorCount(1)
-			.setPBufferInfo(&cameraData.descriptorInfo)
-	};
-	device.updateDescriptorSets(1, descriptorWrites, 0, nullptr);
 }
 
 void BasicUniformBufferRenderer::UpdateCameraUniform() {

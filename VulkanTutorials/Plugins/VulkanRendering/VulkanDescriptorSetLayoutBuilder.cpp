@@ -69,7 +69,7 @@ vk::UniqueDescriptorSetLayout VulkanDescriptorSetLayoutBuilder::BuildUnique(vk::
 		vk::DescriptorSetLayoutCreateInfo({}, (uint32_t)addedBindings.size(), addedBindings.data())
 	));
 	if (!debugName.empty()) {
-		Vulkan::SetDebugName(device, vk::ObjectType::eDescriptorSetLayout, (uint64_t)(VkDescriptorSetLayout)layout.get(), debugName);
+		Vulkan::SetDebugName(device, vk::ObjectType::eDescriptorSetLayout, (uint64_t)(VkDescriptorSetLayout)*layout, debugName);
 	}
 	return layout;
 }

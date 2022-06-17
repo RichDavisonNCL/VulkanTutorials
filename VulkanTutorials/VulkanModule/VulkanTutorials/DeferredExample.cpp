@@ -5,7 +5,6 @@ Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
-#include "Precompiled.h"
 #include "DeferredExample.h"
 #include "GLTFLoader.h"
 using namespace NCL;
@@ -23,20 +22,21 @@ struct LightStageUBOData {
 DeferredExample::DeferredExample(Window& window) : VulkanTutorialRenderer(window) {
 	cameraUniform.camera.SetPitch(-20.0f).SetPosition(Vector3(0, 75.0f, 200)).SetFarPlane(1000.0f);
 
-	cubeMesh	= MakeSmartMesh(LoadMesh("Cube.msh"));
-	sphereMesh	= MakeSmartMesh(LoadMesh("Sphere.msh"));
-	quadMesh	= MakeSmartMesh(GenerateQuad());
+	cubeMesh	= LoadMesh("Cube.msh");
+	sphereMesh	= LoadMesh("Sphere.msh");
+	quadMesh	= GenerateQuad();
 
-	boxObject.mesh		= cubeMesh.get();
+
+	boxObject.mesh		= &*cubeMesh;
 	boxObject.transform = Matrix4::Translation(Vector3(-50, 10, -50)) * Matrix4::Scale(Vector3(10.2f, 10.2f, 10.2f));
 
-	floorObject.mesh		= cubeMesh.get();
+	floorObject.mesh		= &*cubeMesh;
 	floorObject.transform	= Matrix4::Scale(Vector3(100.0f, 1.0f, 100.0f));
 
-	objectTextures[0] = VulkanTexture::TexturePtrFromFilename("rust_diffuse.png");
-	objectTextures[1] = VulkanTexture::TexturePtrFromFilename("rust_bump.png");
-	objectTextures[2] = VulkanTexture::TexturePtrFromFilename("concrete_diffuse.png");
-	objectTextures[3] = VulkanTexture::TexturePtrFromFilename("concrete_bump.png");
+	objectTextures[0] = VulkanTexture::TextureFromFile("rust_diffuse.png");
+	objectTextures[1] = VulkanTexture::TextureFromFile("rust_bump.png");
+	objectTextures[2] = VulkanTexture::TextureFromFile("concrete_diffuse.png");
+	objectTextures[3] = VulkanTexture::TextureFromFile("concrete_bump.png");
 
 	LoadShaders();
 	CreateFrameBuffers();
@@ -62,9 +62,9 @@ DeferredExample::DeferredExample(Window& window) : VulkanTutorialRenderer(window
 
 	lightStageUniform = CreateBuffer(sizeof(LightStageUBOData), vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible);
 
-	UpdateUniformBufferDescriptor(*lightStageDescriptor, lightStageUniform, 0);
-	UpdateUniformBufferDescriptor(*lightDescriptor, lightUniform, 0);
-	UpdateUniformBufferDescriptor(*lightStageCamDescriptor, cameraUniform.cameraData, 0);
+	UpdateBufferDescriptor(*lightStageDescriptor, lightStageUniform, 0, vk::DescriptorType::eUniformBuffer);
+	UpdateBufferDescriptor(*lightDescriptor, lightUniform, 0, vk::DescriptorType::eUniformBuffer);
+	UpdateBufferDescriptor(*lightStageCamDescriptor, cameraUniform.cameraData, 0, vk::DescriptorType::eUniformBuffer);
 }
 
 DeferredExample::~DeferredExample() {
@@ -88,11 +88,11 @@ void	DeferredExample::LoadShaders() {
 }
 
 void	DeferredExample::CreateFrameBuffers() {
-	bufferTextures[0] = VulkanTexture::GenerateColourTexturePtr(windowWidth, windowHeight, "GBufferDiffuse");
-	bufferTextures[1] = VulkanTexture::GenerateColourTexturePtr(windowWidth, windowHeight, "GBufferNormals");
-	bufferTextures[2] = VulkanTexture::GenerateDepthTexturePtr(windowWidth, windowHeight, "GBufferDepth", false);
-	bufferTextures[3] = VulkanTexture::GenerateColourTexturePtr(windowWidth, windowHeight, "DeferredDiffuse");
-	bufferTextures[4] = VulkanTexture::GenerateColourTexturePtr(windowWidth, windowHeight, "DeferredSpecular");
+	bufferTextures[0] = VulkanTexture::CreateColourTexture(windowWidth, windowHeight, "GBuffer Diffuse");
+	bufferTextures[1] = VulkanTexture::CreateColourTexture(windowWidth, windowHeight, "GBuffer Normals");
+	bufferTextures[2] = VulkanTexture::CreateDepthTexture(windowWidth, windowHeight, "GBuffer Depth", false);
+	bufferTextures[3] = VulkanTexture::CreateColourTexture(windowWidth, windowHeight, "Deferred Diffuse");
+	bufferTextures[4] = VulkanTexture::CreateColourTexture(windowWidth, windowHeight, "Deferred Specular");
 }
 
 void	DeferredExample::BuildGBufferPipeline() {
@@ -106,14 +106,14 @@ void	DeferredExample::BuildGBufferPipeline() {
 	.BuildUnique(device);
 
 	gBufferPipeline = VulkanPipelineBuilder("Main Scene Pipeline")
-		.WithVertexSpecification(cubeMesh->GetVertexSpecification())
+		.WithVertexInputState(cubeMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShaderState(gBufferShader)
+		.WithShader(gBufferShader)
 		.WithBlendState(vk::BlendFactor::eSrcAlpha, vk::BlendFactor::eOneMinusSrcAlpha, false)
 		.WithBlendState(vk::BlendFactor::eSrcAlpha, vk::BlendFactor::eOneMinusSrcAlpha, false) //We have two attachments, and we want them both to get added!
 		.WithDepthState(vk::CompareOp::eLessOrEqual, true, true, false)
 		.WithColourFormats({ bufferTextures[0]->GetFormat(), bufferTextures[1]->GetFormat() })
-		.WithDepthStencilFormat(bufferTextures[2]->GetFormat())
+		.WithDepthFormat(bufferTextures[2]->GetFormat())
 		.WithDescriptorSetLayout(cameraLayout)			//Camera is set 0
 		.WithDescriptorSetLayout(objectTextureLayout)	//Textures are set 1
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4))
@@ -150,9 +150,9 @@ void	DeferredExample::BuildLightPassPipeline() {
 	.BuildUnique(device);
 
 	lightPipeline = VulkanPipelineBuilder("Deferred Lighting Pipeline")
-		.WithVertexSpecification(sphereMesh->GetVertexSpecification())
+		.WithVertexInputState(sphereMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShaderState(lightingShader)
+		.WithShader(lightingShader)
 		.WithRaster(vk::CullModeFlagBits::eFront, vk::PolygonMode::eFill)
 		.WithBlendState(vk::BlendFactor::eOne, vk::BlendFactor::eOne, true)
 		.WithBlendState(vk::BlendFactor::eOne, vk::BlendFactor::eOne, true) //We have two attachments, and we want them both to get added!
@@ -181,9 +181,9 @@ void	DeferredExample::BuildCombinePipeline() {
 	.BuildUnique(device);
 
 	combinePipeline = VulkanPipelineBuilder("Post process pipeline")
-		.WithVertexSpecification(quadMesh->GetVertexSpecification())
+		.WithVertexInputState(quadMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleStrip)
-		.WithShaderState(combineShader)
+		.WithShader(combineShader)
 		.WithDescriptorSetLayout(combineTextureLayout)
 		.WithColourFormats({ surfaceFormat })
 		.WithDepthStencilFormat(depthBuffer->GetFormat())
@@ -197,6 +197,8 @@ void	DeferredExample::BuildCombinePipeline() {
 }
 
 void	DeferredExample::FillGBuffer() {
+	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *gBufferPipeline.pipeline);
+
 	VulkanDynamicRenderBuilder()
 		.WithColourAttachment(bufferTextures[0]->GetDefaultView(), vk::ImageLayout::eColorAttachmentOptimal, true, ClearColour(0.0f, 0.0f, 0.0f, 1.0f))
 		.WithColourAttachment(bufferTextures[1]->GetDefaultView(), vk::ImageLayout::eColorAttachmentOptimal, true, ClearColour(0.0f, 0.0f, 0.0f, 1.0f))
@@ -204,10 +206,8 @@ void	DeferredExample::FillGBuffer() {
 		.WithRenderArea(defaultScreenRect)
 	.Begin(defaultCmdBuffer);
 
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, gBufferPipeline.pipeline.get());
-	
-	UpdateUniformBufferDescriptor(*cameraDescriptor, cameraUniform.cameraData, 0);
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, gBufferPipeline.layout.get(), 0, 1, &*cameraDescriptor, 0, nullptr);
+	UpdateBufferDescriptor(*cameraDescriptor, cameraUniform.cameraData, 0, vk::DescriptorType::eUniformBuffer);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *gBufferPipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
 
 	RenderSingleObject(boxObject	, defaultCmdBuffer, gBufferPipeline	, 1);
 	RenderSingleObject(floorObject	, defaultCmdBuffer, gBufferPipeline	, 1);
@@ -236,7 +236,7 @@ void	DeferredExample::RenderLights() {	//Second step: Take in the GBUffer and re
 		defaultCmdBuffer.pushConstants(*lightPipeline.layout,
 			vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment
 			, 0, sizeof(int), (void*)&i);
-		SubmitDrawCall(sphereMesh.get(), defaultCmdBuffer);
+		SubmitDrawCall(*sphereMesh, defaultCmdBuffer);
 	}
 	EndRendering(defaultCmdBuffer);
 }
@@ -248,18 +248,21 @@ void	DeferredExample::CombineBuffers() {
 	TransitionColourToSampler(&*bufferTextures[3], defaultCmdBuffer);
 	TransitionColourToSampler(&*bufferTextures[4], defaultCmdBuffer);
 
+	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *combinePipeline.pipeline);
+
 	BeginDefaultRendering(defaultCmdBuffer);
 
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *combinePipeline.pipeline);
 	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *combinePipeline.layout, 0, 1, &*combineTextureDescriptor, 0, nullptr);
 
-	SubmitDrawCall(&*quadMesh, defaultCmdBuffer);
+	SubmitDrawCall(*quadMesh, defaultCmdBuffer);
 
 	EndRendering(defaultCmdBuffer);
 
 	TransitionSamplerToColour(&*bufferTextures[0], defaultCmdBuffer);
 	TransitionSamplerToColour(&*bufferTextures[1], defaultCmdBuffer);
+
 	TransitionSamplerToDepth( &*bufferTextures[2], defaultCmdBuffer);
+
 	TransitionSamplerToColour(&*bufferTextures[3], defaultCmdBuffer);
 	TransitionSamplerToColour(&*bufferTextures[4], defaultCmdBuffer);
 }

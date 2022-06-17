@@ -7,6 +7,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../../Common/ShaderBase.h"
+#include "SmartTypes.h"
 
 namespace NCL::Rendering {
 	class VulkanShader;
@@ -27,7 +28,7 @@ namespace NCL::Rendering {
 
 		VulkanShader*	Build(vk::Device device);
 
-		std::unique_ptr<VulkanShader> BuildUnique(vk::Device device);
+		UniqueVulkanShader BuildUnique(vk::Device device);
 
 	protected:
 		std::string shaderFiles[(int)ShaderStages::MAXSIZE];

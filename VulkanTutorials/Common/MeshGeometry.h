@@ -1,9 +1,15 @@
+/*
+Part of Newcastle University's Game Engineering source code.
+
+Use as you see fit!
+
+Comments and queries to: richard-gordon.davison AT ncl.ac.uk
+https://research.ncl.ac.uk/game/
+*/
 #pragma once
 #include <vector>
-#include "Vector2.h"
-#include "Vector3.h"
-#include "Vector4.h"
-#include "Maths.h"
+#include <string>
+
 using std::vector;
 
 namespace NCL {
@@ -12,6 +18,8 @@ namespace NCL {
 		class Vector3;
 		class Vector4;
 		class Matrix4;
+
+		class Vector4i;
 	}
 	namespace Rendering {
 		class RendererBase;
@@ -54,8 +62,7 @@ namespace NCL {
 		int base  = 0;
 	};
 
-	class MeshGeometry
-	{
+	class MeshGeometry	{
 	public:		
 		virtual ~MeshGeometry();
 
