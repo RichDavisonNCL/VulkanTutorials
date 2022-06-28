@@ -11,7 +11,7 @@ namespace NCL::Rendering {
 	class VulkanDynamicRenderBuilder	{
 	public:
 		VulkanDynamicRenderBuilder();
-		~VulkanDynamicRenderBuilder();
+		~VulkanDynamicRenderBuilder() {}
 
 		VulkanDynamicRenderBuilder& WithColourAttachment(
 			vk::ImageView	texture,
@@ -40,8 +40,8 @@ namespace NCL::Rendering {
 		vk::RenderingInfoKHR renderInfo;
 		std::vector< vk::RenderingAttachmentInfoKHR > colourAttachments;
 		vk::RenderingAttachmentInfoKHR depthAttachment;
-		bool usingStencil;
-		int layerCount;
-		vk::Rect2D renderArea;
+		bool		usingStencil;
+		uint32_t	layerCount;
+		vk::Rect2D	renderArea;
 	};
 }

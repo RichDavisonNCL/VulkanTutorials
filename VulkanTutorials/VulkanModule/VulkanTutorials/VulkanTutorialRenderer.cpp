@@ -24,12 +24,14 @@ VulkanTutorialRenderer::VulkanTutorialRenderer(Window& window, VulkanInitInfo in
 
 	cameraLayout = VulkanDescriptorSetLayoutBuilder("CameraMatrices")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-		.BuildUnique(GetDevice()); //Get our camera matrices...
+		.Build(GetDevice()); //Get our camera matrices...
 	cameraDescriptor = BuildUniqueDescriptorSet(*cameraLayout);
 
 	UpdateBufferDescriptor(*cameraDescriptor, cameraUniform.cameraData, 0, vk::DescriptorType::eUniformBuffer);
 
 	runTime = 0.0f;
+
+	nullLayout = VulkanDescriptorSetLayoutBuilder().Build(device);
 }
 
 VulkanTutorialRenderer::~VulkanTutorialRenderer() {

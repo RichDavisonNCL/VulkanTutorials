@@ -7,6 +7,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "VulkanTutorialRenderer.h"
+
 namespace NCL::Rendering {
 	class BasicMultiPipelineRenderer : public VulkanTutorialRenderer {
 	public:
@@ -27,7 +28,7 @@ namespace NCL::Rendering {
 		UniqueVulkanShader texturingShader;
 		UniqueVulkanShader solidColourShader;
 
-		vk::DescriptorSet		textureDescriptorSetA;
-		vk::DescriptorSet		textureDescriptorSetB;
+		vk::UniqueDescriptorSet		textureDescriptorSetA;
+		vk::UniqueDescriptorSet		textureDescriptorSetB;
 	};
 }

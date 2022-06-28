@@ -16,7 +16,7 @@ CubeMapRenderer::CubeMapRenderer(Window& window) : VulkanTutorialRenderer(window
 
 	cubemapLayout = VulkanDescriptorSetLayoutBuilder("Cubemap Layout")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-		.BuildUnique(device);
+	.Build(device);
 
 	cubeTex = VulkanTexture::VulkanCubemapFromFiles(
 		"Cubemap/skyrender0004.png", "Cubemap/skyrender0001.png",
@@ -25,30 +25,28 @@ CubeMapRenderer::CubeMapRenderer(Window& window) : VulkanTutorialRenderer(window
 		"Cubemap Texture!"
 	);	
 
-	cameraUniform.camera.SetPosition(Vector3(0, 0, 10));
+	cameraUniform.camera.SetPosition({ 0, 0, 10 });
 	
 	cubemapDescriptor = BuildUniqueDescriptorSet(*cubemapLayout);
-	UpdateImageDescriptor(*cubemapDescriptor, 0, cubeTex->GetDefaultView(), *defaultSampler);
+	UpdateImageDescriptor(*cubemapDescriptor, 0, 0, cubeTex->GetDefaultView(), *defaultSampler);
 
 	cameraPosLayout = VulkanDescriptorSetLayoutBuilder("Camera Position Layout")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-		.BuildUnique(device);
+	.Build(device);
 
 	cameraPosDescriptor = BuildUniqueDescriptorSet(*cameraPosLayout);
 
 	camPosUniform = CreateBuffer(sizeof(Vector3), vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible);
 
-	skyboxShader = VulkanShaderBuilder()
+	skyboxShader = VulkanShaderBuilder("Basic Shader!")
 		.WithVertexBinary("skybox.vert.spv")
 		.WithFragmentBinary("skybox.frag.spv")
-		.WithDebugName("Basic Shader!")
-	.BuildUnique(device);
+	.Build(device);
 
-	objectShader = VulkanShaderBuilder()
+	objectShader = VulkanShaderBuilder("Basic Shader!")
 		.WithVertexBinary("cubemapObject.vert.spv")
 		.WithFragmentBinary("cubemapObject.frag.spv")
-		.WithDebugName("Basic Shader!")
-	.BuildUnique(device);
+	.Build(device);
 
 	skyboxPipeline = VulkanPipelineBuilder("CubeMapRenderer Skybox Pipeline")
 		.WithVertexInputState(quadMesh->GetVertexInputState())

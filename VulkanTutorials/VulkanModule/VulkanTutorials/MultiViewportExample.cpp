@@ -16,7 +16,7 @@ MultiViewportExample::MultiViewportExample(Window& window) : VulkanTutorialRende
 	shader = VulkanShaderBuilder("Basic Shader!")
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	pipeline = VulkanPipelineBuilder("Test Pipeline")
 		.WithVertexInputState(triMesh->GetVertexInputState())

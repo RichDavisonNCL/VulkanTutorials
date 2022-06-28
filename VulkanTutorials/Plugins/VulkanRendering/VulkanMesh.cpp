@@ -8,7 +8,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "Precompiled.h"
 #include "VulkanMesh.h"
 #include "VulkanRenderer.h"
-#include "Vulkan.h"
+#include "VulkanUtils.h"
 
 using namespace NCL;
 using namespace Rendering;
@@ -139,9 +139,9 @@ void VulkanMesh::UploadToGPU(RendererBase* r)  {
 		renderer->SubmitCmdBufferWait(cmdBuffer);
 	}
 	if (!debugName.empty()) {
-		Vulkan::SetDebugName(sourceDevice, vk::ObjectType::eBuffer, (uint64_t)(VkBuffer)*vertexBuffer.buffer, debugName + " vertex attributes");
+		Vulkan::SetDebugName(sourceDevice, vk::ObjectType::eBuffer, Vulkan::GetVulkanHandle(*vertexBuffer.buffer), debugName + " vertex attributes");
 		if (GetIndexCount() > 0) {
-			Vulkan::SetDebugName(sourceDevice, vk::ObjectType::eBuffer, (uint64_t)(VkBuffer)*indexBuffer.buffer, debugName + " vertex indices");
+			Vulkan::SetDebugName(sourceDevice, vk::ObjectType::eBuffer, Vulkan::GetVulkanHandle(*indexBuffer.buffer), debugName + " vertex indices");
 		}
 	}
 }

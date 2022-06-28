@@ -17,7 +17,7 @@ bool Assets::ReadTextFile(const std::string &filepath, std::string& result) {
 		return true;
 	}
 	else {
-		std::cout << __FUNCTION__ << " can't read file " << filepath << std::endl;
+		std::cout << __FUNCTION__ << " can't read file " << filepath << "\n";
 		return false;
 	}
 }

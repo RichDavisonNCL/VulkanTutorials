@@ -16,14 +16,14 @@ MeshMaterial::MeshMaterial(const std::string& filename) {
 	file >> dataType;
 
 	if (dataType != "MeshMat") {
-		std::cout << "File " << filename << " is not a MeshMaterial!\n";
+		std::cout << __FUNCTION__ << " File " << filename << " is not a MeshMaterial!\n";
 		return;
 	}
 	int version;
 	file >> version;
 
 	if (version != 1) {
-		std::cout << "File " << filename << " has incompatible version " << version << "!\n";
+		std::cout << __FUNCTION__ << " File " << filename << " has incompatible version " << version << "!\n";
 		return;
 	}
 

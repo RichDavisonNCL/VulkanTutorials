@@ -13,19 +13,19 @@ using namespace Rendering;
 const int SHADOWSIZE = 2048;
 
 ShadowMappingExample::ShadowMappingExample(Window& window) : VulkanTutorialRenderer(window) {
-	cameraUniform.camera.SetPitch(-40.0f).SetYaw(310).SetPosition(Vector3(-150,120.0f, 240));
+	cameraUniform.camera.SetPitch(-40.0f).SetYaw(310).SetPosition({ -150, 120.0f, 240 });
 
 	cubeMesh	= LoadMesh("Cube.msh");
 	
 	shadowFillShader = VulkanShaderBuilder("Shadow Fill Shader")
 		.WithVertexBinary("ShadowFill.vert.spv")
 		.WithFragmentBinary("ShadowFill.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	shadowUseShader = VulkanShaderBuilder("Shadow Use Shader")
 		.WithVertexBinary("ShadowUse.vert.spv")
 		.WithFragmentBinary("ShadowUse.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	shadowMap = VulkanTexture::CreateDepthTexture(SHADOWSIZE, SHADOWSIZE, "Shadow Map", false);
 
@@ -39,7 +39,7 @@ ShadowMappingExample::ShadowMappingExample(Window& window) : VulkanTutorialRende
 
 	shadowMatrixLayout = VulkanDescriptorSetLayoutBuilder("ShadowMatrix")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-	.BuildUnique(device); //Get our camera matrices...
+	.Build(device); //Get our camera matrices...
 
 	shadowMatrixDescriptor = BuildUniqueDescriptorSet(*shadowMatrixLayout);
 	UpdateBufferDescriptor(*shadowMatrixDescriptor, shadowMatUniform, 0, vk::DescriptorType::eUniformBuffer);
@@ -50,13 +50,13 @@ ShadowMappingExample::ShadowMappingExample(Window& window) : VulkanTutorialRende
 	BuildMainPipeline();
 	BuildShadowPipeline();
 
-	UpdateImageDescriptor(*sceneShadowTexDescriptor, 0, shadowMap->GetDefaultView(), *defaultSampler, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+	UpdateImageDescriptor(*sceneShadowTexDescriptor, 0, 0, shadowMap->GetDefaultView(), *defaultSampler, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
 
 	boxObject.mesh			= &*cubeMesh;
-	boxObject.transform		= Matrix4::Translation(Vector3(-50, 25, -50));
+	boxObject.transform = Matrix4::Translation({ -50, 25, -50 });
 
 	floorObject.mesh		= &*cubeMesh;
-	floorObject.transform	= Matrix4::Scale(Vector3(100.0f, 1.0f, 100.0f));
+	floorObject.transform = Matrix4::Scale({ 100.0f, 1.0f, 100.0f });
 }
 
 ShadowMappingExample::~ShadowMappingExample() {
@@ -65,7 +65,7 @@ ShadowMappingExample::~ShadowMappingExample() {
 
 void ShadowMappingExample::Update(float dt) {
 	VulkanTutorialRenderer::Update(dt);
-	boxObject.transform = Matrix4::Translation(Vector3(-50, 30.0f + (sin(runTime) * 30.0f), -50));
+	boxObject.transform = Matrix4::Translation({ -50, 30.0f + (sin(runTime) * 30.0f), -50 });
 }
 
 void	ShadowMappingExample::BuildShadowPipeline() {
@@ -83,11 +83,11 @@ void	ShadowMappingExample::BuildShadowPipeline() {
 void	ShadowMappingExample::BuildMainPipeline() {
 	diffuseLayout = VulkanDescriptorSetLayoutBuilder("DiffuseTex")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)	
-		.BuildUnique(device); //And a diffuse texture
+		.Build(device); //And a diffuse texture
 
 	shadowTexLayout = VulkanDescriptorSetLayoutBuilder("ShadowTex")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-		.BuildUnique(device); //And our shadow map!
+		.Build(device); //And our shadow map!
 
 	scenePipeline = VulkanPipelineBuilder("Main Scene Pipeline")
 		.WithVertexInputState(cubeMesh->GetVertexInputState())

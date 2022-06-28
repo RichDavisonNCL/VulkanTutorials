@@ -18,7 +18,7 @@ BasicUniformBufferRenderer::BasicUniformBufferRenderer(Window& window) : VulkanT
 	shader = VulkanShaderBuilder("Basic Uniform Buffer Usage!")
 		.WithVertexBinary("BasicUniformBuffer.vert.spv")
 		.WithFragmentBinary("BasicUniformBuffer.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	cameraData		= CreateBuffer(sizeof(Matrix4) * 2, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible);
 	cameraMemory	= (Matrix4*)device.mapMemory(*cameraData.deviceMem, 0, cameraData.allocInfo.allocationSize);
@@ -31,7 +31,7 @@ void BasicUniformBufferRenderer::Update(float dt) {
 }
 
 void	BasicUniformBufferRenderer::BuildPipeline() {
-	vk::DescriptorSetLayout matrixLayout = VulkanDescriptorSetLayoutBuilder("Matrices")
+	matrixLayout = VulkanDescriptorSetLayoutBuilder("Matrices")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
 	.Build(device);
 
@@ -40,14 +40,12 @@ void	BasicUniformBufferRenderer::BuildPipeline() {
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shader)
 		.WithColourFormats({ surfaceFormat })
-		.WithDescriptorSetLayout(matrixLayout)
+		.WithDescriptorSetLayout(*matrixLayout)
 	.Build(device, pipelineCache);
 
-	descriptorSet = BuildUniqueDescriptorSet(matrixLayout);
+	descriptorSet = BuildUniqueDescriptorSet(*matrixLayout);
 
 	UpdateBufferDescriptor(*descriptorSet, cameraData, 0, vk::DescriptorType::eUniformBuffer);
-
-	device.destroyDescriptorSetLayout(matrixLayout);
 }
 
 void BasicUniformBufferRenderer::RenderFrame() {

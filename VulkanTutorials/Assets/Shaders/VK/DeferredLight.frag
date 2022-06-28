@@ -5,10 +5,6 @@
 
 #include "Lighting.glslh"
 
-layout(push_constant) uniform LightIndex    {
-    int lightIndex;
-};
-
 layout (set = 1, binding  = 0) uniform Lights 
 {
 	Light allLights[64];
@@ -18,9 +14,11 @@ layout (set = 2, binding  = 0) uniform LightStageUBO
 {	
 	mat4	inverseProjView;	
 	vec3	cameraPosition;
-	float	scrap; //Strangely important!
+	float	scrap; //Maintains Alignment
 	vec2	resolution;
 };
+
+layout (location = 0) in flat int lightIndex;
 
 layout (set = 3, binding  = 0) uniform  sampler2D bumpTex;	//Comes from G-Buffer
 layout (set = 3, binding  = 1) uniform  sampler2D depthTex;	//Comes from G-Buffer
@@ -49,8 +47,6 @@ void main() {
 		discard;
 	}
 	LightCalculation(worldSpace, worldBump, cameraPosition, vec3(1,1,1), allLights[lightIndex], diffuseColour.xyz, specularColour.xyz, 0.0f);
-
-	//diffuseColour.xyz = allLights[lightIndex].colour.xyz;
 
 	diffuseColour.a		= 1.0f;
 	specularColour.a	= 1.0f;

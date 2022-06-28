@@ -9,12 +9,6 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanShader.h"
 #include "../../Common/Assets.h"
 
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <iosfwd>
-#include <set>
-
 using std::ifstream;
 
 using namespace NCL;
@@ -36,46 +30,25 @@ VulkanShader::VulkanShader()	{
 }
 
 VulkanShader::~VulkanShader()	{
-	std::set< vk::ShaderModule> uniqueModules;
-
-	for (int i = 0; i < stageCount; ++i) {
-		uniqueModules.insert(shaderModules[i]);	
-	}
-
-	for (vk::ShaderModule i : uniqueModules) {
-		sourceDevice.destroyShaderModule(i);
-	}
-	delete[] infos;
+	delete infos;
 }
 
 void VulkanShader::ReloadShader() {
 
 }
 
-void VulkanShader::SetSourceDevice(vk::Device d) {
-	sourceDevice = d;
-}
-
-void VulkanShader::AddBinaryShaderModule(const string& fromFile, ShaderStages stage, const string& entryPoint) {
+void VulkanShader::AddBinaryShaderModule(const string& fromFile, ShaderStages stage, vk::Device device, const string& entryPoint) {
 	char* data;
 	size_t dataSize = 0;
 	Assets::ReadBinaryFile(Assets::SHADERDIR + "VK/" + fromFile, &data, dataSize);
-	bool found = false;
-	for (int i = 0; i < (int)ShaderStages::MAXSIZE; ++i) {
-		if (shaderFiles[i] == fromFile) {	//already loaded this binary!
-			shaderModules[(int)stage] = shaderModules[i];
-			found = true;
-			break;
-		}
+
+	if (data) {
+		shaderModules[(int)stage] = device.createShaderModuleUnique(vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), dataSize, (uint32_t*)data));
 	}
-	if (!found) {
-		if (data) {
-			CreateShaderModule(data, dataSize, shaderModules[(int)stage], sourceDevice);
-		}
-		else {
-			std::cout << __FUNCTION__ << " Problem loading shader file " << fromFile << "!\n";
-		}
+	else {
+		std::cout << __FUNCTION__ << " Problem loading shader file " << fromFile << "!\n";
 	}
+
 	shaderFiles[(int)stage] = fromFile;
 	entryPoints[(int)stage] = entryPoint;
 }
@@ -89,11 +62,11 @@ void VulkanShader::Init() {
 	}
 	infos = new vk::PipelineShaderStageCreateInfo[stageCount];
 
-	int doneCount = 0;
+	uint32_t doneCount = 0;
 	for (int i = 0; i < (int)ShaderStages::MAXSIZE; ++i) {
 		if (shaderModules[i]) {
 			infos[doneCount].stage	= stageTypes[i];
-			infos[doneCount].module = shaderModules[i];
+			infos[doneCount].module = *shaderModules[i];
 			infos[doneCount].pName	= entryPoints[i].c_str();
 
 			doneCount++;
@@ -102,15 +75,6 @@ void VulkanShader::Init() {
 			}
 		}
 	}
-}
-
-vk::ShaderModule VulkanShader::GetShaderModule(ShaderStages stage) const {
-	return shaderModules[(int)stage];
-}
-
-bool		VulkanShader::CreateShaderModule(char*data, size_t size, vk::ShaderModule& into, vk::Device& device) {
-	into = device.createShaderModule(vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), size, (uint32_t*)data));
-	return true;
 }
 
 void	VulkanShader::FillShaderStageCreateInfo(vk::GraphicsPipelineCreateInfo &info) const {

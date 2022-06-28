@@ -20,18 +20,17 @@ struct LightStageUBOData {
 };
 
 DeferredExample::DeferredExample(Window& window) : VulkanTutorialRenderer(window) {
-	cameraUniform.camera.SetPitch(-20.0f).SetPosition(Vector3(0, 75.0f, 200)).SetFarPlane(1000.0f);
+	cameraUniform.camera.SetPitch(-20.0f).SetPosition({ 0, 75.0f, 200 }).SetFarPlane(1000.0f);
 
 	cubeMesh	= LoadMesh("Cube.msh");
 	sphereMesh	= LoadMesh("Sphere.msh");
 	quadMesh	= GenerateQuad();
 
-
 	boxObject.mesh		= &*cubeMesh;
-	boxObject.transform = Matrix4::Translation(Vector3(-50, 10, -50)) * Matrix4::Scale(Vector3(10.2f, 10.2f, 10.2f));
+	boxObject.transform = Matrix4::Translation({ -50, 10, -50 }) * Matrix4::Scale({ 10.2f, 10.2f, 10.2f });
 
 	floorObject.mesh		= &*cubeMesh;
-	floorObject.transform	= Matrix4::Scale(Vector3(100.0f, 1.0f, 100.0f));
+	floorObject.transform = Matrix4::Scale({ 500.0f, 1.0f, 500.0f });
 
 	objectTextures[0] = VulkanTexture::TextureFromFile("rust_diffuse.png");
 	objectTextures[1] = VulkanTexture::TextureFromFile("rust_bump.png");
@@ -39,10 +38,11 @@ DeferredExample::DeferredExample(Window& window) : VulkanTutorialRenderer(window
 	objectTextures[3] = VulkanTexture::TextureFromFile("concrete_bump.png");
 
 	LoadShaders();
-	CreateFrameBuffers();
+	CreateFrameBuffers(windowWidth, windowHeight);
 	BuildGBufferPipeline();
 	BuildLightPassPipeline();
 	BuildCombinePipeline();
+	UpdateDescriptors();
 
 	Light allLights[LIGHTCOUNT];
 	for (int i = 0; i < LIGHTCOUNT; ++i) {
@@ -64,46 +64,53 @@ DeferredExample::DeferredExample(Window& window) : VulkanTutorialRenderer(window
 
 	UpdateBufferDescriptor(*lightStageDescriptor, lightStageUniform, 0, vk::DescriptorType::eUniformBuffer);
 	UpdateBufferDescriptor(*lightDescriptor, lightUniform, 0, vk::DescriptorType::eUniformBuffer);
-	UpdateBufferDescriptor(*lightStageCamDescriptor, cameraUniform.cameraData, 0, vk::DescriptorType::eUniformBuffer);
 }
 
-DeferredExample::~DeferredExample() {
+void DeferredExample::OnWindowResize(int w, int h) {
+	VulkanRenderer::OnWindowResize(w, h);
+	CreateFrameBuffers(w,h);
+	UpdateDescriptors();
 }
 
 void	DeferredExample::LoadShaders() {
 	gBufferShader = VulkanShaderBuilder("Deferred GBuffer Fill Shader")
 		.WithVertexBinary("DeferredScene.vert.spv")
 		.WithFragmentBinary("DeferredScene.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	lightingShader = VulkanShaderBuilder("Deferred Lighting Shader")
 		.WithVertexBinary("DeferredLight.vert.spv")
 		.WithFragmentBinary("DeferredLight.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	combineShader = VulkanShaderBuilder("Deferred Combine Shader")
 		.WithVertexBinary("DeferredCombine.vert.spv")
 		.WithFragmentBinary("DeferredCombine.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 }
 
-void	DeferredExample::CreateFrameBuffers() {
-	bufferTextures[0] = VulkanTexture::CreateColourTexture(windowWidth, windowHeight, "GBuffer Diffuse");
-	bufferTextures[1] = VulkanTexture::CreateColourTexture(windowWidth, windowHeight, "GBuffer Normals");
-	bufferTextures[2] = VulkanTexture::CreateDepthTexture(windowWidth, windowHeight, "GBuffer Depth", false);
-	bufferTextures[3] = VulkanTexture::CreateColourTexture(windowWidth, windowHeight, "Deferred Diffuse");
-	bufferTextures[4] = VulkanTexture::CreateColourTexture(windowWidth, windowHeight, "Deferred Specular");
+void	DeferredExample::CreateFrameBuffers(uint32_t width, uint32_t height) {
+	bufferTextures[0] = VulkanTexture::CreateColourTexture(width, height, "GBuffer Diffuse");
+	bufferTextures[1] = VulkanTexture::CreateColourTexture(width, height, "GBuffer Normals");
+	bufferTextures[2] = VulkanTexture::CreateDepthTexture(width, height, "GBuffer Depth", false);
+	bufferTextures[3] = VulkanTexture::CreateColourTexture(width, height, "Deferred Diffuse");
+	bufferTextures[4] = VulkanTexture::CreateColourTexture(width, height, "Deferred Specular");
+}
+
+void	DeferredExample::UpdateDescriptors() {
+	UpdateImageDescriptor(*lightTextureDescriptor, 0, 0, bufferTextures[1]->GetDefaultView(), *defaultSampler, vk::ImageLayout::eShaderReadOnlyOptimal);
+	UpdateImageDescriptor(*lightTextureDescriptor, 1, 0, bufferTextures[2]->GetDefaultView(), *defaultSampler, vk::ImageLayout::eDepthStencilReadOnlyOptimal);//???
+
+	UpdateImageDescriptor(*combineTextureDescriptor, 0, 0, bufferTextures[0]->GetDefaultView(), *defaultSampler);
+	UpdateImageDescriptor(*combineTextureDescriptor, 1, 0, bufferTextures[3]->GetDefaultView(), *defaultSampler);
+	UpdateImageDescriptor(*combineTextureDescriptor, 2, 0, bufferTextures[4]->GetDefaultView(), *defaultSampler);
 }
 
 void	DeferredExample::BuildGBufferPipeline() {
-	cameraLayout = VulkanDescriptorSetLayoutBuilder("CameraMatrices")
-		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-	.BuildUnique(device); //Get our camera matrices...
-
 	objectTextureLayout = VulkanDescriptorSetLayoutBuilder("Object Textures")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device);
+	.Build(device);
 
 	gBufferPipeline = VulkanPipelineBuilder("Main Scene Pipeline")
 		.WithVertexInputState(cubeMesh->GetVertexInputState())
@@ -114,40 +121,34 @@ void	DeferredExample::BuildGBufferPipeline() {
 		.WithDepthState(vk::CompareOp::eLessOrEqual, true, true, false)
 		.WithColourFormats({ bufferTextures[0]->GetFormat(), bufferTextures[1]->GetFormat() })
 		.WithDepthFormat(bufferTextures[2]->GetFormat())
-		.WithDescriptorSetLayout(cameraLayout)			//Camera is set 0
-		.WithDescriptorSetLayout(objectTextureLayout)	//Textures are set 1
+		.WithDescriptorSetLayout(*cameraLayout)			//Camera is set 0
+		.WithDescriptorSetLayout(*objectTextureLayout)	//Textures are set 1
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4))
 	.Build(device, pipelineCache);
 
 	boxObject.objectDescriptorSet	= BuildUniqueDescriptorSet(*objectTextureLayout);
 	floorObject.objectDescriptorSet = BuildUniqueDescriptorSet(*objectTextureLayout);
 
-	UpdateImageDescriptor(*boxObject.objectDescriptorSet, 0, objectTextures[0]->GetDefaultView(), *defaultSampler);
-	UpdateImageDescriptor(*boxObject.objectDescriptorSet, 1, objectTextures[1]->GetDefaultView(), *defaultSampler);
+	UpdateImageDescriptor(*boxObject.objectDescriptorSet, 0, 0, objectTextures[0]->GetDefaultView(), *defaultSampler);
+	UpdateImageDescriptor(*boxObject.objectDescriptorSet, 1, 0, objectTextures[1]->GetDefaultView(), *defaultSampler);
 
-	UpdateImageDescriptor(*floorObject.objectDescriptorSet, 0, objectTextures[2]->GetDefaultView(), *defaultSampler);
-	UpdateImageDescriptor(*floorObject.objectDescriptorSet, 1, objectTextures[3]->GetDefaultView(), *defaultSampler);
-
-	cameraDescriptor = BuildUniqueDescriptorSet(*cameraLayout);
+	UpdateImageDescriptor(*floorObject.objectDescriptorSet, 0, 0, objectTextures[2]->GetDefaultView(), *defaultSampler);
+	UpdateImageDescriptor(*floorObject.objectDescriptorSet, 1, 0, objectTextures[3]->GetDefaultView(), *defaultSampler);
 }
 
 void	DeferredExample::BuildLightPassPipeline() {
-	lightStageCamLayout = VulkanDescriptorSetLayoutBuilder("CameraMatrices")
-		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-	.BuildUnique(device); //Get our camera matrices...
-
 	lightLayout = VulkanDescriptorSetLayoutBuilder("All Lights")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device); //Get our camera matrices...
+	.Build(device); //Get our camera matrices...
 
 	lightStageLayout = VulkanDescriptorSetLayoutBuilder("Light Stage Data")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device); //Get our camera matrices...	
+	.Build(device); //Get our camera matrices...	
 
 	lightTextureLayout = VulkanDescriptorSetLayoutBuilder("GBuffer Textures")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device);
+	.Build(device);
 
 	lightPipeline = VulkanPipelineBuilder("Deferred Lighting Pipeline")
 		.WithVertexInputState(sphereMesh->GetVertexInputState())
@@ -156,21 +157,16 @@ void	DeferredExample::BuildLightPassPipeline() {
 		.WithRaster(vk::CullModeFlagBits::eFront, vk::PolygonMode::eFill)
 		.WithBlendState(vk::BlendFactor::eOne, vk::BlendFactor::eOne, true)
 		.WithBlendState(vk::BlendFactor::eOne, vk::BlendFactor::eOne, true) //We have two attachments, and we want them both to get added!
-		.WithPushConstant(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(int))
-		.WithDescriptorSetLayout(cameraLayout)		//Camera is set 0
-		.WithDescriptorSetLayout(lightLayout)		//Lights are set 1
-		.WithDescriptorSetLayout(lightStageLayout)	//Light index is set 2
-		.WithDescriptorSetLayout(lightTextureLayout)//Textures are set 3
+		.WithDescriptorSetLayout(*cameraLayout)		//Camera is set 0
+		.WithDescriptorSetLayout(*lightLayout)		//Lights are set 1
+		.WithDescriptorSetLayout(*lightStageLayout)	//Light index is set 2
+		.WithDescriptorSetLayout(*lightTextureLayout)//Textures are set 3
 		.WithColourFormats({ bufferTextures[3]->GetFormat() , bufferTextures[4]->GetFormat() })
 	.Build(device, pipelineCache);
 
 	lightDescriptor			= BuildUniqueDescriptorSet(*lightLayout);
 	lightStageDescriptor	= BuildUniqueDescriptorSet(*lightStageLayout);
 	lightTextureDescriptor	= BuildUniqueDescriptorSet(*lightTextureLayout);
-	lightStageCamDescriptor = BuildUniqueDescriptorSet(*lightStageCamLayout);
-
-	UpdateImageDescriptor(*lightTextureDescriptor, 0, bufferTextures[1]->GetDefaultView(), *defaultSampler,  vk::ImageLayout::eShaderReadOnlyOptimal);
-	UpdateImageDescriptor(*lightTextureDescriptor, 1, bufferTextures[2]->GetDefaultView(), *defaultSampler,  vk::ImageLayout::eDepthStencilReadOnlyOptimal);//???
 }
 
 void	DeferredExample::BuildCombinePipeline() {
@@ -178,22 +174,18 @@ void	DeferredExample::BuildCombinePipeline() {
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)	//Diffuse GBuffer Part
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)	//Diffuse Lighting Part
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)	//Specular Lighting Part
-	.BuildUnique(device);
+	.Build(device);
 
 	combinePipeline = VulkanPipelineBuilder("Post process pipeline")
 		.WithVertexInputState(quadMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleStrip)
 		.WithShader(combineShader)
-		.WithDescriptorSetLayout(combineTextureLayout)
+		.WithDescriptorSetLayout(*combineTextureLayout)
 		.WithColourFormats({ surfaceFormat })
 		.WithDepthStencilFormat(depthBuffer->GetFormat())
 	.Build(device, pipelineCache);
 
 	combineTextureDescriptor = BuildUniqueDescriptorSet(*combineTextureLayout);
-
-	UpdateImageDescriptor(*combineTextureDescriptor, 0, bufferTextures[0]->GetDefaultView(), *defaultSampler, vk::ImageLayout::eShaderReadOnlyOptimal);
-	UpdateImageDescriptor(*combineTextureDescriptor, 1, bufferTextures[3]->GetDefaultView(), *defaultSampler, vk::ImageLayout::eShaderReadOnlyOptimal);
-	UpdateImageDescriptor(*combineTextureDescriptor, 2, bufferTextures[4]->GetDefaultView(), *defaultSampler, vk::ImageLayout::eShaderReadOnlyOptimal);
 }
 
 void	DeferredExample::FillGBuffer() {
@@ -227,17 +219,13 @@ void	DeferredExample::RenderLights() {	//Second step: Take in the GBUffer and re
 		.WithLayerCount(1)
 	.Begin(defaultCmdBuffer);
 
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *lightPipeline.layout, 0, 1, &*lightStageCamDescriptor, 0, nullptr);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *lightPipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
 	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *lightPipeline.layout, 1, 1, &*lightDescriptor, 0, nullptr);
 	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *lightPipeline.layout, 2, 1, &*lightStageDescriptor, 0, nullptr);
 	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *lightPipeline.layout, 3, 1, &*lightTextureDescriptor, 0, nullptr);
 
-	for (int i = 0; i < LIGHTCOUNT; ++i) {
-		defaultCmdBuffer.pushConstants(*lightPipeline.layout,
-			vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment
-			, 0, sizeof(int), (void*)&i);
-		SubmitDrawCall(*sphereMesh, defaultCmdBuffer);
-	}
+	SubmitDrawCall(*sphereMesh, defaultCmdBuffer, LIGHTCOUNT);
+
 	EndRendering(defaultCmdBuffer);
 }
 

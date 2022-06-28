@@ -10,7 +10,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanMesh.h"
 #include "VulkanShader.h"
 #include "VulkanRenderer.h"
-#include "Vulkan.h"
+#include "VulkanUtils.h"
 
 using namespace NCL;
 using namespace Rendering;
@@ -49,27 +49,30 @@ VulkanDescriptorSetLayoutBuilder& VulkanDescriptorSetLayoutBuilder::WithStorageB
 	return *this;
 }
 
-VulkanDescriptorSetLayoutBuilder& VulkanDescriptorSetLayoutBuilder::WithDebugName(const string& name) {
-	debugName = name;
+VulkanDescriptorSetLayoutBuilder& VulkanDescriptorSetLayoutBuilder::WithBindlessAccess() {
+	usingBindless = true;
 	return *this;
 }
 
-vk::DescriptorSetLayout VulkanDescriptorSetLayoutBuilder::Build(vk::Device device) {
-	vk::DescriptorSetLayout outLayout = device.createDescriptorSetLayout(
-		vk::DescriptorSetLayoutCreateInfo({}, (uint32_t)addedBindings.size(), addedBindings.data())
-	);	
-	if (!debugName.empty()) {
-		Vulkan::SetDebugName(device, vk::ObjectType::eDescriptorSetLayout, (uint64_t)(VkDescriptorSetLayout)outLayout, debugName);
-	}
-	return outLayout;
-}
+vk::UniqueDescriptorSetLayout VulkanDescriptorSetLayoutBuilder::Build(vk::Device device) {
+	createInfo.setBindings(addedBindings);
+	vk::DescriptorSetLayoutBindingFlagsCreateInfoEXT bindingFlagsInfo;
+	std::vector< vk::DescriptorBindingFlags> bindingFlags;
 
-vk::UniqueDescriptorSetLayout VulkanDescriptorSetLayoutBuilder::BuildUnique(vk::Device device) {
-	vk::UniqueDescriptorSetLayout layout = std::move(device.createDescriptorSetLayoutUnique(
-		vk::DescriptorSetLayoutCreateInfo({}, (uint32_t)addedBindings.size(), addedBindings.data())
-	));
+	if (usingBindless >= 0) {
+		for (int i = 0; i < addedBindings.size(); ++i) {
+			bindingFlags.push_back(vk::DescriptorBindingFlagBits::ePartiallyBound | vk::DescriptorBindingFlagBits::eVariableDescriptorCount | vk::DescriptorBindingFlagBits::eUpdateAfterBind);
+		}
+		bindingFlagsInfo.setBindingFlags(bindingFlags);
+		createInfo.pNext = &bindingFlagsInfo;
+
+		createInfo.flags |= vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool;
+	}
+	
+
+	vk::UniqueDescriptorSetLayout layout = std::move(device.createDescriptorSetLayoutUnique(createInfo));
 	if (!debugName.empty()) {
-		Vulkan::SetDebugName(device, vk::ObjectType::eDescriptorSetLayout, (uint64_t)(VkDescriptorSetLayout)*layout, debugName);
+		Vulkan::SetDebugName(device, vk::ObjectType::eDescriptorSetLayout, Vulkan::GetVulkanHandle(*layout), debugName);
 	}
 	return layout;
 }

@@ -1,6 +1,5 @@
 /******************************************************************************
 This file is part of the Newcastle Vulkan Tutorial Series
-
 Author:Rich Davison
 Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
@@ -25,6 +24,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "DeferredExample.h"
 #include "TestRayTrace.h"
 #include "GLTFExample.h"
+#include "BindlessExample.h"
 
 #include "BasicSkinningExample.h"
 
@@ -53,6 +53,7 @@ int main() {
 	//BasicMultiPipelineRenderer* renderer = new BasicMultiPipelineRenderer(*w);
 	//BasicComputeUsage * renderer = new BasicComputeUsage(*w);
 	//MultiViewportExample* renderer = new MultiViewportExample(*w);
+	//BindlessExample* renderer = new BindlessExample(*w);
 
 	/*
 	Rendering Technique Tutorials

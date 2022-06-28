@@ -31,20 +31,16 @@ namespace NCL::Rendering {
 	struct VulkanBuffer;
 	struct BufferedData;
 
+	using DeviceCreateModifier = void(*)(vk::DeviceCreateInfo&, vk::PhysicalDevice);
+
 	struct VulkanInitInfo {
 		std::vector<const char*> extensions;
 		std::vector<const char*> layers;
 
-		int minorVersion = 1;
 		int majorVersion = 1;
+		int minorVersion = 1;
 
-		VulkanInitInfo(const std::vector<const char*>& extensions, const std::vector<const char*>& layers) {
-			this->extensions	= extensions;
-			this->layers		= layers;
-		}
-		VulkanInitInfo() {
-
-		}
+		DeviceCreateModifier deviceModifier;
 	};
 
 	class VulkanRenderer : public RendererBase {
@@ -78,11 +74,10 @@ namespace NCL::Rendering {
 
 		void DispatchCompute(vk::CommandBuffer  to, unsigned int xCount, unsigned int yCount = 0, unsigned int zCount = 0);
 
-		vk::DescriptorSet		BuildDescriptorSet(vk::DescriptorSetLayout  layout);
-		vk::UniqueDescriptorSet BuildUniqueDescriptorSet(vk::DescriptorSetLayout  layout);
+		vk::UniqueDescriptorSet BuildUniqueDescriptorSet(vk::DescriptorSetLayout  layout, vk::DescriptorPool pool = {}, uint32_t variableDescriptorCount = 0);
 
 		void	UpdateBufferDescriptor(vk::DescriptorSet set, const VulkanBuffer& data, int bindingSlot, vk::DescriptorType bufferType);
-		void	UpdateImageDescriptor(vk::DescriptorSet set, int bindingNum, vk::ImageView view, vk::Sampler sampler, vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal);
+		void	UpdateImageDescriptor(vk::DescriptorSet set, int bindingNum, int subIndex, vk::ImageView view, vk::Sampler sampler, vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal);
 
 		void	ImageTransitionBarrier(vk::CommandBuffer  buffer, vk::Image i, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::ImageAspectFlags aspect, vk::PipelineStageFlags srcStage, vk::PipelineStageFlags dstStage, int mipLevel = 0, int layer = 0 );
 		void	ImageTransitionBarrier(vk::CommandBuffer  buffer, const VulkanTexture* t, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vk::ImageAspectFlags aspect, vk::PipelineStageFlags srcStage, vk::PipelineStageFlags dstStage, int mipLevel = 0, int layer = 0);
@@ -90,11 +85,9 @@ namespace NCL::Rendering {
 		vk::CommandBuffer	BeginComputeCmdBuffer(const std::string& debugName = "");
 		vk::CommandBuffer	BeginCmdBuffer(const std::string& debugName = "");
 
-		void				SubmitCmdBufferWait(vk::CommandBuffer buffer, bool andFree = false);
-		void				SubmitCmdBuffer(vk::CommandBuffer  buffer, bool andFree = false);
-		vk::Fence 			SubmitCmdBufferFence(vk::CommandBuffer  buffer, bool andFree = false);
-
-		void				DestroyCmdBuffer(vk::CommandBuffer  buffer);
+		void				SubmitCmdBufferWait(vk::CommandBuffer buffer);
+		void				SubmitCmdBuffer(vk::CommandBuffer  buffer);
+		vk::Fence 			SubmitCmdBufferFence(vk::CommandBuffer  buffer);
 
 		VulkanBuffer CreateBuffer(size_t size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties = vk::MemoryPropertyFlagBits::eDeviceLocal);
 		void		 DestroyBuffer(VulkanBuffer& uniform);
@@ -144,18 +137,19 @@ namespace NCL::Rendering {
 		vk::CommandPool			commandPool;			//Source Command Buffers from here
 		vk::CommandPool			computeCommandPool;		//Source Command Buffers from here
 
-	//private:
+	//private: 
 		void	InitCommandPools();
-		void	PresentScreenImage();
 		bool	InitInstance(int major, int minor);
+		bool	InitPhysicalDevice();
 		bool	InitGPUDevice();
 		bool	InitSurface();
-		int		InitBufferChain(vk::CommandBuffer  cmdBuffer);
+		uint32_t	InitBufferChain(vk::CommandBuffer  cmdBuffer);
 
 		bool	InitDeviceQueues();
 		bool	CreateDefaultFrameBuffers();
 
-		vk::DescriptorSetLayout nullLayout;
+		VulkanInitInfo initInfo;
+
 		vk::SurfaceKHR		surface;
 		vk::Format			surfaceFormat;
 		vk::ColorSpaceKHR	surfaceSpace;

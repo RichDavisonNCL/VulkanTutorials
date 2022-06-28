@@ -15,7 +15,7 @@ GLTFExample::GLTFExample(Window& window) : VulkanTutorialRenderer(window)
 {
 	cameraUniform.camera.SetPitch(-20.0f)
 	.SetYaw(90.0f)
-	.SetPosition(Vector3(850, 840, -30))
+	.SetPosition({ 850, 840, -30 })
 	.SetFarPlane(5000.0f);
 
 	for (const auto& m : loader.outMeshes) {
@@ -25,28 +25,28 @@ GLTFExample::GLTFExample(Window& window) : VulkanTutorialRenderer(window)
 
 	textureLayout = VulkanDescriptorSetLayoutBuilder("Object Textures")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device);
+	.Build(device);
 
 	for (const auto& m : loader.outMats) {	//Build descriptors for each mesh and its sublayers
 		layerDescriptors.push_back({});
 		vector<vk::UniqueDescriptorSet>& matSet = layerDescriptors.back();
 		for (const auto& l : m.allLayers) {
 			matSet.push_back(BuildUniqueDescriptorSet(*textureLayout));
-			UpdateImageDescriptor(*matSet.back(), 0, ((VulkanTexture*)l.diffuse)->GetDefaultView(), *defaultSampler);
+			UpdateImageDescriptor(*matSet.back(), 0, 0, ((VulkanTexture*)l.diffuse)->GetDefaultView(), *defaultSampler);
 		}
 	}
 
 	shader = VulkanShaderBuilder("Texturing Shader")
 		.WithVertexBinary("SimpleVertexTransform.vert.spv")
 		.WithFragmentBinary("SingleTexture.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	VulkanMesh* m = (VulkanMesh*)loader.outMeshes[0];
 	pipeline = VulkanPipelineBuilder("Main Scene Pipeline")
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4))
 		.WithVertexInputState(m->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShader(*shader)
+		.WithShader(shader)
 		.WithBlendState(vk::BlendFactor::eOne, vk::BlendFactor::eOne, false)
 		.WithDepthState(vk::CompareOp::eLessOrEqual, true, true, false)
 		.WithColourFormats({ surfaceFormat })

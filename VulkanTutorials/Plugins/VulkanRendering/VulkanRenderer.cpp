@@ -11,7 +11,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanTexture.h"
 #include "VulkanPipeline.h"
 #include "VulkanBuffers.h"
-#include "Vulkan.h"
+#include "VulkanUtils.h"
 #include "VulkanDescriptorSetLayoutBuilder.h"
 
 #include "../../Common/TextureLoader.h"
@@ -25,7 +25,9 @@ using namespace NCL::Win32Code;
 using namespace NCL;
 using namespace Rendering;
 
-VulkanRenderer::VulkanRenderer(Window& window, VulkanInitInfo info) : RendererBase(window) {
+vk::PhysicalDeviceDescriptorIndexingFeatures indexingFeatures;
+
+VulkanRenderer::VulkanRenderer(Window& window, VulkanInitInfo info) : RendererBase(window), initInfo(info) {
 	depthBuffer		= nullptr;
 	frameBuffers	= nullptr;
 
@@ -33,8 +35,10 @@ VulkanRenderer::VulkanRenderer(Window& window, VulkanInitInfo info) : RendererBa
 	layerList.insert(layerList.end(), info.layers.begin(), info.layers.end());
 
 	InitInstance(info.majorVersion, info.minorVersion);
+
+	InitPhysicalDevice();
+	
 	InitGPUDevice();
-	Vulkan::dispatcher = new vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr, device);
 
 	InitCommandPools();
 	InitDefaultDescriptorPool();
@@ -60,14 +64,12 @@ VulkanRenderer::~VulkanRenderer() {
 	for (unsigned int i = 0; i < numFrameBuffers; ++i) {
 		device.destroyFramebuffer(frameBuffers[i]);
 	}
-
 	device.destroyDescriptorPool(defaultDescriptorPool);
 	device.destroySwapchainKHR(swapChain);
 	device.destroyCommandPool(commandPool);
 	device.destroyCommandPool(computeCommandPool);
 	device.destroyRenderPass(defaultRenderPass);
 	device.destroyPipelineCache(pipelineCache);
-	device.destroyDescriptorSetLayout(nullLayout);
 	device.destroy(); //Destroy everything except instance before this gets destroyed!
 
 	delete Vulkan::dispatcher;
@@ -102,11 +104,11 @@ bool VulkanRenderer::InitInstance(int major, int minor) {
 		.setPpEnabledLayerNames(instanceLayers.data());
 
 	instance = vk::createInstance(instanceInfo);
-
+	Vulkan::dispatcher = new vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr); //Instance dispatcher
 	return true;
 }
 
-bool VulkanRenderer::InitGPUDevice() {
+bool	VulkanRenderer::InitPhysicalDevice() {
 	auto enumResult = instance.enumeratePhysicalDevices();
 
 	if (enumResult.empty()) {
@@ -120,8 +122,12 @@ bool VulkanRenderer::InitGPUDevice() {
 		}
 	}
 
-	std::cout << "Vulkan using physical device " << gpu.getProperties().deviceName << std::endl;
+	std::cout << __FUNCTION__ << " Vulkan using physical device " << gpu.getProperties().deviceName << std::endl;
 
+	return true;
+}
+
+bool VulkanRenderer::InitGPUDevice() {
 	extensionList.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 	extensionList.push_back("VK_KHR_dynamic_rendering");
 	extensionList.push_back("VK_KHR_maintenance4");
@@ -146,7 +152,6 @@ bool VulkanRenderer::InitGPUDevice() {
 	vk::PhysicalDeviceDynamicRenderingFeaturesKHR dynamicRendering;
 	dynamicRendering.dynamicRendering = true;
 	
-
 	vk::DeviceCreateInfo createInfo = vk::DeviceCreateInfo()
 		.setQueueCreateInfoCount(1)
 		.setPNext(&dynamicRendering)
@@ -157,6 +162,10 @@ bool VulkanRenderer::InitGPUDevice() {
 		.setEnabledExtensionCount((uint32_t)extensionList.size())
 		.setPpEnabledExtensionNames(extensionList.data());
 
+	if (initInfo.deviceModifier) {
+		initInfo.deviceModifier(createInfo, gpu);
+	}
+
 	InitSurface();
 	InitDeviceQueues();
 
@@ -164,8 +173,8 @@ bool VulkanRenderer::InitGPUDevice() {
 	deviceQueue = device.getQueue(gfxQueueIndex, 0);
 	deviceMemoryProperties = gpu.getMemoryProperties();
 
-	nullLayout = VulkanDescriptorSetLayoutBuilder().Build(device);
-
+	delete Vulkan::dispatcher;
+	Vulkan::dispatcher = new vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr , device); //DEVICE dispatcher
 	return true;
 }
 
@@ -195,7 +204,7 @@ bool VulkanRenderer::InitSurface() {
 	return formats.size() > 0;
 }
 
-int VulkanRenderer::InitBufferChain(vk::CommandBuffer  cmdBuffer) {
+uint32_t VulkanRenderer::InitBufferChain(vk::CommandBuffer  cmdBuffer) {
 	vk::SwapchainKHR oldChain					= swapChain;
 	std::vector<SwapChain*> oldSwapChainList	= swapChainList;
 	swapChainList.clear();
@@ -335,7 +344,7 @@ vk::CommandBuffer VulkanRenderer::BeginComputeCmdBuffer(const std::string& debug
 	vk::CommandBufferBeginInfo beginInfo = vk::CommandBufferBeginInfo();
 
 	if (!debugName.empty()) {
-		Vulkan::SetDebugName(device, vk::ObjectType::eCommandBuffer, (uint64_t)(VkCommandBuffer)newBuf, debugName);
+		Vulkan::SetDebugName(device, vk::ObjectType::eCommandBuffer, Vulkan::GetVulkanHandle(newBuf), debugName);
 	}
 
 	newBuf.begin(beginInfo);
@@ -356,13 +365,13 @@ vk::CommandBuffer VulkanRenderer::BeginCmdBuffer(const std::string& debugName) {
 	newBuf.setScissor( 0, 1, &defaultScissor);
 
 	if (!debugName.empty()) {
-		Vulkan::SetDebugName(device, vk::ObjectType::eCommandBuffer, (uint64_t)(VkCommandBuffer)newBuf, debugName);
+		Vulkan::SetDebugName(device, vk::ObjectType::eCommandBuffer, Vulkan::GetVulkanHandle(newBuf), debugName);
 	}
 
 	return newBuf;
 }
 
-void		VulkanRenderer::SubmitCmdBufferWait(vk::CommandBuffer  buffer, bool andFree) {
+void		VulkanRenderer::SubmitCmdBufferWait(vk::CommandBuffer  buffer) {
 	vk::Fence fence = SubmitCmdBufferFence(buffer);
 
 	if (!fence) {
@@ -370,21 +379,18 @@ void		VulkanRenderer::SubmitCmdBufferWait(vk::CommandBuffer  buffer, bool andFre
 	}
 
 	if (device.waitForFences(1, &fence, true, UINT64_MAX) != vk::Result::eSuccess) {
-		std::cout << "Device queue submission taking too long?" << std::endl;
+		std::cout << __FUNCTION__ << " Device queue submission taking too long?\n";
 	};
 
 	device.destroyFence(fence);
-
-	if (andFree) {
-		device.freeCommandBuffers(commandPool, buffer);
-	}
 }
 
-void 	VulkanRenderer::SubmitCmdBuffer(vk::CommandBuffer  buffer, bool andFree) {
-	if (buffer) {
+void 	VulkanRenderer::SubmitCmdBuffer(vk::CommandBuffer  buffer) {
+	if (buffer) {	
 		buffer.end();
 	}
 	else {
+		std::cout << __FUNCTION__ << " Submitting invalid buffer?\n";
 		return;
 	}
 	vk::SubmitInfo submitInfo = vk::SubmitInfo();
@@ -392,18 +398,16 @@ void 	VulkanRenderer::SubmitCmdBuffer(vk::CommandBuffer  buffer, bool andFree) {
 	submitInfo.setPCommandBuffers(&buffer);
 
 	deviceQueue.submit(submitInfo, {});
-
-	if (andFree) {
-		device.freeCommandBuffers(commandPool, buffer);
-	}
 }
 
-vk::Fence 	VulkanRenderer::SubmitCmdBufferFence(vk::CommandBuffer  buffer, bool andFree) {
+vk::Fence 	VulkanRenderer::SubmitCmdBufferFence(vk::CommandBuffer  buffer) {
 	vk::Fence fence;
 	if (buffer) {
+		
 		buffer.end();
 	}
 	else {
+		std::cout << __FUNCTION__ << " Submitting invalid buffer?\n";
 		return fence;
 	}
 	fence = device.createFence(vk::FenceCreateInfo());
@@ -414,14 +418,7 @@ vk::Fence 	VulkanRenderer::SubmitCmdBufferFence(vk::CommandBuffer  buffer, bool 
 
 	deviceQueue.submit(submitInfo, fence);
 
-	if (andFree) {
-		device.freeCommandBuffers(commandPool, buffer);
-	}
 	return fence;
-}
-
-void		VulkanRenderer::DestroyCmdBuffer(vk::CommandBuffer  buffer) {
-
 }
 
 bool VulkanRenderer::InitDeviceQueues() {
@@ -484,7 +481,7 @@ void VulkanRenderer::OnWindowResize(int width, int height) {
 
 	vk::CommandBuffer cmds = BeginCmdBuffer();
 
-	std::cout << "calling resize! new dimensions: " << windowWidth << " , " << windowHeight << std::endl;
+	std::cout << __FUNCTION__ << " New dimensions: " << windowWidth << " , " << windowHeight << "\n";
 	vkDeviceWaitIdle(device);
 
 	//delete depthBuffer;
@@ -515,6 +512,9 @@ void VulkanRenderer::CompleteResize() {
 }
 
 void	VulkanRenderer::BeginFrame() {
+	//if (hostWindow.IsMinimised()) {
+	//	defaultCmdBuffer = BeginCmdBuffer();
+	//}
 	defaultCmdBuffer.reset({});
 
 	defaultCmdBuffer.begin(vk::CommandBufferBeginInfo());
@@ -523,22 +523,31 @@ void	VulkanRenderer::BeginFrame() {
 }
 
 void	VulkanRenderer::EndFrame() {
-	SubmitCmdBuffer(defaultCmdBuffer);
+	if (hostWindow.IsMinimised()) {
+		SubmitCmdBufferWait(defaultCmdBuffer);
+	}
+	else {
+		SubmitCmdBuffer(defaultCmdBuffer);
+	}
 }
 
 void VulkanRenderer::SwapBuffers() {
-	if (hostWindow.IsMinimised()) {
-		return; //????
+	vk::UniqueSemaphore	presentSempaphore;
+	vk::UniqueFence		presentFence;
+
+	if (!hostWindow.IsMinimised()) {
+		vk::CommandBuffer cmds = BeginCmdBuffer();
+		TransitionSwapchainForPresenting(cmds);
+		SubmitCmdBufferWait(cmds);
+		device.freeCommandBuffers(commandPool, cmds);
+
+		vk::Result presentResult = deviceQueue.presentKHR(vk::PresentInfoKHR(0, nullptr, 1, &swapChain, &currentSwap, nullptr));
+
+		presentSempaphore = device.createSemaphoreUnique(vk::SemaphoreCreateInfo());
+		presentFence	  = device.createFenceUnique(vk::FenceCreateInfo());
+	
+		currentSwap = device.acquireNextImageKHR(swapChain, UINT64_MAX, *presentSempaphore, *presentFence).value;	//Get swap image
 	}
-	PresentScreenImage();
-
-	vk::Result presentResult = deviceQueue.presentKHR(vk::PresentInfoKHR(0, nullptr, 1, &swapChain, &currentSwap, nullptr));
-
-	vk::Semaphore	presentSempaphore = device.createSemaphore(vk::SemaphoreCreateInfo());
-	vk::Fence		fence = device.createFence(vk::FenceCreateInfo());
-
-	currentSwap = device.acquireNextImageKHR(swapChain, UINT64_MAX, presentSempaphore, fence).value;	//Get swap image
-
 	defaultBeginInfo = vk::RenderPassBeginInfo()
 		.setRenderPass(defaultRenderPass)
 		.setFramebuffer(frameBuffers[currentSwap])
@@ -548,10 +557,9 @@ void VulkanRenderer::SwapBuffers() {
 
 	defaultCmdBuffer = swapChainList[currentSwap]->frameCmds;
 
-	vk::Result waitResult = device.waitForFences(fence, true, ~0);
-	
-	device.destroySemaphore(presentSempaphore);
-	device.destroyFence(fence);
+	if (!hostWindow.IsMinimised()) {
+		vk::Result waitResult = device.waitForFences(*presentFence, true, ~0);
+	}
 }
 
 void	VulkanRenderer::InitDefaultRenderPass() {
@@ -594,12 +602,6 @@ void	VulkanRenderer::InitDefaultRenderPass() {
 		.setPSubpasses(&subPass);
 
 	defaultRenderPass = device.createRenderPass(renderPassInfo);
-}
-
-void	VulkanRenderer::PresentScreenImage() {
-	vk::CommandBuffer cmds = BeginCmdBuffer();
-	TransitionSwapchainForPresenting(cmds);
-	SubmitCmdBufferWait(cmds, true);
 }
 
 bool VulkanRenderer::CreateDefaultFrameBuffers() {
@@ -668,7 +670,7 @@ void	VulkanRenderer::InitDefaultDescriptorPool() {
 	defaultDescriptorPool = device.createDescriptorPool(poolCreate);
 }
 
-void	VulkanRenderer::UpdateImageDescriptor(vk::DescriptorSet set, int bindingNum, vk::ImageView view, vk::Sampler sampler, vk::ImageLayout layout) {
+void	VulkanRenderer::UpdateImageDescriptor(vk::DescriptorSet set, int bindingNum, int subIndex, vk::ImageView view, vk::Sampler sampler, vk::ImageLayout layout) {
 	auto imageInfo = vk::DescriptorImageInfo()
 		.setSampler(sampler)
 		.setImageView(view)
@@ -678,6 +680,7 @@ void	VulkanRenderer::UpdateImageDescriptor(vk::DescriptorSet set, int bindingNum
 		.setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
 		.setDstSet(set)
 		.setDstBinding(bindingNum)
+		.setDstArrayElement(subIndex)
 		.setDescriptorCount(1)
 		.setPImageInfo(&imageInfo);
 
@@ -718,8 +721,6 @@ VulkanBuffer VulkanRenderer::CreateBuffer(size_t size, vk::BufferUsageFlags usag
 }
 
 void VulkanRenderer::DestroyBuffer(VulkanBuffer& buffer) {
-	//device.destroyBuffer(buffer.buffer.get());
-	//device.freeMemory(buffer.deviceMem.get());
 	buffer.buffer.reset();
 	buffer.deviceMem.reset();
 }
@@ -730,26 +731,24 @@ void VulkanRenderer::UploadBufferData(VulkanBuffer& uniform, void* data, int dat
 	device.unmapMemory(*uniform.deviceMem);
 }
 
-vk::DescriptorSet	VulkanRenderer::BuildDescriptorSet(vk::DescriptorSetLayout  layout) {
+vk::UniqueDescriptorSet VulkanRenderer::BuildUniqueDescriptorSet(vk::DescriptorSetLayout  layout, vk::DescriptorPool pool, uint32_t variableDescriptorCount) {
+	if (!pool) {
+		pool = defaultDescriptorPool;
+	}
 	vk::DescriptorSetAllocateInfo allocateInfo = vk::DescriptorSetAllocateInfo()
-		.setDescriptorPool(defaultDescriptorPool)
+		.setDescriptorPool(pool)
 		.setDescriptorSetCount(1)
 		.setPSetLayouts(&layout);
 
-	vk::DescriptorSet newSet;
-	vk::Result allocResult = device.allocateDescriptorSets(&allocateInfo, &newSet);
-	return newSet;
-}
+	vk::DescriptorSetVariableDescriptorCountAllocateInfoEXT variableDescriptorInfo;
 
-vk::UniqueDescriptorSet VulkanRenderer::BuildUniqueDescriptorSet(vk::DescriptorSetLayout  layout) {
-	vk::DescriptorSetAllocateInfo allocateInfo = vk::DescriptorSetAllocateInfo()
-		.setDescriptorPool(defaultDescriptorPool)
-		.setDescriptorSetCount(1)
-		.setPSetLayouts(&layout);
+	if (variableDescriptorCount > 0) {
+		variableDescriptorInfo.setDescriptorSetCount(1);
+		variableDescriptorInfo.pDescriptorCounts = &variableDescriptorCount;
+		allocateInfo.setPNext((const void*)&variableDescriptorInfo);
+	}
 
-	vk::UniqueDescriptorSet set = std::move(device.allocateDescriptorSetsUnique(allocateInfo)[0]);
-
-	return set;
+	return std::move(device.allocateDescriptorSetsUnique(allocateInfo)[0]);
 }
 
 void VulkanRenderer::SubmitDrawCallLayer(const VulkanMesh& m, unsigned int layer, vk::CommandBuffer  to, int instanceCount) {

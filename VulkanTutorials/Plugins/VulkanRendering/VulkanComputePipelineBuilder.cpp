@@ -8,7 +8,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "Precompiled.h"
 #include "VulkanComputePipelineBuilder.h"
 #include "VulkanCompute.h"
-#include "Vulkan.h"
+#include "VulkanUtils.h"
 
 using namespace NCL;
 using namespace Rendering;
@@ -17,16 +17,8 @@ VulkanComputePipelineBuilder::VulkanComputePipelineBuilder(const std::string& na
 	debugName = name;
 }
 
-VulkanComputePipelineBuilder::~VulkanComputePipelineBuilder() {
-}
-
 VulkanComputePipelineBuilder& VulkanComputePipelineBuilder::WithPushConstant(vk::ShaderStageFlags flags, uint32_t offset, uint32_t size) {
 	allPushConstants.emplace_back(vk::PushConstantRange(flags, offset, size));
-	return *this;
-}
-
-VulkanComputePipelineBuilder& VulkanComputePipelineBuilder::WithPushConstant(vk::PushConstantRange layout) {
-	allPushConstants.emplace_back(layout);
 	return *this;
 }
 
@@ -35,7 +27,7 @@ VulkanComputePipelineBuilder& VulkanComputePipelineBuilder::WithDescriptorSetLay
 	return *this;
 }
 
-VulkanComputePipelineBuilder& VulkanComputePipelineBuilder::WithComputeState(VulkanCompute* compute) {
+VulkanComputePipelineBuilder& VulkanComputePipelineBuilder::WithShader(UniqueVulkanCompute& compute) {
 	compute->FillShaderStageCreateInfo(pipelineCreate);
 	return *this;
 }
@@ -43,11 +35,6 @@ VulkanComputePipelineBuilder& VulkanComputePipelineBuilder::WithComputeState(Vul
 VulkanComputePipelineBuilder& VulkanComputePipelineBuilder::WithLayout(vk::PipelineLayout layout) {
 	this->layout = layout;
 	pipelineCreate.setLayout(layout);
-	return *this;
-}
-
-VulkanComputePipelineBuilder& VulkanComputePipelineBuilder::WithDebugName(const std::string& name) {
-	debugName = name;
 	return *this;
 }
 
@@ -67,7 +54,7 @@ VulkanPipeline	VulkanComputePipelineBuilder::Build(vk::Device device, vk::Pipeli
 	output.pipeline = device.createComputePipelineUnique(cache, pipelineCreate).value;
 
 	if (!debugName.empty()) {
-		Vulkan::SetDebugName(device, vk::ObjectType::ePipeline, (uint64_t)(VkPipeline)*output.pipeline, debugName);
+		Vulkan::SetDebugName(device, vk::ObjectType::ePipeline, Vulkan::GetVulkanHandle(*output.pipeline), debugName);
 	}
 
 	return output;

@@ -16,7 +16,7 @@ PrerecordedCmdListRenderer::PrerecordedCmdListRenderer(Window& window) : VulkanT
 	shader = VulkanShaderBuilder("Basic Shader!")
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 	 
 	BuildPipeline();
 

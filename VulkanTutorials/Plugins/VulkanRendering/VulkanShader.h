@@ -19,22 +19,17 @@ namespace NCL::Rendering {
 		~VulkanShader();
 
 	protected:
-		void AddBinaryShaderModule(const string& fromFile, ShaderStages stage, const string& entryPoint = "main");
-		vk::ShaderModule GetShaderModule(ShaderStages stage) const;
-
-		void SetSourceDevice(vk::Device d);
+		void AddBinaryShaderModule(const string& fromFile, ShaderStages stage, vk::Device device, const string& entryPoint = "main");
 
 		void Init();
 
 	protected:			
 		VulkanShader();
 
-		static bool		CreateShaderModule(char* data, size_t size, vk::ShaderModule& into, vk::Device& device);
-
-		vk::ShaderModule shaderModules[(int)ShaderStages::MAXSIZE];
+		vk::UniqueShaderModule shaderModules[(int)ShaderStages::MAXSIZE];
 		string entryPoints[(int)ShaderStages::MAXSIZE];
-		int stageCount;
+
+		uint32_t stageCount;
 		vk::PipelineShaderStageCreateInfo* infos;
-		vk::Device sourceDevice;
 	};
 }

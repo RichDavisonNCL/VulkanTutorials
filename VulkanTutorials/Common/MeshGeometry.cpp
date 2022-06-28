@@ -148,14 +148,14 @@ MeshGeometry::MeshGeometry(const std::string&filename) {
 	file >> filetype;
 
 	if (filetype != "MeshGeometry") {
-		std::cout << "File is not a MeshGeometry file!" << std::endl;
+		std::cout << __FUNCTION__ << " File is not a MeshGeometry file!\n";
 		return;
 	}
 
 	file >> fileVersion;
 
 	if (fileVersion != 1) {
-		std::cout << "MeshGeometry file has incompatible version!" << std::endl;
+		std::cout << __FUNCTION__ << " MeshGeometry file has incompatible version!\n";
 		return;
 	}
 
@@ -409,35 +409,34 @@ void MeshGeometry::ReadSubMeshNames(std::ifstream& file, int count) {
 
 bool MeshGeometry::ValidateMeshData() {
 	if (GetPositionData().empty()) {
-		std::cout << __FUNCTION__ << " mesh " << debugName << " does not have any vertex positions!" << std::endl;
+		std::cout << __FUNCTION__ << " mesh " << debugName << " does not have any vertex positions!\n";
 		return false;
 	}
 	if (!GetTextureCoordData().empty() && GetTextureCoordData().size() != GetVertexCount()) {
-		std::cout << __FUNCTION__ << " mesh " << debugName << " has an incorrect texture coordinate attribute count!" << std::endl;
+		std::cout << __FUNCTION__ << " mesh " << debugName << " has an incorrect texture coordinate attribute count!\n";
 		return false;
 	}
 	if (!GetColourData().empty() && GetColourData().size() != GetVertexCount()) {
-		std::cout << __FUNCTION__ << " mesh " << debugName << " has an incorrect colour attribute count!" << std::endl;
+		std::cout << __FUNCTION__ << " mesh " << debugName << " has an incorrect colour attribute count!\n";
 		return false;
 	}
 	if (!GetNormalData().empty() && GetNormalData().size() != GetVertexCount()) {
-		std::cout << __FUNCTION__ << " mesh " << debugName << " has an incorrect normal attribute count!" << std::endl;
+		std::cout << __FUNCTION__ << " mesh " << debugName << " has an incorrect normal attribute count!\n";
 		return false;
 	}
 	if (!GetTangentData().empty() && GetTangentData().size() != GetVertexCount()) {
-		std::cout << __FUNCTION__ << " mesh " << debugName << " has an incorrect tangent attribute count!" << std::endl;
+		std::cout << __FUNCTION__ << " mesh " << debugName << " has an incorrect tangent attribute count!\n";
 		return false;
 	}
 
 	if (!GetSkinWeightData().empty() && GetSkinWeightData().size() != GetVertexCount()) {
-		std::cout << __FUNCTION__ << " mesh " << debugName << " has an incorrect skin weight attribute count!" << std::endl;
+		std::cout << __FUNCTION__ << " mesh " << debugName << " has an incorrect skin weight attribute count!\n";
 		return false;
 	}
 
 	if (!GetSkinIndexData().empty() && GetSkinIndexData().size() != GetVertexCount()) {
-		std::cout << __FUNCTION__ << " mesh " << debugName << " has an incorrect skin index attribute count!" << std::endl;
+		std::cout << __FUNCTION__ << " mesh " << debugName << " has an incorrect skin index attribute count!\n";
 		return false;
 	}
-
 	return true;
 }

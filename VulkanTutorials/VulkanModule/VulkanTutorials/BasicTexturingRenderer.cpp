@@ -6,7 +6,7 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #include "BasicTexturingRenderer.h"
-#include "../../Plugins/VulkanRendering/Vulkan.h"
+#include "../../Plugins/VulkanRendering/VulkanUtils.h"
 
 using namespace NCL;
 using namespace Rendering;
@@ -20,7 +20,7 @@ BasicTexturingRenderer::BasicTexturingRenderer(Window& window) : VulkanTutorialR
 	defaultShader = VulkanShaderBuilder("Texturing Shader!")
 		.WithVertexBinary("BasicTexturing.vert.spv")
 		.WithFragmentBinary("BasicTexturing.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	BuildPipeline();
 }
@@ -28,7 +28,7 @@ BasicTexturingRenderer::BasicTexturingRenderer(Window& window) : VulkanTutorialR
 void	BasicTexturingRenderer::BuildPipeline() {
 	descriptorLayout = VulkanDescriptorSetLayoutBuilder("Texture Layout A")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device);
+	.Build(device);
 
 	texturePipeline = VulkanPipelineBuilder("Texturing Pipeline")
 		.WithVertexInputState(defaultMesh->GetVertexInputState())
@@ -42,7 +42,7 @@ void	BasicTexturingRenderer::BuildPipeline() {
 
 	for (int i = 0; i < 2; ++i) {
 		descriptorSets[i] = BuildUniqueDescriptorSet(*descriptorLayout);
-		UpdateImageDescriptor(*descriptorSets[i], 0, textures[i]->GetDefaultView(), *defaultSampler);
+		UpdateImageDescriptor(*descriptorSets[i], 0, 0, textures[i]->GetDefaultView(), *defaultSampler);
 	}
 }
 

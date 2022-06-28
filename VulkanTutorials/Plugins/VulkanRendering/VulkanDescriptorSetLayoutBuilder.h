@@ -13,21 +13,22 @@ namespace NCL::Rendering {
 
 	class VulkanDescriptorSetLayoutBuilder	{
 	public:
-		VulkanDescriptorSetLayoutBuilder(const std::string& name = "") { debugName = name; };
+		VulkanDescriptorSetLayoutBuilder(const std::string& name = "") { debugName = name; usingBindless = -1; };
 		~VulkanDescriptorSetLayoutBuilder() {};
 
-		VulkanDescriptorSetLayoutBuilder& WithSamplers(unsigned int count, vk::ShaderStageFlags inShaders);
-		VulkanDescriptorSetLayoutBuilder& WithUniformBuffers(unsigned int count, vk::ShaderStageFlags inShaders);
+		VulkanDescriptorSetLayoutBuilder& WithSamplers(unsigned int count, vk::ShaderStageFlags inShaders = vk::ShaderStageFlagBits::eAll);
+		VulkanDescriptorSetLayoutBuilder& WithUniformBuffers(unsigned int count, vk::ShaderStageFlags inShaders = vk::ShaderStageFlagBits::eAll);
+		VulkanDescriptorSetLayoutBuilder& WithStorageBuffers(unsigned int count, vk::ShaderStageFlags inShaders = vk::ShaderStageFlagBits::eAll);
 
-		VulkanDescriptorSetLayoutBuilder& WithStorageBuffers(unsigned int count, vk::ShaderStageFlags inShaders);
+		VulkanDescriptorSetLayoutBuilder& WithBindlessAccess();//Buffers after this are bindless!
 
-		VulkanDescriptorSetLayoutBuilder& WithDebugName(const std::string& name);
-
-		vk::DescriptorSetLayout Build(vk::Device device);
-		vk::UniqueDescriptorSetLayout BuildUnique(vk::Device device);
+		vk::UniqueDescriptorSetLayout Build(vk::Device device);
 
 	protected:
 		std::string	debugName;
+		int usingBindless;
 		std::vector< vk::DescriptorSetLayoutBinding> addedBindings;
+
+		vk::DescriptorSetLayoutCreateInfo createInfo;
 	};
 }

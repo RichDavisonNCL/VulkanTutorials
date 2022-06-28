@@ -17,12 +17,5 @@ void main() {
 
    fragColor = (sceneSample * diffuseSample) + specularSample;
 
-   //fragColor = sceneSample + diffuseSample + specularSample;
-   //no specular yet
-   //fragColor = sceneSample + specularSample;
-
-  // fragColor = diffuseSample;
-
-  //fragColor = sceneSample;
    fragColor.a = 1.0f;
 }

@@ -16,7 +16,7 @@ BasicSkinningExample::BasicSkinningExample(Window& window) : VulkanTutorialRende
 {
 	cameraUniform.camera.SetPitch(0.0f)
 		.SetYaw(160)
-		.SetPosition(Vector3(3, 0, -12))
+		.SetPosition({ 3, 0, -12 })
 		.SetFarPlane(5000.0f);
 
 	for (const auto& m : loader.outMeshes) {
@@ -26,26 +26,26 @@ BasicSkinningExample::BasicSkinningExample(Window& window) : VulkanTutorialRende
 
 	textureLayout = VulkanDescriptorSetLayoutBuilder("Object Textures")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device);
+		.Build(device);
 
 	for (const auto& m : loader.outMats) {	//Build descriptors for each mesh and its sublayers
 		layerDescriptors.push_back({});
 		vector<vk::UniqueDescriptorSet>& matSet = layerDescriptors.back();
 		for (const auto& l : m.allLayers) {
 			matSet.push_back(BuildUniqueDescriptorSet(*textureLayout));
-			UpdateImageDescriptor(*matSet.back(), 0, ((VulkanTexture*)l.diffuse)->GetDefaultView(), *defaultSampler);
+			UpdateImageDescriptor(*matSet.back(), 0, 0,((VulkanTexture*)l.diffuse)->GetDefaultView(), *defaultSampler);
 		}
 	}
 	shader = VulkanShaderBuilder("Texturing Shader")
 		.WithVertexBinary("BasicSkinning.vert.spv")
 		.WithFragmentBinary("SingleTexture.frag.spv")
-		.BuildUnique(device);
+	.Build(device);
 
 	jointsLayout = VulkanDescriptorSetLayoutBuilder("Joint Data")
 		.WithStorageBuffers(1, vk::ShaderStageFlagBits::eVertex)
-	.BuildUnique(device); //Get our camera matrices...
+		.Build(device); //Get our camera matrices...
 
-	jointsDescriptor = BuildDescriptorSet(*jointsLayout);
+	jointsDescriptor = BuildUniqueDescriptorSet(*jointsLayout);
 
 	VulkanMesh* m = (VulkanMesh*)loader.outMeshes[0];
 
@@ -60,7 +60,7 @@ BasicSkinningExample::BasicSkinningExample(Window& window) : VulkanTutorialRende
 		.WithDepthState(vk::CompareOp::eLessOrEqual, true, true, false)
 		.WithDescriptorSetLayout(*cameraLayout)	//Camera is set 0
 		.WithDescriptorSetLayout(*textureLayout)//Textures are set 1
-		.WithDescriptorSetLayout(jointsLayout)	//Joints are set 2
+		.WithDescriptorSetLayout(*jointsLayout)	//Joints are set 2
 	.Build(device, pipelineCache);
 
 	int matCount = loader.outMeshes[0]->GetJointCount();
@@ -80,7 +80,7 @@ BasicSkinningExample::BasicSkinningExample(Window& window) : VulkanTutorialRende
 
 	UploadBufferData(jointsBuffer, testData.data(), sizeof(Matrix4) * matCount);
 
-	UpdateBufferDescriptor(jointsDescriptor, jointsBuffer, 0, vk::DescriptorType::eStorageBuffer);
+	UpdateBufferDescriptor(*jointsDescriptor, jointsBuffer, 0, vk::DescriptorType::eStorageBuffer);
 	UpdateBufferDescriptor(*cameraDescriptor, cameraUniform.cameraData, 0, vk::DescriptorType::eUniformBuffer);
 	frameTime		= 1 / 30.0f;
 	currentFrame	= 0;
@@ -92,7 +92,7 @@ void BasicSkinningExample::RenderFrame() {
 
 	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
 	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 2, 1, &jointsDescriptor, 0, nullptr);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 2, 1, &*jointsDescriptor, 0, nullptr);
 
 	for (size_t i = 0; i < loader.outMeshes.size(); ++i) {
 		VulkanMesh* loadedMesh = (VulkanMesh*)loader.outMeshes[i];

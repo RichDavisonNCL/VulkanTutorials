@@ -30,3 +30,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 #include "../../Common/Matrix3.h"
 #include "../../Common/Matrix4.h"
+
+#include "../../Common/Camera.h"
+
+#include <memory>

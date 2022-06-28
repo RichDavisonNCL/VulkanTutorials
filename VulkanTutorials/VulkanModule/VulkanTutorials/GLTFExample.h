@@ -18,7 +18,7 @@ namespace NCL::Rendering {
 
 		void RenderFrame()		override;
 	protected:
-		std::shared_ptr<VulkanShader> shader;
+		UniqueVulkanShader shader;
 
 		GLTFLoader loader;
 

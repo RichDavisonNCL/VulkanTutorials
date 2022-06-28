@@ -7,8 +7,6 @@ License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "VulkanTutorialRenderer.h"
-#include "../../Common/Vector3.h"
-#include "../../Common/Vector4.h"
 #include "../../Plugins/VulkanRendering/VulkanPipeline.h"
 namespace NCL::Rendering {
 	class BasicDescriptorRenderer : public VulkanTutorialRenderer	{

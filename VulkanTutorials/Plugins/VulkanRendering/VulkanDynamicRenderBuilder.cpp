@@ -7,7 +7,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #include "Precompiled.h"
 #include "VulkanDynamicRenderBuilder.h"
-#include "Vulkan.h"
+#include "VulkanUtils.h"
 
 using namespace NCL;
 using namespace Rendering;
@@ -15,10 +15,6 @@ using namespace Rendering;
 VulkanDynamicRenderBuilder::VulkanDynamicRenderBuilder() {
 	usingStencil	= false;
 	layerCount		= 1;
-}
-
-VulkanDynamicRenderBuilder::~VulkanDynamicRenderBuilder() {
-
 }
 
 VulkanDynamicRenderBuilder& VulkanDynamicRenderBuilder::WithColourAttachment(
@@ -76,6 +72,7 @@ VulkanDynamicRenderBuilder& VulkanDynamicRenderBuilder::Begin(vk::CommandBuffer 
 	if (usingStencil) {
 		renderInfo.setPStencilAttachment(&depthAttachment);
 	}
+
 	buffer.beginRendering(renderInfo, *NCL::Rendering::Vulkan::dispatcher);
 	return *this;
 }

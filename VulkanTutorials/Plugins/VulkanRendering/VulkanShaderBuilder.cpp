@@ -6,10 +6,9 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #include "Precompiled.h"
-#include "Vulkan.h"
+#include "VulkanUtils.h"
 #include "VulkanShader.h"
 #include "VulkanShaderBuilder.h"
-#include <string>
 
 using std::string;
 using namespace NCL;
@@ -51,15 +50,8 @@ VulkanShaderBuilder& VulkanShaderBuilder::WithTessEvalBinary(const string& name,
 	return *this;
 }
 
-VulkanShaderBuilder& VulkanShaderBuilder::WithDebugName(const string& name) {
-	debugName = name;
-	return *this;
-}
-
-VulkanShader* VulkanShaderBuilder::Build(vk::Device device) {
+UniqueVulkanShader VulkanShaderBuilder::Build(vk::Device device) {
 	VulkanShader* newShader = new VulkanShader();
-
-	newShader->SetSourceDevice(device);
 
 	//mesh and 'traditional' pipeline are mutually exclusive
 	if (!shaderFiles[(int)ShaderStages::Mesh].empty() &&
@@ -71,17 +63,13 @@ VulkanShader* VulkanShaderBuilder::Build(vk::Device device) {
 
 	for (int i = 0; i < (int)ShaderStages::MAXSIZE; ++i) {
 		if (!shaderFiles[i].empty()) {
-			newShader->AddBinaryShaderModule(shaderFiles[i],(ShaderStages)i, entryPoints[i]);
+			newShader->AddBinaryShaderModule(shaderFiles[i],(ShaderStages)i, device, entryPoints[i]);
 
 			if (!debugName.empty()) {
-				Vulkan::SetDebugName(device, vk::ObjectType::eShaderModule, (uint64_t)newShader->shaderModules[i].operator VkShaderModule() , debugName);
+				Vulkan::SetDebugName(device, vk::ObjectType::eShaderModule, Vulkan::GetVulkanHandle(*newShader->shaderModules[i]), debugName);
 			}
 		}
 	};
 	newShader->Init();
-	return newShader;
-}
-
-UniqueVulkanShader VulkanShaderBuilder::BuildUnique(vk::Device device) {
-	return UniqueVulkanShader(Build(device));
+	return UniqueVulkanShader(newShader);
 }

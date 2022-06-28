@@ -9,7 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanTexture.h"
 #include "VulkanRenderer.h"
 #include "../../Common/TextureLoader.h"
-#include "Vulkan.h"
+#include "VulkanUtils.h"
 
 using namespace NCL;
 using namespace Rendering;
@@ -29,14 +29,14 @@ VulkanTexture::~VulkanTexture() {
 	sourceDevice.freeMemory(deviceMem);
 }
 
-int VulkanTexture::CalculateMipCount(int width, int height) {
+int VulkanTexture::CalculateMipCount(uint32_t width, uint32_t height) {
 	if (height == 0 || width == 0) {
 		return 0;
 	}
 	return (int)floor(log2(float(std::min(width, height)))) + 1;
 }
 
- VulkanTexture* VulkanTexture::GenerateTextureFromDataInternal(int width, int height, int channelCount, bool isCube, std::vector<char*>dataSrcs, const std::string& debugName) {
+ VulkanTexture* VulkanTexture::GenerateTextureFromDataInternal(uint32_t width, uint32_t height, uint32_t channelCount, bool isCube, std::vector<char*>dataSrcs, const std::string& debugName) {
 	 vk::Format				format = vk::Format::eR8G8B8A8Unorm;
 	 vk::ImageAspectFlags	aspect = vk::ImageAspectFlagBits::eColor;
 	 vk::ImageLayout		layout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -139,24 +139,26 @@ UniqueVulkanTexture VulkanTexture::VulkanCubemapFromFiles(
 	int channels[6]  = { 0 };
 	int flags[6]	 = { 0 };
 
+	bool loadedData = true;
 	for (int i = 0; i < 6; ++i) {
 		TextureLoader::LoadTexture(*(allFiles[i]), texData[i], width[i], height[i], channels[i], flags[i]);
 		if (i > 0 && (width[i] != width[0] || height[0] != height[0])) {
 			std::cout << __FUNCTION__ << " cubemap input textures don't match in size?\n";
-			for (int i = 0; i < 6; ++i) {
-				delete texData[i];
-			}
-			return nullptr;
+			loadedData = false;
+			break;
 		}
 		if (width[i] == 0 || height[i] == 0) {
 			std::cout << __FUNCTION__ << " can't load cubemap " << *allFiles[i] << "\n";
-			for (int i = 0; i < 6; ++i) {
-				delete texData[i];
-			}
-			return nullptr;
+			loadedData = false;
+			break;
 		}
 	}
-
+	if (!loadedData) {
+		for (int i = 0; i < 6; ++i) {
+			delete texData[i];
+		}
+		return nullptr;
+	}
 	VulkanTexture* cubeTex = GenerateTextureFromDataInternal(width[0], height[0], channels[0], true, texData, debugName);
 
 	//delete the old texData;
@@ -179,7 +181,7 @@ void	VulkanTexture::InitTextureDeviceMemory(VulkanTexture& img) {
 	vkRenderer->GetDevice().bindImageMemory(*img.image, img.deviceMem, 0);
 }
 
-VulkanTexture* VulkanTexture::GenerateTextureInternal(int width, int height, int mipcount, bool isCubemap, const std::string& debugName, vk::Format format, vk::ImageAspectFlags aspect, vk::ImageUsageFlags usage, vk::ImageLayout outLayout, vk::PipelineStageFlags pipeType) {
+VulkanTexture* VulkanTexture::GenerateTextureInternal(uint32_t width, uint32_t height, uint32_t mipcount, bool isCubemap, const std::string& debugName, vk::Format format, vk::ImageAspectFlags aspect, vk::ImageUsageFlags usage, vk::ImageLayout outLayout, vk::PipelineStageFlags pipeType) {
 	VulkanTexture* tex = new VulkanTexture();
 	tex->width		= width;
 	tex->height		= height;
@@ -208,8 +210,8 @@ VulkanTexture* VulkanTexture::GenerateTextureInternal(int width, int height, int
 
 	tex->defaultView = tex->GenerateDefaultView(tex->aspectType);
 
-	Vulkan::SetDebugName(vkRenderer->GetDevice(), vk::ObjectType::eImage, (uint64_t)tex->image.get().operator VkImage(), debugName);
-	Vulkan::SetDebugName(vkRenderer->GetDevice(),vk::ObjectType::eImageView, (uint64_t)tex->defaultView.get().operator VkImageView(), debugName);
+	Vulkan::SetDebugName(vkRenderer->GetDevice(), vk::ObjectType::eImage, Vulkan::GetVulkanHandle(*tex->image), debugName);
+	Vulkan::SetDebugName(vkRenderer->GetDevice(),vk::ObjectType::eImageView, Vulkan::GetVulkanHandle(*tex->defaultView), debugName);
 
 	vk::CommandBuffer tempBuffer = vkRenderer->BeginCmdBuffer();
 	vkRenderer->ImageTransitionBarrier(tempBuffer, tex, vk::ImageLayout::eUndefined, outLayout, tex->aspectType, vk::PipelineStageFlagBits::eTopOfPipe, pipeType);
@@ -217,7 +219,7 @@ VulkanTexture* VulkanTexture::GenerateTextureInternal(int width, int height, int
 	return tex;
 }
 
-UniqueVulkanTexture VulkanTexture::CreateDepthTexture(int width, int height, const std::string& debugName, bool hasStencil, bool useMips) {
+UniqueVulkanTexture VulkanTexture::CreateDepthTexture(uint32_t width, uint32_t height, const std::string& debugName, bool hasStencil, bool useMips) {
 	vk::Format			 format		= hasStencil ? vk::Format::eD24UnormS8Uint : vk::Format::eD32Sfloat;
 	vk::ImageAspectFlags aspect		= hasStencil ? vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil : vk::ImageAspectFlagBits::eDepth;
 	vk::ImageLayout		 layout		= hasStencil ? vk::ImageLayout::eDepthStencilAttachmentOptimal : vk::ImageLayout::eDepthAttachmentOptimal;	
@@ -225,7 +227,7 @@ UniqueVulkanTexture VulkanTexture::CreateDepthTexture(int width, int height, con
 	return UniqueVulkanTexture(GenerateTextureInternal(width, height, 1, false, debugName, format, aspect, usage, layout, vk::PipelineStageFlagBits::eEarlyFragmentTests));
 }
 
-UniqueVulkanTexture VulkanTexture::CreateColourTexture(int width, int height, const std::string& debugName, bool isFloat, bool useMips) {
+UniqueVulkanTexture VulkanTexture::CreateColourTexture(uint32_t width, uint32_t height, const std::string& debugName, bool isFloat, bool useMips) {
 	vk::Format			 format		= isFloat ? vk::Format::eR32G32B32A32Sfloat : vk::Format::eB8G8R8A8Unorm;
 	vk::ImageAspectFlags aspect		= vk::ImageAspectFlagBits::eColor;
 	vk::ImageLayout		 layout		= vk::ImageLayout::eColorAttachmentOptimal;	

@@ -4,6 +4,7 @@ set(PROJECT_NAME VulkanTutorials)
 # Source groups
 ################################################################################
 set(Header_Files
+    "BindlessExample.h"
     "BasicComputeUsage.h"
     "BasicDescriptorRenderer.h"
     "BasicGeometryRenderer.h"
@@ -56,6 +57,8 @@ set(Shaders
     "../../Assets/Shaders/VK/SolidColour.frag"
     "../../Assets/Shaders/VK/tri.frag"
     "../../Assets/Shaders/VK/tri.vert"
+	"../../Assets/Shaders/VK/BindlessExample.frag"
+    "../../Assets/Shaders/VK/BindlessExample.vert"
 )
 source_group("Shaders" FILES ${Shaders})
 
@@ -78,6 +81,7 @@ set(Shaders__Shadow_Mapping
 source_group("Shaders\\Shadow Mapping" FILES ${Shaders__Shadow_Mapping})
 
 set(Source_Files
+    "BindlessExample.cpp"
     "BasicComputeUsage.cpp"
     "BasicDescriptorRenderer.cpp"
     "BasicGeometryRenderer.cpp"
@@ -203,7 +207,7 @@ foreach (file ${ALL_FILES})
     get_filename_component(file_name ${file} NAME)
 	get_filename_component(file_ext ${file} EXT)
 	
-	if(file_ext STREQUAL ".cpp" OR file_ext STREQUAL ".cpp")
+	if(file_ext STREQUAL ".h" OR file_ext STREQUAL ".cpp")
 		continue()
 	endif()
 		

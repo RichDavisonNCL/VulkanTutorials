@@ -20,12 +20,12 @@ BasicMultiPipelineRenderer::BasicMultiPipelineRenderer(Window& window) : VulkanT
 	solidColourShader = VulkanShaderBuilder("Solid Colour Shader")
 		.WithVertexBinary("BasicPushConstant.vert.spv")
 		.WithFragmentBinary("SolidColour.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	texturingShader = VulkanShaderBuilder("Texturing Shader")
 		.WithVertexBinary("BasicPushConstant.vert.spv")
 		.WithFragmentBinary("SingleTexture.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	BuildColourPipeline();
 	BuildTexturePipeline();
@@ -49,22 +49,22 @@ void BasicMultiPipelineRenderer::BuildColourPipeline() {
 void BasicMultiPipelineRenderer::BuildTexturePipeline() {
 	vk::UniqueDescriptorSetLayout textureLayout = VulkanDescriptorSetLayoutBuilder("Texture Layout")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device);
+	.Build(device);
 
 	texturedPipeline = VulkanPipelineBuilder("Texturing Pipeline")
 		.WithVertexInputState(triangleMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(texturingShader)
-		.WithDescriptorSetLayout(nullLayout)	//Nothing in slot 0
-		.WithDescriptorSetLayout(textureLayout)
+		.WithDescriptorSetLayout(*nullLayout)	//Nothing in slot 0
+		.WithDescriptorSetLayout(*textureLayout)
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Vector4))
 		.WithBlendState(vk::BlendFactor::eOne, vk::BlendFactor::eOne, true)
 	.Build(device, pipelineCache);
 
-	textureDescriptorSetA = BuildDescriptorSet(*textureLayout);
-	textureDescriptorSetB = BuildDescriptorSet(*textureLayout);
-	UpdateImageDescriptor(textureDescriptorSetA, 0, textures[0]->GetDefaultView(), *defaultSampler);
-	UpdateImageDescriptor(textureDescriptorSetB, 0, textures[1]->GetDefaultView(), *defaultSampler);
+	textureDescriptorSetA = BuildUniqueDescriptorSet(*textureLayout);
+	textureDescriptorSetB = BuildUniqueDescriptorSet(*textureLayout);
+	UpdateImageDescriptor(*textureDescriptorSetA, 0, 0, textures[0]->GetDefaultView(), *defaultSampler);
+	UpdateImageDescriptor(*textureDescriptorSetB, 0, 0, textures[1]->GetDefaultView(), *defaultSampler);
 }
 
 void BasicMultiPipelineRenderer::RenderFrame() {
@@ -87,11 +87,11 @@ void BasicMultiPipelineRenderer::RenderFrame() {
 	////They both use the same pipeline, but different descriptors, as they have different textures
 	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *texturedPipeline.pipeline);
 	defaultCmdBuffer.pushConstants(*texturedPipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Vector4), (void*)&objectPositions[1]);
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *texturedPipeline.layout, 1, 1, &textureDescriptorSetA, 0, nullptr);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *texturedPipeline.layout, 1, 1, &*textureDescriptorSetA, 0, nullptr);
 	SubmitDrawCall(*triangleMesh, defaultCmdBuffer);
 
 	defaultCmdBuffer.pushConstants(*texturedPipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Vector4), (void*)&objectPositions[2]);
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *texturedPipeline.layout, 1, 1, &textureDescriptorSetB, 0, nullptr);
+	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *texturedPipeline.layout, 1, 1, &*textureDescriptorSetB, 0, nullptr);
 	SubmitDrawCall(*triangleMesh, defaultCmdBuffer);
 
 	EndRendering(defaultCmdBuffer);

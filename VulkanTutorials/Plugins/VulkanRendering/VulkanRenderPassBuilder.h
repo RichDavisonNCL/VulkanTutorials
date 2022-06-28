@@ -12,7 +12,7 @@ namespace NCL::Rendering {
 	class VulkanRenderPassBuilder	{
 	public:
 		VulkanRenderPassBuilder(const std::string& name);
-		~VulkanRenderPassBuilder();
+		~VulkanRenderPassBuilder() {}
 
 		VulkanRenderPassBuilder& WithColourAttachment(
 			VulkanTexture* texture, 
@@ -38,10 +38,7 @@ namespace NCL::Rendering {
 			vk::ImageLayout endLayout	= vk::ImageLayout::eDepthStencilAttachmentOptimal
 		);
 
-		VulkanRenderPassBuilder& WithDebugName(const std::string& name);
-
-		vk::RenderPass	Build(vk::Device renderer);
-		vk::UniqueRenderPass BuildUnique(vk::Device renderer);
+		vk::UniqueRenderPass Build(vk::Device renderer);
 
 	protected:
 		std::vector<vk::AttachmentDescription>	allDescriptions;

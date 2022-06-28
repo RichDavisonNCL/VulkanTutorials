@@ -12,21 +12,20 @@ using namespace Rendering;
 
 LightingExample::LightingExample(Window& window) : VulkanTutorialRenderer(window) {
 	cameraUniform.camera.SetPitch(-20.0f);
-	cameraUniform.camera.SetPosition(Vector3(0, 75.0f, 200));
+	cameraUniform.camera.SetPosition({ 0, 75.0f, 200 });
 
 	cubeMesh = LoadMesh("Cube.msh");
 
 	boxObject.mesh		= &*cubeMesh;
-	boxObject.transform = Matrix4::Translation(Vector3(-50, 10, -50)) * Matrix4::Scale(Vector3(10.0f, 10.0f, 10.0f));
+	boxObject.transform = Matrix4::Translation({ -50, 10, -50 }) * Matrix4::Scale({ 10.0f, 10.0f, 10.0f });
 
 	floorObject.mesh		= &*cubeMesh;
-	floorObject.transform	= Matrix4::Scale(Vector3(100.0f, 1.0f, 100.0f));
+	floorObject.transform = Matrix4::Scale({ 100.0f, 1.0f, 100.0f });
 
-	lightingShader = VulkanShaderBuilder()
+	lightingShader = VulkanShaderBuilder("Lighting Shader")
 		.WithVertexBinary("Lighting.vert.spv")
 		.WithFragmentBinary("Lighting.frag.spv")
-		.WithDebugName("Lighting Shader")
-	.BuildUnique(device);
+	.Build(device);
 
 	Light testLight(Vector3(10, 20, -30), 150.0f, Vector4(1, 0.8f, 0.5f, 1));
 
@@ -53,15 +52,15 @@ void	LightingExample::BuildPipeline() {
 	texturesLayout = VulkanDescriptorSetLayoutBuilder("Object Textures")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device);
+	.Build(device);
 
 	lightLayout = VulkanDescriptorSetLayoutBuilder("Active Light")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device); //Get our camera matrices...
+	.Build(device); //Get our camera matrices...
 
 	cameraPosLayout = VulkanDescriptorSetLayoutBuilder("Camera Position")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device); //Get our camera matrices...
+	.Build(device); //Get our camera matrices...
 
 	pipeline = VulkanPipelineBuilder("Lighting Pipeline")
 		.WithVertexInputState(cubeMesh->GetVertexInputState())
@@ -81,11 +80,11 @@ void	LightingExample::BuildPipeline() {
 	floorObject.objectDescriptorSet	= BuildUniqueDescriptorSet(*texturesLayout);
 	cameraPosDescriptor		= BuildUniqueDescriptorSet(*cameraPosLayout);
 
-	UpdateImageDescriptor(*boxObject.objectDescriptorSet, 0, allTextures[0]->GetDefaultView(), *defaultSampler);
-	UpdateImageDescriptor(*boxObject.objectDescriptorSet, 1, allTextures[1]->GetDefaultView(), *defaultSampler);
+	UpdateImageDescriptor(*boxObject.objectDescriptorSet, 0, 0, allTextures[0]->GetDefaultView(), *defaultSampler);
+	UpdateImageDescriptor(*boxObject.objectDescriptorSet, 1, 0, allTextures[1]->GetDefaultView(), *defaultSampler);
 
-	UpdateImageDescriptor(*floorObject.objectDescriptorSet, 0, allTextures[2]->GetDefaultView(), *defaultSampler);
-	UpdateImageDescriptor(*floorObject.objectDescriptorSet, 1, allTextures[3]->GetDefaultView(), *defaultSampler);
+	UpdateImageDescriptor(*floorObject.objectDescriptorSet, 0, 0, allTextures[2]->GetDefaultView(), *defaultSampler);
+	UpdateImageDescriptor(*floorObject.objectDescriptorSet, 1, 0, allTextures[3]->GetDefaultView(), *defaultSampler);
 
 	UpdateBufferDescriptor(*cameraDescriptor	, cameraUniform.cameraData, 0, vk::DescriptorType::eUniformBuffer);
 	UpdateBufferDescriptor(*lightDescriptor		, lightUniform, 0, vk::DescriptorType::eUniformBuffer);

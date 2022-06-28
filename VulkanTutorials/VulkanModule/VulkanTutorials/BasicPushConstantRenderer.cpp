@@ -19,7 +19,7 @@ BasicPushConstantRenderer::BasicPushConstantRenderer(Window& window) : VulkanTut
 	shader = VulkanShaderBuilder("Testing push constants!")
 		.WithVertexBinary("BasicPushConstant.vert.spv")
 		.WithFragmentBinary("BasicPushConstant.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	pipeline = VulkanPipelineBuilder("Basic Push Constant Pipeline")
 		.WithVertexInputState(triMesh->GetVertexInputState())

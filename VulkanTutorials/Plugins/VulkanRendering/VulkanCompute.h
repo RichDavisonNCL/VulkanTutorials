@@ -11,7 +11,7 @@ namespace NCL::Rendering {
 	class VulkanCompute	{
 	public:
 		VulkanCompute(vk::Device sourceDevice, const std::string& filename);
-		~VulkanCompute();
+		~VulkanCompute() {}
 
 		int GetThreadXCount() const;
 		int GetThreadYCount() const;
@@ -22,7 +22,6 @@ namespace NCL::Rendering {
 	protected:
 		int localThreadSize[3];
 		vk::PipelineShaderStageCreateInfo info;
-		vk::ShaderModule	computeModule;
-		vk::Device			sourceDevice;
+		vk::UniqueShaderModule	computeModule;
 	};
 }

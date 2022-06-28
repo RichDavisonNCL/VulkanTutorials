@@ -18,7 +18,7 @@ namespace NCL::Rendering {
 	class VulkanPipelineBuilder	{
 	public:
 		VulkanPipelineBuilder(const std::string& debugName = "");
-		~VulkanPipelineBuilder();
+		~VulkanPipelineBuilder() {}
 
 		VulkanPipelineBuilder& WithDepthState(vk::CompareOp op, bool depthEnabled, bool writeEnabled, bool stencilEnabled = false);
 
@@ -30,20 +30,15 @@ namespace NCL::Rendering {
 
 		VulkanPipelineBuilder& WithTopology(vk::PrimitiveTopology topology);
 
-		VulkanPipelineBuilder& WithShader(const VulkanShader& shader);
 		VulkanPipelineBuilder& WithShader(const UniqueVulkanShader& shader);
 
 		VulkanPipelineBuilder& WithLayout(vk::PipelineLayout layout);
 
 		VulkanPipelineBuilder& WithPushConstant(vk::ShaderStageFlags flags, uint32_t offset, uint32_t size);
-		VulkanPipelineBuilder& WithPushConstant(vk::PushConstantRange layout);
 
 		VulkanPipelineBuilder& WithDescriptorSetLayout(vk::DescriptorSetLayout layout);
-		VulkanPipelineBuilder& WithDescriptorSetLayout(const vk::UniqueDescriptorSetLayout& layout);
 
 		VulkanPipelineBuilder& WithPass(vk::RenderPass& renderPass);
-
-		VulkanPipelineBuilder& WithDebugName(const std::string& name);
 
 		VulkanPipelineBuilder& WithDepthStencilFormat(vk::Format combinedFormat);
 		VulkanPipelineBuilder& WithDepthFormat(vk::Format depthFormat);
@@ -61,7 +56,7 @@ namespace NCL::Rendering {
 		vk::PipelineViewportStateCreateInfo			viewportCreate;
 		vk::PipelineMultisampleStateCreateInfo		sampleCreate;
 		vk::PipelineDynamicStateCreateInfo			dynamicCreate;
-
+		vk::PipelineVertexInputStateCreateInfo		vertexCreate;
 		vk::PipelineLayout layout;
 
 		std::vector< vk::PipelineColorBlendAttachmentState>			blendAttachStates;

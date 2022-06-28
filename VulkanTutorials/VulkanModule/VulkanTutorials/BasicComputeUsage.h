@@ -20,15 +20,15 @@ namespace NCL::Rendering {
 		void	BuildRasterPipeline();
 		void	BuildComputePipeline();
 
-		UniqueVulkanMesh	particleMesh;
-
 		UniqueVulkanShader	rasterShader;
 		UniqueVulkanCompute	computeShader;
 
 		VulkanPipeline	basicPipeline;
 		VulkanPipeline	computePipeline;
 
-		VulkanBuffer		particlePositions;
-		vk::DescriptorSet	bufferDescriptor;
+		VulkanBuffer			particlePositions;
+		vk::UniqueDescriptorSet	bufferDescriptor;
+
+		vk::UniqueDescriptorSetLayout dataLayout;
 	};
 }

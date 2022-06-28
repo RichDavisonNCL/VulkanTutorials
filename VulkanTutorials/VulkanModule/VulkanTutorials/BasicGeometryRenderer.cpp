@@ -16,7 +16,7 @@ BasicGeometryRenderer::BasicGeometryRenderer(Window& window) : VulkanTutorialRen
 	shader = VulkanShaderBuilder("Basic Shader!")
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	basicPipeline = VulkanPipelineBuilder("Basic Pipeline")
 		.WithVertexInputState(triMesh->GetVertexInputState())

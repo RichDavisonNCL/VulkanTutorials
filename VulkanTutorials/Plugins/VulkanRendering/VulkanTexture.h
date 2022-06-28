@@ -25,8 +25,8 @@ namespace NCL::Rendering {
 		static TextureBase* TextureFromFilenameLoader(const std::string& name);//Compatability function with old course modules
 
 		static UniqueVulkanTexture TextureFromFile(const std::string& name);
-		static UniqueVulkanTexture CreateDepthTexture(int width, int height, const std::string& debugName = "DefaultDepth", bool hasStencil = true, bool mips = false);
-		static UniqueVulkanTexture CreateColourTexture(int width, int height, const std::string& debugName = "DefaultColour", bool isFloat = false, bool mips = false);
+		static UniqueVulkanTexture CreateDepthTexture(uint32_t width, uint32_t height, const std::string& debugName = "DefaultDepth", bool hasStencil = true, bool mips = false);
+		static UniqueVulkanTexture CreateColourTexture(uint32_t width, uint32_t height, const std::string& debugName = "DefaultColour", bool isFloat = false, bool mips = false);
 
 		vk::ImageView GetDefaultView() const {
 			return *defaultView;
@@ -48,13 +48,13 @@ namespace NCL::Rendering {
 		void GenerateMipMaps(vk::CommandBuffer  buffer, vk::ImageLayout endLayout, vk::PipelineStageFlags endFlags);
 
 		static void	InitTextureDeviceMemory(VulkanTexture& img);
-		static VulkanTexture* GenerateTextureInternal(int width, int height, int mipcount, bool isCube, const std::string& debugName, vk::Format format, vk::ImageAspectFlags aspect, vk::ImageUsageFlags usage, vk::ImageLayout outLayout, vk::PipelineStageFlags pipeType);
+		static VulkanTexture* GenerateTextureInternal(uint32_t width, uint32_t height, uint32_t mipcount, bool isCube, const std::string& debugName, vk::Format format, vk::ImageAspectFlags aspect, vk::ImageUsageFlags usage, vk::ImageLayout outLayout, vk::PipelineStageFlags pipeType);
 
-		static VulkanTexture* GenerateTextureFromDataInternal(int width, int height, int channelCount, bool isCube, std::vector<char*>dataSrcs, const std::string& debugName);
+		static VulkanTexture* GenerateTextureFromDataInternal(uint32_t width, uint32_t height, uint32_t channelCount, bool isCube, std::vector<char*>dataSrcs, const std::string& debugName);
 
 		vk::UniqueImageView  GenerateDefaultView(vk::ImageAspectFlags type);
 
-		static int CalculateMipCount(int width, int height);
+		static int CalculateMipCount(uint32_t width, uint32_t height);
 
 		vk::UniqueImageView		defaultView;
 		vk::UniqueImage			image;

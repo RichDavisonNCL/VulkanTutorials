@@ -13,14 +13,15 @@ namespace NCL::Rendering {
 
 	public:
 		DeferredExample(Window& window);
-		~DeferredExample();
+		~DeferredExample() {}
 
 		void RenderFrame()		override;
 		void Update(float dt)	override;
+		void OnWindowResize(int w, int h)	override;
 
 	protected:
 		void	LoadShaders();
-		void	CreateFrameBuffers();
+		void	CreateFrameBuffers(uint32_t width, uint32_t height);
 		void	BuildGBufferPipeline();
 		void	BuildLightPassPipeline();
 		void	BuildCombinePipeline();
@@ -28,6 +29,7 @@ namespace NCL::Rendering {
 		void	FillGBuffer();
 		void	RenderLights();
 		void	CombineBuffers();
+		void	UpdateDescriptors();
 
 		UniqueVulkanShader gBufferShader;
 		UniqueVulkanShader lightingShader;
@@ -48,9 +50,6 @@ namespace NCL::Rendering {
 
 		vk::UniqueDescriptorSet			lightDescriptor;
 		vk::UniqueDescriptorSetLayout	lightLayout;
-
-		vk::UniqueDescriptorSet			lightStageCamDescriptor;
-		vk::UniqueDescriptorSetLayout	lightStageCamLayout;
 
 		vk::UniqueDescriptorSetLayout	lightCameraLayout;
 

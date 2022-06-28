@@ -6,7 +6,7 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #include "Precompiled.h"
-#include "Vulkan.h"
+#include "VulkanUtils.h"
 
 using namespace NCL;
 using namespace Rendering;
@@ -21,3 +21,14 @@ void Vulkan::SetDebugName(vk::Device device, vk::ObjectType t, uint64_t handle, 
 		.setPObjectName(debugName.c_str()), *Vulkan::dispatcher
 	);
 };
+
+void Vulkan::BeginDebugArea(vk::CommandBuffer b, const std::string& name) {
+	vk::DebugUtilsLabelEXT labelInfo;
+	labelInfo.pLabelName = name.c_str();
+
+	b.beginDebugUtilsLabelEXT(labelInfo, *Vulkan::dispatcher);
+}
+
+void Vulkan::EndDebugArea(vk::CommandBuffer b) {
+	b.endDebugUtilsLabelEXT(*Vulkan::dispatcher);
+}

@@ -9,7 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanRenderPassBuilder.h"
 #include "VulkanTexture.h"
 #include "VulkanRenderer.h"
-#include "Vulkan.h"
+#include "VulkanUtils.h"
 
 using namespace NCL;
 using namespace Rendering;
@@ -17,10 +17,6 @@ using namespace Rendering;
 VulkanRenderPassBuilder::VulkanRenderPassBuilder(const std::string& name) {
 	subPass.setPDepthStencilAttachment(nullptr);
 	debugName = name;
-}
-
-VulkanRenderPassBuilder::~VulkanRenderPassBuilder() {
-
 }
 
 VulkanRenderPassBuilder& VulkanRenderPassBuilder::WithColourAttachment(VulkanTexture* texture, bool clear, vk::ImageLayout startLayout, vk::ImageLayout useLayout,  vk::ImageLayout endLayout) {
@@ -53,34 +49,7 @@ VulkanRenderPassBuilder& VulkanRenderPassBuilder::WithDepthStencilAttachment(Vul
 	return WithDepthAttachment(texture, clear, startLayout, useLayout, endLayout); //we just get different default parameters!
 }
 
-VulkanRenderPassBuilder& VulkanRenderPassBuilder::WithDebugName(const string& name) {
-	debugName = name;
-	return *this;
-}
-
-vk::RenderPass	VulkanRenderPassBuilder::Build(vk::Device device) {
-	vk::RenderPass pass;
-
-	subPass.setColorAttachmentCount((uint32_t)allReferences.size())
-		.setPColorAttachments(allReferences.data())
-		.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics);
-
-	vk::RenderPassCreateInfo renderPassInfo = vk::RenderPassCreateInfo()
-		.setAttachmentCount((uint32_t)allDescriptions.size())
-		.setPAttachments(allDescriptions.data())
-		.setSubpassCount(1)
-		.setPSubpasses(&subPass);
-
-	pass = device.createRenderPass(renderPassInfo);
-
-	if (!debugName.empty()) {
-		Vulkan::SetDebugName(device, vk::ObjectType::eRenderPass, (uint64_t)(VkRenderPass)pass, debugName);
-	}
-
-	return pass;
-}
-
-vk::UniqueRenderPass VulkanRenderPassBuilder::BuildUnique(vk::Device device) {
+vk::UniqueRenderPass VulkanRenderPassBuilder::Build(vk::Device device) {
 	subPass.setColorAttachmentCount((uint32_t)allReferences.size())
 		.setPColorAttachments(allReferences.data())
 		.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics);
@@ -94,7 +63,7 @@ vk::UniqueRenderPass VulkanRenderPassBuilder::BuildUnique(vk::Device device) {
 	vk::UniqueRenderPass pass = device.createRenderPassUnique(renderPassInfo);
 
 	if (!debugName.empty()) {
-		Vulkan::SetDebugName(device, vk::ObjectType::eRenderPass, (uint64_t)(VkRenderPass)pass.get(), debugName);
+		Vulkan::SetDebugName(device, vk::ObjectType::eRenderPass, Vulkan::GetVulkanHandle(*pass), debugName);
 	}
 
 	return pass;

@@ -22,9 +22,9 @@ namespace NCL::Rendering {
         UniqueVulkanShader shader;
         GLTFLoader loader;
 
-        VulkanBuffer		    jointsBuffer;
-        vk::DescriptorSet		jointsDescriptor;
-        vk::UniqueDescriptorSetLayout jointsLayout;
+        VulkanBuffer		            jointsBuffer;
+        vk::UniqueDescriptorSet		    jointsDescriptor;
+        vk::UniqueDescriptorSetLayout   jointsLayout;
 
         vk::UniqueDescriptorSetLayout	textureLayout;
         vector<vector<vk::UniqueDescriptorSet>>	 layerDescriptors;

@@ -6,13 +6,9 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "../../Common/Camera.h"
-#include "../../Common/Matrix4.h"
-#include "../../Common/Vector3.h"
-#include "../../Common/Vector4.h"
-
 #include "../../Common/TextureLoader.h"
-#include <memory>
+
+#include "../../Plugins/VulkanRendering/VulkanUtils.h"
 
 namespace NCL::Rendering {
 	struct CameraUniform {
@@ -89,6 +85,8 @@ namespace NCL::Rendering {
 		UniqueVulkanMesh GenerateGrid();
 
 		CameraUniform cameraUniform;
+		vk::UniqueDescriptorSetLayout nullLayout;
+
 		vk::UniqueDescriptorSet			cameraDescriptor;
 		vk::UniqueDescriptorSetLayout	cameraLayout;
 

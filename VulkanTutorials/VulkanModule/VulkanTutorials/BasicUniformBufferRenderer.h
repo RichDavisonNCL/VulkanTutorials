@@ -7,7 +7,6 @@ License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "VulkanTutorialRenderer.h"
-#include "../../Common/Camera.h"
 
 namespace NCL::Rendering {
 	class BasicUniformBufferRenderer : public VulkanTutorialRenderer {
@@ -27,6 +26,7 @@ namespace NCL::Rendering {
 		VulkanPipeline	pipeline;
 
 		vk::UniqueDescriptorSet	descriptorSet;
+		vk::UniqueDescriptorSetLayout matrixLayout;
 
 		VulkanBuffer	cameraData;
 		Camera			camera;

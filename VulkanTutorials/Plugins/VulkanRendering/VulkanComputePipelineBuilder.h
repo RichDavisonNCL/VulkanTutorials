@@ -7,6 +7,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "VulkanPipeline.h"
+#include "SmartTypes.h"
 
 namespace NCL::Rendering {
 	class VulkanCompute;
@@ -14,16 +15,13 @@ namespace NCL::Rendering {
 	class VulkanComputePipelineBuilder	{
 	public:
 		VulkanComputePipelineBuilder(const std::string& name = "");
-		~VulkanComputePipelineBuilder();
+		~VulkanComputePipelineBuilder() {}
 
 		VulkanComputePipelineBuilder& WithLayout(vk::PipelineLayout layout);
 
 		VulkanComputePipelineBuilder& WithPushConstant(vk::ShaderStageFlags flags, uint32_t offset, uint32_t size);
-		VulkanComputePipelineBuilder& WithPushConstant(vk::PushConstantRange layout);
 		VulkanComputePipelineBuilder& WithDescriptorSetLayout(vk::DescriptorSetLayout layout);
-		VulkanComputePipelineBuilder& WithComputeState(VulkanCompute* shader);
-		VulkanComputePipelineBuilder& WithDebugName(const std::string& name);
-
+		VulkanComputePipelineBuilder& WithShader(UniqueVulkanCompute& shader);
 
 		VulkanPipeline	Build(vk::Device device, vk::PipelineCache cache);
 	protected:

@@ -19,12 +19,12 @@ PostProcessingExample::PostProcessingExample(Window& window) : VulkanTutorialRen
 	gridShader = VulkanShaderBuilder("Grid Shader")
 		.WithVertexBinary("SimpleVertexTransform.vert.spv")
 		.WithFragmentBinary("BasicUniformBuffer.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	invertShader = VulkanShaderBuilder("Post process shader!")
 		.WithVertexBinary("PostProcess.vert.spv")
 		.WithFragmentBinary("PostProcess.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	BuildMainPipeline();
 	BuildProcessPipeline();
@@ -36,7 +36,7 @@ PostProcessingExample::PostProcessingExample(Window& window) : VulkanTutorialRen
 void	PostProcessingExample::BuildMainPipeline() {		
 	matrixLayout = VulkanDescriptorSetLayoutBuilder("Matrices")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-	.BuildUnique(device);
+	.Build(device);
 
 	gridPipeline = VulkanPipelineBuilder("Main Scene Pipeline")
 		.WithVertexInputState(gridMesh->GetVertexInputState())
@@ -53,7 +53,7 @@ void	PostProcessingExample::BuildMainPipeline() {
 void	PostProcessingExample::BuildProcessPipeline() {
 	processLayout = VulkanDescriptorSetLayoutBuilder("Texture Layout")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device);
+	.Build(device);
 
 	invertPipeline = VulkanPipelineBuilder("Post process pipeline")
 		.WithVertexInputState(quadMesh->GetVertexInputState())
@@ -66,7 +66,7 @@ void	PostProcessingExample::BuildProcessPipeline() {
 
 	processDescriptor = BuildUniqueDescriptorSet(*processLayout);
 
-	UpdateImageDescriptor(*processDescriptor, 0, postTexture->GetDefaultView(), *defaultSampler, vk::ImageLayout::eShaderReadOnlyOptimal);
+	UpdateImageDescriptor(*processDescriptor, 0, 0, postTexture->GetDefaultView(), *defaultSampler);
 
 	processSampler = device.createSamplerUnique(
 		vk::SamplerCreateInfo()

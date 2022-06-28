@@ -16,7 +16,7 @@ BasicDescriptorRenderer::BasicDescriptorRenderer(Window& window) : VulkanTutoria
 	shader = VulkanShaderBuilder("Basic Descriptor Shader!")
 		.WithVertexBinary("BasicDescriptor.vert.spv")
 		.WithFragmentBinary("BasicDescriptor.frag.spv")
-	.BuildUnique(device);
+	.Build(device);
 
 	BuildPipeline();
 }
@@ -25,7 +25,7 @@ void BasicDescriptorRenderer::BuildPipeline() {
 	descriptorLayout = VulkanDescriptorSetLayoutBuilder("Uniform Data")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-	.BuildUnique(device);
+	.Build(device);
 
 	pipeline = VulkanPipelineBuilder()
 		.WithVertexInputState(triMesh->GetVertexInputState())

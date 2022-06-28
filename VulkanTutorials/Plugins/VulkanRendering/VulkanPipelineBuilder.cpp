@@ -9,7 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanPipelineBuilder.h"
 #include "VulkanMesh.h"
 #include "VulkanShader.h"
-#include "Vulkan.h"
+#include "VulkanUtils.h"
 
 using namespace NCL;
 using namespace Rendering;
@@ -34,7 +34,6 @@ VulkanPipelineBuilder::VulkanPipelineBuilder(const std::string& pipeName)	{
 		.setStencilTestEnable(false)
 		.setDepthBoundsTestEnable(false);
 
-	//allColourRenderingFormats	= { vk::Format::eUndefined };
 	depthRenderingFormat		= vk::Format::eUndefined;
 	stencilRenderingFormat		= vk::Format::eUndefined;
 
@@ -46,10 +45,6 @@ VulkanPipelineBuilder::VulkanPipelineBuilder(const std::string& pipeName)	{
 	debugName = pipeName;
 
 	inputAsmCreate.setTopology(vk::PrimitiveTopology::eTriangleList);
-}
-
-VulkanPipelineBuilder::~VulkanPipelineBuilder()
-{
 }
 
 VulkanPipelineBuilder& VulkanPipelineBuilder::WithDepthState(vk::CompareOp op, bool depthEnabled, bool writeEnabled, bool stencilEnabled) {
@@ -85,17 +80,12 @@ VulkanPipelineBuilder& VulkanPipelineBuilder::WithRaster(vk::CullModeFlagBits cu
 }
 
 VulkanPipelineBuilder& VulkanPipelineBuilder::WithVertexInputState(const vk::PipelineVertexInputStateCreateInfo& spec) {
-	pipelineCreate.setPVertexInputState(&spec);
+	vertexCreate = spec;
 	return *this;
 }
 
 VulkanPipelineBuilder& VulkanPipelineBuilder::WithTopology(vk::PrimitiveTopology topology) {
 	inputAsmCreate.setTopology(topology);
-	return *this;
-}
-
-VulkanPipelineBuilder& VulkanPipelineBuilder::WithShader(const VulkanShader& shader) {
-	shader.FillShaderStageCreateInfo(pipelineCreate);
 	return *this;
 }
 
@@ -112,11 +102,6 @@ VulkanPipelineBuilder& VulkanPipelineBuilder::WithLayout(vk::PipelineLayout layo
 
 VulkanPipelineBuilder& VulkanPipelineBuilder::WithPushConstant(vk::ShaderStageFlags flags, uint32_t offset, uint32_t size) {
 	allPushConstants.emplace_back(vk::PushConstantRange(flags, offset, size));
-	return *this;
-}
-
-VulkanPipelineBuilder& VulkanPipelineBuilder::WithPushConstant(vk::PushConstantRange layout) {
-	allPushConstants.emplace_back(layout);
 	return *this;
 }
 
@@ -143,17 +128,6 @@ VulkanPipelineBuilder& VulkanPipelineBuilder::WithColourFormats(const std::vecto
 
 VulkanPipelineBuilder& VulkanPipelineBuilder::WithDescriptorSetLayout(vk::DescriptorSetLayout layout) {
 	allLayouts.emplace_back(layout);
-
-	return *this;
-}
-
-VulkanPipelineBuilder& VulkanPipelineBuilder::WithDescriptorSetLayout(const vk::UniqueDescriptorSetLayout& layout) {
-	allLayouts.emplace_back(*layout);
-	return *this;
-}
-
-VulkanPipelineBuilder& VulkanPipelineBuilder::WithDebugName(const string& name) {
-	debugName = name;
 	return *this;
 }
 
@@ -173,10 +147,6 @@ VulkanPipeline	VulkanPipelineBuilder::Build(vk::Device device, vk::PipelineCache
 		}
 	}
 
-	//if (depthRenderingFormat != vk::Format::eUndefined) {
-
-	//}
-
 	blendCreate.setAttachments(blendAttachStates);
 	blendCreate.setBlendConstants({ 1.0f, 1.0f, 1.0f, 1.0f });
 
@@ -190,7 +160,8 @@ VulkanPipeline	VulkanPipelineBuilder::Build(vk::Device device, vk::PipelineCache
 		.setPInputAssemblyState(&inputAsmCreate)
 		.setPMultisampleState(&sampleCreate)
 		.setPRasterizationState(&rasterCreate)
-		.setLayout(*output.layout);
+		.setLayout(*output.layout)
+		.setPVertexInputState(&vertexCreate);
 	//We must be using dynamic rendering, better set it up!
 	vk::PipelineRenderingCreateInfoKHR			renderingCreate;
 	if (!allColourRenderingFormats.empty() || depthRenderingFormat != vk::Format::eUndefined) {
@@ -206,7 +177,7 @@ VulkanPipeline	VulkanPipelineBuilder::Build(vk::Device device, vk::PipelineCache
 	output.pipeline			= device.createGraphicsPipelineUnique(cache, pipelineCreate).value;
 
 	if (!debugName.empty()) {
-		Vulkan::SetDebugName(device, vk::ObjectType::ePipeline, (uint64_t)(VkPipeline)*output.pipeline, debugName);
+		Vulkan::SetDebugName(device, vk::ObjectType::ePipeline, Vulkan::GetVulkanHandle(*output.pipeline), debugName);
 	}
 
 	return output;
