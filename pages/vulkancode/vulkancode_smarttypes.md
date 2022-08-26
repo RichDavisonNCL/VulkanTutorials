@@ -11,4 +11,6 @@ folder: vulkancode
 
 SMART TYPES
 
+$$ x = y ^2 $$
+
 {% include links.html %}

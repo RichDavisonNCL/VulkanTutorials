@@ -3,6 +3,19 @@
 <head>
     {% include head.html %}
     <script>
+        MathJax = {
+        tex: {
+            inlineMath: [['$', '$'], ['\\(', '\\)']]
+        },
+        svg: {
+            fontCache: 'global'
+        }
+        };
+        </script>
+        <script type="text/javascript" id="MathJax-script" async
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js">
+    </script>
+    <script>
         $(document).ready(function() {
             // Initialize navgoco with default options
             $("#mysidebar").navgoco({

@@ -219,15 +219,45 @@ entries:
     output: web, pdf
     folderitems:
 
-    - title: About Ruby, Gems, Bundler, etc.
-      url: /mydoc_about_ruby_gems_etc.html
+    - title: Introducing Vulkan
+      url: /vulkan_introduction.html
       output: web, pdf
 
-    - title: Install Jekyll on Mac
-      url: /mydoc_install_jekyll_on_mac.html
+    - title: Command Lists
+      url: /vulkan_command_lists.html
       output: web, pdf
 
-    - title: Install Jekyll on Windows
+    - title: Pipelines
+      url: /vulkan_pipelines.html
+      output: web, pdf
+
+    - title: Descriptors
+      url: /vulkan_descriptors.html
+      output: web, pdf
+
+    - title: Images
+      url: /vulkan_images.html
+      output: web, pdf
+
+    - title: Samplers
+      url: /vulkan_samplers.html
+      output: web, pdf
+
+    - title: Barriers
+      url: /vulkan_barriers.html
+      output: web, pdf
+
+    - title: Render Passes
+      url: /vulkan_render_passes.html
+      output: web, pdf
+
+    - title: Dynamic Rendering
+      url: /vulkan_dynamic_rendering.html
+      output: web, pdf
+
+    - title: Push Constants
+      url: /vulkan_push_constants.html
+      output: web, pdf
 
   - title: Vulkan Tutorials
     output: web, pdf

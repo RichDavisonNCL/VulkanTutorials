@@ -1,5 +1,5 @@
 ---
-title: Command Lists
+title: Command Lists in Vulkan
 keywords: documentation theme, jekyll, technical writers, help authoring tools, hat replacements
 last_updated: August 24 2022
 tags: [Vulkan]
@@ -8,7 +8,6 @@ sidebar: vulkan_sidebar
 permalink: vulkan_command_lists.html
 folder: vulkan
 ---
-
-TEST TEST TEST
+command lists
 
 {% include links.html %}
