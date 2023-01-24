@@ -1,0 +1,9 @@
+[submodule "GLTFLoader"]
+	path = GLTFLoader
+	url = https://github.com/RichDavisonNCL/GLTFLoader
+[submodule "NCLCoreClasses"]
+	path = NCLCoreClasses
+	url = https://github.com/RichDavisonNCL/NCLCoreClasses
+[submodule "VulkanRendering"]
+	path = VulkanRendering
+	url = https://github.com/RichDavisonNCL/VulkanRendering

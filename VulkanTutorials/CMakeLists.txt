@@ -1,94 +1,142 @@
-cmake_minimum_required(VERSION 3.16.0 FATAL_ERROR)
-
-set(CMAKE_SYSTEM_VERSION 10.0 CACHE STRING "" FORCE)
-
-project(VulkanTutorials CXX)
+set(PROJECT_NAME VulkanTutorials)
 
 ################################################################################
-# Set target arch type if empty. Visual studio solution generator provides it.
+# Source groups
 ################################################################################
-if(NOT CMAKE_VS_PLATFORM_NAME)
-    set(CMAKE_VS_PLATFORM_NAME "x64")
-endif()
-message("${CMAKE_VS_PLATFORM_NAME} architecture in use")
 
-if(NOT ("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "x64"))
-    message(FATAL_ERROR "${CMAKE_VS_PLATFORM_NAME} arch is not supported!")
-endif()
+file(GLOB_RECURSE Header_Files CONFIGURE_DEPENDS *.h)
+source_group("Header Files" FILES ${Header_Files})
 
-################################################################################
-# Global configuration types
-################################################################################
-set(CMAKE_CONFIGURATION_TYPES
-    "Debug"
-    "Release"
-    CACHE STRING "" FORCE
+file(GLOB_RECURSE Source_Files CONFIGURE_DEPENDS *.cpp)
+source_group("Source Files" FILES ${Source_Files})
+
+file(GLOB_RECURSE ALL_SHADERS CONFIGURE_DEPENDS 
+	${ASSET_ROOT}Shaders/*.vert 
+	${ASSET_ROOT}Shaders/*.frag 
+	${ASSET_ROOT}Shaders/*.comp 
+	${ASSET_ROOT}Shaders/*.geom 
+	${ASSET_ROOT}Shaders/*.tesc 
+	${ASSET_ROOT}Shaders/*.tese 
+	${ASSET_ROOT}Shaders/*.rgen 
+	${ASSET_ROOT}Shaders/*.rint 
+	${ASSET_ROOT}Shaders/*.rahit 
+	${ASSET_ROOT}Shaders/*.rchit 
+	${ASSET_ROOT}Shaders/*.rmiss 
+	${ASSET_ROOT}Shaders/*.rcall 
+	${ASSET_ROOT}Shaders/*.task 
+	${ASSET_ROOT}Shaders/*.mesh)
+	
+source_group("Shader Files" FILES ${ALL_SHADERS})
+
+set(ALL_FILES
+    ${Header_Files}
+    ${Source_Files}
+	${ALL_SHADERS}
 )
 
 ################################################################################
-# Global compiler options
+# Target
+################################################################################
+add_executable(${PROJECT_NAME} ${ALL_FILES})
+
+target_precompile_headers(${PROJECT_NAME} PRIVATE
+    <vulkan/vulkan.hpp>
+    <memory>
+    <unordered_set>
+    <vector>
+    <string>
+    <fstream>
+    <iostream>
+    <string>
+    <iosfwd>
+    <set>
+
+    <Matrix2.h>
+    <Matrix3.h>
+    <Matrix4.h>
+    <Vector2.h>
+    <Vector3.h>
+    <Vector4.h>
+    <Quaternion.h>
+
+    <Camera.h>
+    <TextureLoader.h>
+
+    <SmartTypes.h>
+    <VulkanRenderer.h>
+    <VulkanShader.h>
+    <VulkanShaderBuilder.h>
+    <VulkanTexture.h>
+    <VulkanMesh.h>
+    <VulkanPipelineBuilder.h>
+    <VulkanDynamicRenderBuilder.h>
+
+    <VulkanDescriptorSetLayoutBuilder.h>
+    <VulkanRenderPassBuilder.h>
+    <VulkanCompute.h>
+    <VulkanComputePipelineBuilder.h>
+)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    INTERPROCEDURAL_OPTIMIZATION_RELEASE "TRUE"
+)
+################################################################################
+# Compile and link options
 ################################################################################
 if(MSVC)
-    # remove default flags provided with CMake for MSVC
-    set(CMAKE_CXX_FLAGS "")
-    set(CMAKE_CXX_FLAGS_DEBUG "")
-    set(CMAKE_CXX_FLAGS_RELEASE "")
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        ${DEFAULT_CXX_DEBUG_INFORMATION_FORMAT};
+        ${DEFAULT_CXX_EXCEPTION_HANDLING};
+    )
 endif()
 
 ################################################################################
-# Global linker options
+# Dependencies
 ################################################################################
-if(MSVC)
-    # remove default flags provided with CMake for MSVC
-    set(CMAKE_EXE_LINKER_FLAGS "")
-    set(CMAKE_MODULE_LINKER_FLAGS "")
-    set(CMAKE_SHARED_LINKER_FLAGS "")
-    set(CMAKE_STATIC_LINKER_FLAGS "")
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS}")
-    set(CMAKE_MODULE_LINKER_FLAGS_DEBUG "${CMAKE_MODULE_LINKER_FLAGS}")
-    set(CMAKE_SHARED_LINKER_FLAGS_DEBUG "${CMAKE_SHARED_LINKER_FLAGS}")
-    set(CMAKE_STATIC_LINKER_FLAGS_DEBUG "${CMAKE_STATIC_LINKER_FLAGS}")
-    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS}")
-    set(CMAKE_MODULE_LINKER_FLAGS_RELEASE "${CMAKE_MODULE_LINKER_FLAGS}")
-    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS}")
-    set(CMAKE_STATIC_LINKER_FLAGS_RELEASE "${CMAKE_STATIC_LINKER_FLAGS}")
-endif()
+target_include_directories (${PROJECT_NAME} 
+    PUBLIC ${Vulkan_INCLUDE_DIR}
+    PUBLIC ${CMAKE_SOURCE_DIR}/NCLCoreClasses
+    PUBLIC ${CMAKE_SOURCE_DIR}/VulkanRendering
+    PUBLIC ${CMAKE_SOURCE_DIR}/GLTFLoader
+)	
 
-################################################################################
-# Nuget packages function stub.
-################################################################################
-function(use_package TARGET PACKAGE VERSION)
-    message(WARNING "No implementation of use_package. Create yours. "
-                    "Package \"${PACKAGE}\" with version \"${VERSION}\" "
-                    "for target \"${TARGET}\" is ignored!")
-endfunction()
+foreach (file ${ALL_SHADERS})
+    get_filename_component(file_name ${file} NAME)
+	get_filename_component(file_ext ${file} EXT)
+	
+	message("Adding custom command to ${file}")
+	get_filename_component(file_dir ${file} ABSOLUTE)
+	set(SPIRV_OUTPUT ${file_name}.spv)
+	set(SPIRV_ABS_INPUT ${file_dir})
+	set(SPIRV_ABS_OUTPUT ${file_dir}.spv)
+	
+	add_custom_command(
+		OUTPUT ${SPIRV_ABS_OUTPUT}
+		
+		COMMENT "Compiling GLSL shader:"
+		COMMAND ${Vulkan_GLSLANG_VALIDATOR_EXECUTABLE} -V  ${SPIRV_ABS_INPUT} -o ${SPIRV_ABS_OUTPUT}
+		DEPENDS ${file}
+		VERBATIM
+	)
+	list(APPEND SPIRV_BINARY_FILES ${SPIRV_OUTPUT})   
+endforeach()
 
-################################################################################
-# Common utils
-################################################################################
-include(CMake/Utils.cmake)
+add_custom_target(
+    Shaders
+    DEPENDS ON ${SPIRV_BINARY_FILES}
+)
 
-################################################################################
-# Additional Global Settings(add specific info there)
-################################################################################
-include(CMake/GlobalSettingsInclude.cmake OPTIONAL)
+set(PROJECT_DEPENDENCIES
+    NCLCoreClasses
+    VulkanRendering
+    GLTFLoader
+)
 
-################################################################################
-# Use solution folders feature
-################################################################################
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+add_dependencies(${PROJECT_NAME}
+    ${PROJECT_DEPENDENCIES}
+    Shaders
+)
 
-find_package(Vulkan REQUIRED FATAL_ERROR)
-
-set(ASSET_ROOT "${CMAKE_SOURCE_DIR}/Assets/" CACHE STRING "" FORCE)
-add_compile_definitions(ASSETROOTLOCATION="${ASSET_ROOT}") 
-
-################################################################################
-# Sub-projects
-################################################################################
-add_subdirectory(Common)
-add_subdirectory(Plugins/GLTFLoader)
-add_subdirectory(Plugins/VulkanRendering)
-add_subdirectory(VulkanModule/VulkanTutorials)
-
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT VulkanTutorials)
+target_link_libraries(${PROJECT_NAME} 
+    PRIVATE ${PROJECT_DEPENDENCIES}
+)
