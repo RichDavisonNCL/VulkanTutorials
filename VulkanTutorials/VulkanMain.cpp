@@ -14,7 +14,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "PrerecordedCmdListRenderer.h"
 #include "DescriptorBufferExample.h"
 
-#include "AsyncComputeUsage.h"
+//#include "AsyncComputeUsage.h"
 
 #include "MultiViewportExample.h"
 
