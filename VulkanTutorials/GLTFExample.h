@@ -16,6 +16,8 @@ namespace NCL::Rendering {
 		GLTFExample(Window& window);
 		~GLTFExample() {}
 
+		void SetupTutorial() override;
+
 		void RenderFrame()		override;
 	protected:
 		UniqueVulkanShader shader;

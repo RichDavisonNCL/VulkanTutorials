@@ -11,12 +11,17 @@ using namespace NCL;
 using namespace Rendering;
 
 GLTFExample::GLTFExample(Window& window) : VulkanTutorialRenderer(window)
-,loader("Sponza/Sponza.gltf", [](void) ->  MeshGeometry* {return new VulkanMesh(); })
 {
+}
+
+void GLTFExample::SetupTutorial() {
+	VulkanTutorialRenderer::SetupTutorial();
+	loader.Load("Sponza/Sponza.gltf", [](void) ->  MeshGeometry* {return new VulkanMesh(); });
+
 	cameraUniform.camera.SetPitch(-20.0f)
-	.SetYaw(90.0f)
-	.SetPosition({ 850, 840, -30 })
-	.SetFarPlane(5000.0f);
+		.SetYaw(90.0f)
+		.SetPosition({ 850, 840, -30 })
+		.SetFarPlane(5000.0f);
 
 	for (const auto& m : loader.outMeshes) {
 		VulkanMesh* loadedMesh = (VulkanMesh*)m;
@@ -25,7 +30,7 @@ GLTFExample::GLTFExample(Window& window) : VulkanTutorialRenderer(window)
 
 	textureLayout = VulkanDescriptorSetLayoutBuilder("Object Textures")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.Build(device);
+		.Build(device);
 
 	for (const auto& m : loader.outMats) {	//Build descriptors for each mesh and its sublayers
 		layerDescriptors.push_back({});
@@ -39,7 +44,7 @@ GLTFExample::GLTFExample(Window& window) : VulkanTutorialRenderer(window)
 	shader = VulkanShaderBuilder("Texturing Shader")
 		.WithVertexBinary("SimpleVertexTransform.vert.spv")
 		.WithFragmentBinary("SingleTexture.frag.spv")
-	.Build(device);
+		.Build(device);
 
 	VulkanMesh* m = (VulkanMesh*)loader.outMeshes[0];
 	pipeline = VulkanPipelineBuilder("Main Scene Pipeline")
@@ -53,8 +58,9 @@ GLTFExample::GLTFExample(Window& window) : VulkanTutorialRenderer(window)
 		.WithDepthStencilFormat(depthBuffer->GetFormat())
 		.WithDescriptorSetLayout(0, *cameraLayout)		//Camera is set 0
 		.WithDescriptorSetLayout(1, *textureLayout)	//Textures are set 1
-	.Build(device);
+		.Build(device);
 }
+
 
 void GLTFExample::RenderFrame() {
 	TransitionSwapchainForRendering(defaultCmdBuffer);

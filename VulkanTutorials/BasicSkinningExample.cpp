@@ -11,14 +11,16 @@ License: MIT (see LICENSE file at the top of the source tree)
 using namespace NCL;
 using namespace Rendering;
 
-BasicSkinningExample::BasicSkinningExample(Window& window) : VulkanTutorialRenderer(window) 
-,loader("CesiumMan/CesiumMan.gltf", [](void) ->  MeshGeometry* {return new VulkanMesh(); })
+BasicSkinningExample::BasicSkinningExample(Window& window) : VulkanTutorialRenderer(window)
 {
 
 }
 
 void BasicSkinningExample::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
+
+	loader.Load("CesiumMan/CesiumMan.gltf", [](void) ->  MeshGeometry* {return new VulkanMesh(); });
+
 	cameraUniform.camera.SetPitch(0.0f)
 		.SetYaw(160)
 		.SetPosition({ 3, 0, -12 })

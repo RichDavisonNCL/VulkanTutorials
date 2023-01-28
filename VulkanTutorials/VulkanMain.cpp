@@ -66,8 +66,8 @@ int main() {
 	//PostProcessingExample* renderer = new PostProcessingExample(*w);
 	//ShadowMappingExample* renderer = new ShadowMappingExample(*w);
 	//LightingExample* renderer = new LightingExample(*w);
-	DeferredExample* renderer = new DeferredExample(*w);
-	//GLTFExample* renderer = new GLTFExample(*w);
+	//DeferredExample* renderer = new DeferredExample(*w);
+	GLTFExample* renderer = new GLTFExample(*w);
 	//TestRayTrace* renderer = new TestRayTrace(*w);
 	//BasicSkinningExample* renderer = new BasicSkinningExample(*w);
 	//CubeMapRenderer* renderer = new CubeMapRenderer(*w);
