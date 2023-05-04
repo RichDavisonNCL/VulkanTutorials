@@ -25,6 +25,8 @@ find_package(Vulkan REQUIRED FATAL_ERROR)
 set(ASSET_ROOT "${CMAKE_SOURCE_DIR}/Assets/" CACHE STRING "" FORCE)
 add_compile_definitions(ASSETROOTLOCATION="${ASSET_ROOT}") 
 
+set(ADD_RAY_TRACING CACHE BOOL FALSE)
+
 if(MSVC)
     add_compile_definitions("VK_USE_PLATFORM_WIN32_KHR") 
     add_compile_definitions("NOMINMAX")
@@ -38,6 +40,10 @@ add_subdirectory(NCLCoreClasses)
 add_subdirectory(GLTFLoader)
 add_subdirectory(VulkanRendering)
 add_subdirectory(VulkanTutorials)
+
+if(ADD_RAY_TRACING)
+	add_subdirectory(VulkanRayTracing)
+endif()
 
 if(MSVC)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT VulkanTutorials)
