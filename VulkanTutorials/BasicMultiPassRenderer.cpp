@@ -106,7 +106,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 //}
 //
 //void BasicMultiPassRenderer::RenderFrame() {
-//	frameCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline.pipeline);
+//	frameCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline);
 //
 //	UpdateCameraUniform();
 //

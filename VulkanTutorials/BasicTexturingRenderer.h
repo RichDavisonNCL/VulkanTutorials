@@ -18,8 +18,6 @@ namespace NCL::Rendering {
 		void RenderFrame() override;
 
 	protected:
-		void	BuildPipeline();
-
 		VulkanPipeline	texturePipeline;
 
 		UniqueVulkanShader	defaultShader;

@@ -11,10 +11,11 @@ using namespace NCL;
 using namespace Rendering;
 
 VulkanTutorialRenderer::VulkanTutorialRenderer(Window& window) : VulkanRenderer(window) {
+	majorVersion = 1;
+	minorVersion = 3;
 }
 
 VulkanTutorialRenderer::~VulkanTutorialRenderer() {
-	DestroyBuffer(cameraUniform.cameraData);
 }
 
 void VulkanTutorialRenderer::SetupTutorial() {
@@ -34,28 +35,32 @@ void VulkanTutorialRenderer::SetupTutorial() {
 		.Build(GetDevice()); //Get our camera matrices...
 	cameraDescriptor = BuildUniqueDescriptorSet(*cameraLayout);
 
-	UpdateBufferDescriptor(*cameraDescriptor, cameraUniform.cameraData, 0, vk::DescriptorType::eUniformBuffer);
+	UpdateBufferDescriptor(*cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
 
 	runTime = 0.0f;
 
-	nullLayout = VulkanDescriptorSetLayoutBuilder().Build(device);
+	nullLayout = VulkanDescriptorSetLayoutBuilder().Build(GetDevice());
 
-	Vulkan::SetNullDescriptor(device, *nullLayout);
+	Vulkan::SetNullDescriptor(GetDevice(), *nullLayout);
 }
 
 void VulkanTutorialRenderer::BuildCamera() {
-	cameraUniform.camera		= Camera::BuildPerspectiveCamera(Vector3(0, 0, 1), 0, 0, 45.0f, 0.1f, 1000.0f);
-	cameraUniform.cameraData	= CreateBuffer(sizeof(Matrix4) * 2, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible);
-	cameraUniform.cameraMemory	= (Matrix4*)GetDevice().mapMemory(*cameraUniform.cameraData.deviceMem, 0, cameraUniform.cameraData.allocInfo.allocationSize);
+	camera			= Camera::BuildPerspectiveCamera(Vector3(0, 0, 1), 0, 0, 45.0f, 0.1f, 1000.0f);
+	cameraBuffer = VulkanBufferBuilder(sizeof(Matrix4) * 2)
+		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
+		.WithHostVisibility()
+		.WithPersistentMapping()
+		.Build(GetDevice(), GetMemoryAllocator());
 }
 
 void VulkanTutorialRenderer::UpdateCamera(float dt) {
-	cameraUniform.camera.UpdateCamera(dt);
+	camera.UpdateCamera(dt);
 }
 
 void VulkanTutorialRenderer::UploadCameraUniform() {
-	cameraUniform.cameraMemory[0] = cameraUniform.camera.BuildViewMatrix();
-	cameraUniform.cameraMemory[1] = cameraUniform.camera.BuildProjectionMatrix(hostWindow.GetScreenAspect());
+	Matrix4* cameraMatrices = (Matrix4*)cameraBuffer.Data();
+	cameraMatrices[0] = camera.BuildViewMatrix();
+	cameraMatrices[1] = camera.BuildProjectionMatrix(hostWindow.GetScreenAspect());
 }
 
 UniqueVulkanMesh VulkanTutorialRenderer::GenerateTriangle() {
@@ -98,8 +103,6 @@ UniqueVulkanMesh VulkanTutorialRenderer::GenerateGrid() {
 
 UniqueVulkanMesh VulkanTutorialRenderer::LoadMesh(const string& filename) {
 	VulkanMesh* newMesh = new VulkanMesh(filename);
-	newMesh->SetPrimitiveType(NCL::GeometryPrimitive::Triangles);
-	newMesh->SetDebugName(filename);
 	newMesh->UploadToGPU(this);
 	return UniqueVulkanMesh(newMesh);
 }
@@ -109,7 +112,7 @@ void VulkanTutorialRenderer::RenderSingleObject(RenderObject& o, vk::CommandBuff
 	toBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *toPipeline.layout, descriptorSet, 1, &*o.objectDescriptorSet, 0, nullptr);
 	
 	if (o.mesh->GetSubMeshCount() == 0) {
-		SubmitDrawCall(*o.mesh, toBuffer);
+		SubmitDrawCall(toBuffer, *o.mesh);
 	}
 	else {
 		for (unsigned int i = 0; i < o.mesh->GetSubMeshCount(); ++i) {

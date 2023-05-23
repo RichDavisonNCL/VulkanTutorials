@@ -7,16 +7,9 @@ License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "../NCLCoreClasses/TextureLoader.h"
-
 #include "../VulkanRendering/VulkanUtils.h"
 
 namespace NCL::Rendering {
-	struct CameraUniform {
-		Camera			camera;
-		VulkanBuffer	cameraData;
-		Matrix4*		cameraMemory;
-	};
-
 	struct RenderObject {
 		VulkanMesh* mesh;
 		Matrix4 transform;
@@ -66,7 +59,9 @@ namespace NCL::Rendering {
 		UniqueVulkanMesh GenerateQuad();
 		UniqueVulkanMesh GenerateGrid();
 
-		CameraUniform cameraUniform;
+		Camera			camera;
+		VulkanBuffer	cameraBuffer;
+
 		vk::UniqueDescriptorSetLayout nullLayout;
 
 		vk::UniqueDescriptorSet			cameraDescriptor;

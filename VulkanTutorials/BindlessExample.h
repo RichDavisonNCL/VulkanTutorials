@@ -15,15 +15,12 @@ namespace NCL::Rendering {
         ~BindlessExample() {}
 
         void SetupTutorial() override;
-
         void RenderFrame()		override;
-        static void InitBindlessDevice(vk::DeviceCreateInfo&, vk::PhysicalDevice device);
 
     protected:
         void CreateBindlessDescriptorPool();
-        void UpdateBindlessImageDescriptor(vk::DescriptorSet set, int bindingSlot, int index, vk::ImageView view, vk::Sampler sampler, vk::ImageLayout layout);
 
-        void SetupDeviceInfo(vk::DeviceCreateInfo& info) override;
+        void SetupDevice(vk::PhysicalDeviceFeatures2& deviceFeatures) override;
 
         vk::UniqueDescriptorPool		bindlessDescriptorPool;	//descriptor sets come from here! Specific placement for destructors
 

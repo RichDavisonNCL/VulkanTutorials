@@ -14,40 +14,34 @@ BasicPushConstantRenderer::BasicPushConstantRenderer(Window& window) : VulkanTut
 }
 
 void BasicPushConstantRenderer::SetupTutorial()	{
-	positionUniform = Vector3(0.0f, 0.0f, 0.0f);
-	colourUniform	= Vector4(1.0f, 1.0f, 0.0f, 1.0f);
+	VulkanTutorialRenderer::SetupTutorial();
 
 	triMesh = GenerateTriangle();
 
 	shader = VulkanShaderBuilder("Testing push constants!")
 		.WithVertexBinary("BasicPushConstant.vert.spv")
 		.WithFragmentBinary("BasicPushConstant.frag.spv")
-	.Build(device);
+	.Build(GetDevice());
 
 	pipeline = VulkanPipelineBuilder("Basic Push Constant Pipeline")
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shader)
+		//.WithColourFormats({ surfaceFormat })
+		.WithDepthFormat(depthBuffer->GetFormat())
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(positionUniform))
 		.WithPushConstant(vk::ShaderStageFlagBits::eFragment, sizeof(Vector4), sizeof(colourUniform))
-	.Build(device);
+	.Build(GetDevice());
 }
 
 void BasicPushConstantRenderer::RenderFrame() {
-	TransitionSwapchainForRendering(defaultCmdBuffer);
+	positionUniform = {sin(runTime), 0.0f, 0.0f };
+	colourUniform	= Vector4(1.0f, 1.0f, 0.0f, 1.0f);
 
-	VulkanDynamicRenderBuilder()
-		.WithColourAttachment(swapChainList[currentSwap]->view)
-		.WithRenderArea(defaultScreenRect)
-	.BeginRendering(defaultCmdBuffer);
+	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
-	positionUniform.x = sin(runTime);
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
+	frameCmds.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(positionUniform), (void*)&positionUniform);
+	frameCmds.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eFragment, sizeof(Vector4), sizeof(colourUniform), (void*)&colourUniform);
 
-	defaultCmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(positionUniform), (void*)&positionUniform);
-	defaultCmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eFragment, sizeof(Vector4), sizeof(colourUniform), (void*)&colourUniform);
-
-	SubmitDrawCall(*triMesh, defaultCmdBuffer);
-
-	EndRendering(defaultCmdBuffer);
+	SubmitDrawCall(frameCmds, *triMesh);
 }

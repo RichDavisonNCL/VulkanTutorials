@@ -75,6 +75,7 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
     <VulkanRenderPassBuilder.h>
     <VulkanCompute.h>
     <VulkanComputePipelineBuilder.h>
+	<VulkanBufferBuilder.h>
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -131,6 +132,17 @@ set(PROJECT_DEPENDENCIES
     VulkanRendering
     GLTFLoader
 )
+
+if(ADD_RAY_TRACING)
+	target_include_directories (${PROJECT_NAME} 
+		PUBLIC ${CMAKE_SOURCE_DIR}/VulkanRayTracing
+	)	
+
+	set(PROJECT_DEPENDENCIES
+		${PROJECT_DEPENDENCIES}
+		VulkanRayTracing
+	)
+endif()
 
 add_dependencies(${PROJECT_NAME}
     ${PROJECT_DEPENDENCIES}

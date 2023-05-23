@@ -12,7 +12,7 @@ namespace NCL::Rendering {
 	class ShadowMappingExample : public VulkanTutorialRenderer	{
 	public:
 		ShadowMappingExample(Window& window);
-		~ShadowMappingExample();
+		~ShadowMappingExample() {}
 
 		void SetupTutorial() override;
 
@@ -38,8 +38,7 @@ namespace NCL::Rendering {
 
 		UniqueVulkanTexture shadowMap;
 
-		RenderObject	boxObject;
-		RenderObject	floorObject;
+		RenderObject	sceneObjects[2];
 
 		vk::UniqueDescriptorSetLayout shadowTexLayout;
 		vk::UniqueDescriptorSetLayout shadowMatrixLayout;
@@ -50,8 +49,5 @@ namespace NCL::Rendering {
 
 		VulkanBuffer shadowMatUniform;
 		Matrix4*	shadowMatrix;
-
-		vk::Viewport	shadowViewport;
-		vk::Rect2D		shadowScissor;
 	};
 }

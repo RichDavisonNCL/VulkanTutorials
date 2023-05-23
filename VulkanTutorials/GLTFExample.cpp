@@ -16,9 +16,13 @@ GLTFExample::GLTFExample(Window& window) : VulkanTutorialRenderer(window)
 
 void GLTFExample::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
-	loader.Load("Sponza/Sponza.gltf", [](void) ->  MeshGeometry* {return new VulkanMesh(); });
 
-	cameraUniform.camera.SetPitch(-20.0f)
+	loader.Load("Sponza/Sponza.gltf", 
+		[](void) ->  MeshGeometry* {return new VulkanMesh(); },
+		[&](std::string& input) ->  VulkanTexture* {return VulkanTexture::TextureFromFile(this, input).release(); }
+	);
+
+	camera.SetPitch(-20.0f)
 		.SetYaw(90.0f)
 		.SetPosition({ 850, 840, -30 })
 		.SetFarPlane(5000.0f);
@@ -30,7 +34,7 @@ void GLTFExample::SetupTutorial() {
 
 	textureLayout = VulkanDescriptorSetLayoutBuilder("Object Textures")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-		.Build(device);
+		.Build(GetDevice());
 
 	for (const auto& m : loader.outMats) {	//Build descriptors for each mesh and its sublayers
 		layerDescriptors.push_back({});
@@ -44,7 +48,7 @@ void GLTFExample::SetupTutorial() {
 	shader = VulkanShaderBuilder("Texturing Shader")
 		.WithVertexBinary("SimpleVertexTransform.vert.spv")
 		.WithFragmentBinary("SingleTexture.frag.spv")
-		.Build(device);
+	.Build(GetDevice());
 
 	VulkanMesh* m = (VulkanMesh*)loader.outMeshes[0];
 	pipeline = VulkanPipelineBuilder("Main Scene Pipeline")
@@ -56,31 +60,26 @@ void GLTFExample::SetupTutorial() {
 		.WithDepthState(vk::CompareOp::eLessOrEqual, true, true, false)
 		.WithColourFormats({ surfaceFormat })
 		.WithDepthStencilFormat(depthBuffer->GetFormat())
-		.WithDescriptorSetLayout(0, *cameraLayout)		//Camera is set 0
+		.WithDescriptorSetLayout(0, *cameraLayout)	//Camera is set 0
 		.WithDescriptorSetLayout(1, *textureLayout)	//Textures are set 1
-		.Build(device);
+	.Build(GetDevice());
 }
 
-
 void GLTFExample::RenderFrame() {
-	TransitionSwapchainForRendering(defaultCmdBuffer);
-	BeginDefaultRendering(defaultCmdBuffer);
-
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
+	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 	Matrix4 identity;
-	defaultCmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4), (void*)&identity);
+	frameCmds.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4), (void*)&identity);
 
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
-	UpdateBufferDescriptor(*cameraDescriptor, cameraUniform.cameraData, 0, vk::DescriptorType::eUniformBuffer);
+	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
+	UpdateBufferDescriptor(*cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
 	for(size_t i = 0; i < loader.outMeshes.size(); ++i) {
 		VulkanMesh* loadedMesh = (VulkanMesh*)loader.outMeshes[i];
 		vector<vk::UniqueDescriptorSet>& set = layerDescriptors[i];
 
 		for (unsigned int j = 0; j < loadedMesh->GetSubMeshCount(); ++j) {
-			defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 1, 1, &*set[j], 0, nullptr);
+			frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 1, 1, &*set[j], 0, nullptr);
 		
-			SubmitDrawCallLayer(*loadedMesh, j, defaultCmdBuffer);
+			SubmitDrawCallLayer(*loadedMesh, j, frameCmds);
 		}
 	}
-	EndRendering(defaultCmdBuffer);
 }

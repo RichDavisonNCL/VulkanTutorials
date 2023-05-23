@@ -14,6 +14,10 @@ BasicUniformBufferRenderer::BasicUniformBufferRenderer(Window& window) : VulkanT
 
 }
 
+BasicUniformBufferRenderer::~BasicUniformBufferRenderer() {
+	cameraData.Unmap();
+}
+
 void BasicUniformBufferRenderer::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 
@@ -24,53 +28,45 @@ void BasicUniformBufferRenderer::SetupTutorial() {
 	shader = VulkanShaderBuilder("Basic Uniform Buffer Usage!")
 		.WithVertexBinary("BasicUniformBuffer.vert.spv")
 		.WithFragmentBinary("BasicUniformBuffer.frag.spv")
-	.Build(device);
+	.Build(GetDevice());
 
-	cameraData		= CreateBuffer(sizeof(Matrix4) * 2, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible);
-	cameraMemory	= (Matrix4*)device.mapMemory(*cameraData.deviceMem, 0, cameraData.allocInfo.allocationSize);
+	cameraData = VulkanBufferBuilder(sizeof(Matrix4) * 2, "Camera Data")
+		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
+		.WithHostVisibility()
+		.Build(GetDevice(), GetMemoryAllocator());
+
+	cameraMemory = (Matrix4*)cameraData.Map();
 	
-	BuildPipeline();
-}
-
-void BasicUniformBufferRenderer::Update(float dt) {
-	camera.UpdateCamera(dt);
-}
-
-void	BasicUniformBufferRenderer::BuildPipeline() {
 	matrixLayout = VulkanDescriptorSetLayoutBuilder("Matrices")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-	.Build(device);
+		.Build(GetDevice());
 
 	pipeline = VulkanPipelineBuilder("UBOPipeline")
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shader)
 		.WithColourFormats({ surfaceFormat })
-		.WithDescriptorSetLayout(0,*matrixLayout)
-	.Build(device);
+		.WithDepthFormat(depthBuffer->GetFormat())
+		.WithDescriptorSetLayout(0, *matrixLayout)
+		.Build(GetDevice());
 
 	descriptorSet = BuildUniqueDescriptorSet(*matrixLayout);
 
-	UpdateBufferDescriptor(*descriptorSet, cameraData, 0, vk::DescriptorType::eUniformBuffer);
+	UpdateBufferDescriptor(*descriptorSet, 0, vk::DescriptorType::eUniformBuffer, cameraData);
+}
+
+void BasicUniformBufferRenderer::Update(float dt) {
+	camera.UpdateCamera(dt);
 }
 
 void BasicUniformBufferRenderer::RenderFrame() {
-	TransitionSwapchainForRendering(defaultCmdBuffer);
-
-	VulkanDynamicRenderBuilder rendering = VulkanDynamicRenderBuilder()
-		.WithColourAttachment(swapChainList[currentSwap]->view, vk::ImageLayout::eColorAttachmentOptimal, true, ClearColour(0.2f, 0.2f, 0.2f, 1.0f))
-		.WithRenderArea(defaultScreenRect)
-	.BeginRendering(defaultCmdBuffer);
-
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
+	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
 	UpdateCameraUniform();
 
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*descriptorSet, 0, nullptr);
+	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*descriptorSet, 0, nullptr);
 
-	SubmitDrawCall(*triMesh, defaultCmdBuffer);
-
-	EndRendering(defaultCmdBuffer);
+	SubmitDrawCall(frameCmds, *triMesh);
 }
 
 void BasicUniformBufferRenderer::UpdateCameraUniform() {

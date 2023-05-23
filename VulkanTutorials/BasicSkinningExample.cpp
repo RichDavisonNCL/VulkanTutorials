@@ -13,17 +13,19 @@ using namespace Rendering;
 
 BasicSkinningExample::BasicSkinningExample(Window& window) : VulkanTutorialRenderer(window)
 {
-
 }
 
 void BasicSkinningExample::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 
-	loader.Load("CesiumMan/CesiumMan.gltf", [](void) ->  MeshGeometry* {return new VulkanMesh(); });
+	loader.Load("CesiumMan/CesiumMan.gltf",
+		[](void) ->  MeshGeometry* {return new VulkanMesh(); },
+		[&](std::string& input) ->  VulkanTexture* {return VulkanTexture::TextureFromFile(this, input).release(); }
+	);
 
-	cameraUniform.camera.SetPitch(0.0f)
-		.SetYaw(160)
-		.SetPosition({ 3, 0, -12 })
+	camera.SetPitch(0.0f)
+		.SetYaw(200)
+		.SetPosition({ 0, 0, -2 })
 		.SetFarPlane(5000.0f);
 
 	for (const auto& m : loader.outMeshes) {
@@ -33,7 +35,7 @@ void BasicSkinningExample::SetupTutorial() {
 
 	textureLayout = VulkanDescriptorSetLayoutBuilder("Object Textures")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-		.Build(device);
+		.Build(GetDevice());
 
 	for (const auto& m : loader.outMats) {	//Build descriptors for each mesh and its sublayers
 		layerDescriptors.push_back({});
@@ -46,11 +48,11 @@ void BasicSkinningExample::SetupTutorial() {
 	shader = VulkanShaderBuilder("Texturing Shader")
 		.WithVertexBinary("BasicSkinning.vert.spv")
 		.WithFragmentBinary("SingleTexture.frag.spv")
-	.Build(device);
+	.Build(GetDevice());
 
 	jointsLayout = VulkanDescriptorSetLayoutBuilder("Joint Data")
 		.WithStorageBuffers(1, vk::ShaderStageFlagBits::eVertex)
-		.Build(device); //Get our camera matrices...
+		.Build(GetDevice()); //Get our camera matrices...
 
 	jointsDescriptor = BuildUniqueDescriptorSet(*jointsLayout);
 
@@ -68,13 +70,14 @@ void BasicSkinningExample::SetupTutorial() {
 		.WithDescriptorSetLayout(0,*cameraLayout)	//Camera is set 0
 		.WithDescriptorSetLayout(1,*textureLayout)//Textures are set 1
 		.WithDescriptorSetLayout(2,*jointsLayout)	//Joints are set 2
-	.Build(device);
+	.Build(GetDevice());
 
 	int matCount = loader.outMeshes[0]->GetJointCount();
 
-	jointsBuffer = CreateBuffer(sizeof(Matrix4) * matCount,
-		vk::BufferUsageFlagBits::eStorageBuffer,
-		vk::MemoryPropertyFlagBits::eHostVisible);
+	jointsBuffer = VulkanBufferBuilder(sizeof(Matrix4) * matCount, "Joint Matrices")
+		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer)
+		.WithHostVisibility()
+		.Build(GetDevice(), GetMemoryAllocator());
 
 	vector<Matrix4> bindPose	= loader.outMeshes[0]->GetBindPose();
 	vector<Matrix4> invBindPos	= loader.outMeshes[0]->GetInverseBindPose();
@@ -85,33 +88,10 @@ void BasicSkinningExample::SetupTutorial() {
 		testData.push_back(bindPose[i] * invBindPos[i]);
 	}
 
-	UploadBufferData(jointsBuffer, testData.data(), sizeof(Matrix4) * matCount);
+	jointsBuffer.CopyData(testData.data(), sizeof(Matrix4) * matCount);
 
-	UpdateBufferDescriptor(*jointsDescriptor, jointsBuffer, 0, vk::DescriptorType::eStorageBuffer);
-	UpdateBufferDescriptor(*cameraDescriptor, cameraUniform.cameraData, 0, vk::DescriptorType::eUniformBuffer);
-	frameTime		= 1 / 30.0f;
-	currentFrame	= 0;
-}
-
-void BasicSkinningExample::RenderFrame() {
-	TransitionSwapchainForRendering(defaultCmdBuffer);
-	BeginDefaultRendering(defaultCmdBuffer);
-
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 2, 1, &*jointsDescriptor, 0, nullptr);
-
-	for (size_t i = 0; i < loader.outMeshes.size(); ++i) {
-		VulkanMesh* loadedMesh = (VulkanMesh*)loader.outMeshes[i];
-		vector<vk::UniqueDescriptorSet>& set = layerDescriptors[i];
-
-		for (unsigned int j = 0; j < loadedMesh->GetSubMeshCount(); ++j) {
-			defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 1, 1, &*set[j], 0, nullptr);
-
-			SubmitDrawCallLayer(*loadedMesh, j, defaultCmdBuffer);
-		}
-	}
-	EndRendering(defaultCmdBuffer);
+	UpdateBufferDescriptor(*jointsDescriptor, 0, vk::DescriptorType::eStorageBuffer, jointsBuffer);
+	UpdateBufferDescriptor(*cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
 }
 
 void BasicSkinningExample::Update(float dt) {
@@ -119,21 +99,38 @@ void BasicSkinningExample::Update(float dt) {
 
 	frameTime -= dt;
 
+	MeshGeometry*  mesh = loader.outMeshes[0];
+	MeshAnimation* anim = loader.outAnims[0];
+
 	if (frameTime <= 0.0f) {
-		currentFrame = (currentFrame + 1) % loader.outAnims[0]->GetFrameCount();
-		frameTime += loader.outAnims[0]->GetFrameRate();
+		currentFrame = (currentFrame + 1) % anim->GetFrameCount();
+		frameTime += anim->GetFrameTime();
+		vector<Matrix4> invBindPos = mesh->GetInverseBindPose();
+
+		const Matrix4* frameMats = anim->GetJointData(currentFrame);
+
+		vector<Matrix4> jointData(invBindPos.size());
+
+		for (int i = 0; i < invBindPos.size(); ++i) {
+			jointData[i] = (frameMats[i] * invBindPos[i]);
+		}
+		jointsBuffer.CopyData(jointData.data(), sizeof(Matrix4) * jointData.size());
 	}
+}
 
-	vector<Matrix4> bindPose = loader.outMeshes[0]->GetBindPose();
-	vector<Matrix4> invBindPos = loader.outMeshes[0]->GetInverseBindPose();
+void BasicSkinningExample::RenderFrame() {
+	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
+	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 2, 1, &*jointsDescriptor, 0, nullptr);
 
-	const Matrix4* frameMats = loader.outAnims[0]->GetJointData(currentFrame);
+	for (size_t i = 0; i < loader.outMeshes.size(); ++i) {
+		VulkanMesh* loadedMesh = (VulkanMesh*)loader.outMeshes[i];
+		vector<vk::UniqueDescriptorSet>& set = layerDescriptors[i];
 
-	vector<Matrix4> testData;
+		for (unsigned int j = 0; j < loadedMesh->GetSubMeshCount(); ++j) {
+			frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 1, 1, &*set[j], 0, nullptr);
 
-	for (int i = 0; i < bindPose.size(); ++i) {
-		testData.push_back(frameMats[i] * invBindPos[i]);
+			SubmitDrawCallLayer(*loadedMesh, j, frameCmds);
+		}
 	}
-	int dataSize = sizeof(Matrix4) * loader.outMeshes[0]->GetJointCount();
-	UploadBufferData(jointsBuffer, testData.data(), dataSize);
 }

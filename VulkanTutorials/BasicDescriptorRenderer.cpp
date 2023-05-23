@@ -20,47 +20,47 @@ void BasicDescriptorRenderer::SetupTutorial() {
 	shader = VulkanShaderBuilder("Basic Descriptor Shader!")
 		.WithVertexBinary("BasicDescriptor.vert.spv")
 		.WithFragmentBinary("BasicDescriptor.frag.spv")
-	.Build(device);
+	.Build(GetDevice());
 	
 	descriptorLayout = VulkanDescriptorSetLayoutBuilder("Uniform Data")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-	.Build(device);
+	.Build(GetDevice());
 
 	pipeline = VulkanPipelineBuilder()
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shader)
+		//.WithColourFormats({ surfaceFormat })
+		.WithDepthFormat(depthBuffer->GetFormat())
 		.WithDescriptorSetLayout(0, *descriptorLayout)
-	.Build(device);
+	.Build(GetDevice());
 
 	descriptorSet = BuildUniqueDescriptorSet(*descriptorLayout);
 
-	uniformData[0] = CreateBuffer(sizeof(positionUniform), vk::BufferUsageFlagBits::eUniformBuffer,vk::MemoryPropertyFlagBits::eHostVisible);
-	uniformData[1] = CreateBuffer(sizeof(colourUniform), vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible);
+	uniformData[0] = VulkanBufferBuilder(sizeof(positionUniform), "Positions")
+		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
+		.WithHostVisibility()
+		.Build(GetDevice(), GetMemoryAllocator());
 
-	UpdateBufferDescriptor(*descriptorSet, uniformData[0], 0, vk::DescriptorType::eUniformBuffer);
-	UpdateBufferDescriptor(*descriptorSet, uniformData[1], 1, vk::DescriptorType::eUniformBuffer);
+	uniformData[1] = VulkanBufferBuilder(sizeof(positionUniform), "Colours")
+		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
+		.WithHostVisibility()
+		.Build(GetDevice(), GetMemoryAllocator());
+
+	UpdateBufferDescriptor(*descriptorSet, 0, vk::DescriptorType::eUniformBuffer, uniformData[0]);
+	UpdateBufferDescriptor(*descriptorSet, 1, vk::DescriptorType::eUniformBuffer, uniformData[1]);
 }
 
 void BasicDescriptorRenderer::RenderFrame() {
-	TransitionSwapchainForRendering(defaultCmdBuffer);
-
 	Vector3 positionUniform = Vector3(sin(runTime), 0.0, 0.0f);
 	Vector4 colourUniform	= Vector4(sin(runTime), 0, 1, 1);
 
-	VulkanDynamicRenderBuilder()
-		.WithColourAttachment(swapChainList[currentSwap]->view)
-		.WithRenderArea(defaultScreenRect)
-	.BeginRendering(defaultCmdBuffer);
+	uniformData[0].CopyData((void*)&positionUniform, sizeof(positionUniform));
+	uniformData[1].CopyData((void*)&colourUniform, sizeof(colourUniform));
 
-	UploadBufferData(uniformData[0], (void*)&positionUniform, sizeof(positionUniform));
-	UploadBufferData(uniformData[1], (void*)&colourUniform  , sizeof(colourUniform));
+	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*descriptorSet, 0, nullptr);
 
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*descriptorSet, 0, nullptr);
-
-	SubmitDrawCall(*triMesh, defaultCmdBuffer);
-
-	EndRendering(defaultCmdBuffer);
+	SubmitDrawCall(frameCmds, *triMesh);
 }

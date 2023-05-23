@@ -19,11 +19,11 @@ namespace NCL::Rendering {
 		void RenderFrame() override;
 
 	protected:
-		void SetupDeviceInfo(vk::DeviceCreateInfo& info) override;
+		void SetupDevice(vk::PhysicalDeviceFeatures2& deviceFeatures) override;
 
 		VulkanPipeline	pipeline;
 
-		UniqueVulkanMesh 		triMesh;
+		UniqueVulkanMesh 	triMesh;
 		UniqueVulkanShader	shader;
 
 		VulkanBuffer	uniformData[2];
@@ -34,7 +34,6 @@ namespace NCL::Rendering {
 		VulkanBuffer		descriptorBuffer;
 		vk::DeviceSize		descriptorBufferSize;
 		vk::DeviceAddress	descriptorBufferAddress;
-		//void*				descriptorBufferMemory;
 
 		Vector4	colourUniform;
 		Vector4 positionUniform;

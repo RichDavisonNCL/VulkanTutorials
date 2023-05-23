@@ -23,12 +23,12 @@ void PrerecordedCmdListRenderer::SetupTutorial() {
 	shader = VulkanShaderBuilder("Basic Shader!")
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.Build(device);
+	.Build(GetDevice());
 	 
 	BuildPipeline();
 
-	auto buffers = device.allocateCommandBuffers(vk::CommandBufferAllocateInfo(
-		commandPool, vk::CommandBufferLevel::eSecondary, 1));
+	auto buffers = GetDevice().allocateCommandBuffers(vk::CommandBufferAllocateInfo(
+		GetCommandPool(CommandBufferType::Graphics), vk::CommandBufferLevel::eSecondary, 1));
 
 	recordedBuffer = buffers[0];
 
@@ -36,10 +36,10 @@ void PrerecordedCmdListRenderer::SetupTutorial() {
 	inheritance.setRenderPass(defaultRenderPass);
 	vk::CommandBufferBeginInfo bufferBegin = vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eRenderPassContinue, &inheritance);
 	recordedBuffer.begin(bufferBegin);
-	recordedBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
+	recordedBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 	recordedBuffer.setViewport(0, 1, &defaultViewport);
 	recordedBuffer.setScissor(0, 1, &defaultScissor);
-	SubmitDrawCall(*triMesh, recordedBuffer);
+	SubmitDrawCall(recordedBuffer, *triMesh);
 	recordedBuffer.end();
 }
 
@@ -47,19 +47,19 @@ void PrerecordedCmdListRenderer::BuildPipeline() {
 	pipeline = VulkanPipelineBuilder()
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
+		.WithDepthFormat(depthBuffer->GetFormat())
 		.WithShader(shader)
-	.Build(device);
+	.Build(GetDevice());
 }
 
 void PrerecordedCmdListRenderer::RenderFrame() {
-	TransitionSwapchainForRendering(defaultCmdBuffer);
-	VulkanDynamicRenderBuilder()
-		.WithColourAttachment(swapChainList[currentSwap]->view)
-		.WithRenderArea(defaultScreenRect)
-		.WithSecondaryBuffers()
-		.BeginRendering(defaultCmdBuffer);
+	//VulkanDynamicRenderBuilder()
+	//	.WithColourAttachment(swapChainList[currentSwap]->view)
+	//	.WithRenderArea(defaultScreenRect)
+	//	.WithSecondaryBuffers()
+	//	.BeginRendering(defaultCmdBuffer);
 
-	defaultCmdBuffer.executeCommands(1, &recordedBuffer);
+	frameCmds.executeCommands(1, &recordedBuffer);
 
-	EndRendering(defaultCmdBuffer);
+	//EndRendering(defaultCmdBuffer);
 }

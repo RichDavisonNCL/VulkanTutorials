@@ -20,24 +20,18 @@ void BasicGeometryRenderer::SetupTutorial() {
 	shader = VulkanShaderBuilder("Basic Shader!")
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.Build(device);
+	.Build(GetDevice());
 
 	basicPipeline = VulkanPipelineBuilder("Basic Pipeline")
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
+		//.WithColourFormats({ surfaceFormat })
+		.WithDepthFormat(depthBuffer->GetFormat())
 		.WithShader(shader)
-	.Build(device);
+	.Build(GetDevice());
 }
 
 void BasicGeometryRenderer::RenderFrame() {
-	TransitionSwapchainForRendering(defaultCmdBuffer);
-
-	VulkanDynamicRenderBuilder()
-		.WithColourAttachment(swapChainList[currentSwap]->view)
-		.WithRenderArea(defaultScreenRect)
-	.BeginRendering(defaultCmdBuffer);
-
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *basicPipeline.pipeline);
-	SubmitDrawCall(*triMesh, defaultCmdBuffer);
-	EndRendering(defaultCmdBuffer);
+	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline);
+	SubmitDrawCall(frameCmds, *triMesh);
 }

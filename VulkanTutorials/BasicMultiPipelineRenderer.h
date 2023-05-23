@@ -12,7 +12,7 @@ namespace NCL::Rendering {
 	class BasicMultiPipelineRenderer : public VulkanTutorialRenderer {
 	public:
 		BasicMultiPipelineRenderer(Window& window);
-		~BasicMultiPipelineRenderer();
+		~BasicMultiPipelineRenderer() {}
 
 		void SetupTutorial() override;
 

@@ -15,29 +15,24 @@ MultiViewportExample::MultiViewportExample(Window& window) : VulkanTutorialRende
 }
 
 void MultiViewportExample::SetupTutorial() {
+	VulkanTutorialRenderer::SetupTutorial();
 	triMesh = GenerateTriangle();
 
 	shader = VulkanShaderBuilder("Basic Shader!")
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.Build(device);
+	.Build(GetDevice());
 
 	pipeline = VulkanPipelineBuilder("Test Pipeline")
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
+		.WithDepthFormat(depthBuffer->GetFormat())
 		.WithShader(shader)
-	.Build(device);
+	.Build(GetDevice());
 }
 
 void MultiViewportExample::RenderFrame() {
-	TransitionSwapchainForRendering(defaultCmdBuffer);
-
-	VulkanDynamicRenderBuilder()
-		.WithColourAttachment(swapChainList[currentSwap]->view)
-		.WithRenderArea(defaultScreenRect)
-	.BeginRendering(defaultCmdBuffer);
-
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
+	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 	for (int i = 0; i < 4; ++i) {
 		float xOffset = (float)(i % 2);
 		float yOffset = (float)(i / 2);
@@ -46,9 +41,7 @@ void MultiViewportExample::RenderFrame() {
 		float ySize = (float)(windowHeight / 2);
 
 		vk::Viewport viewport = vk::Viewport(xSize * xOffset, ySize * yOffset, xSize, ySize, 0.0f, 1.0f);
-		defaultCmdBuffer.setViewport(0, 1, &viewport);
-		SubmitDrawCall(*triMesh, defaultCmdBuffer);
+		frameCmds.setViewport(0, 1, &viewport);
+		SubmitDrawCall(frameCmds, *triMesh);
 	}
-
-	EndRendering(defaultCmdBuffer);
 }

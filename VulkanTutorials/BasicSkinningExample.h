@@ -35,8 +35,8 @@ namespace NCL::Rendering {
 
         VulkanPipeline		pipeline;
 
-        float   frameTime;
-        int     currentFrame;
+        float   frameTime       = 0.0f;
+        int     currentFrame    = 0;
     };
 }
 

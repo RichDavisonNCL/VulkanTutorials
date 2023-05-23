@@ -39,11 +39,13 @@ endif()
 add_subdirectory(NCLCoreClasses)
 add_subdirectory(GLTFLoader)
 add_subdirectory(VulkanRendering)
-add_subdirectory(VulkanTutorials)
 
 if(ADD_RAY_TRACING)
 	add_subdirectory(VulkanRayTracing)
+	add_compile_definitions("USE_RAY_TRACING") 
 endif()
+
+add_subdirectory(VulkanTutorials)
 
 if(MSVC)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT VulkanTutorials)

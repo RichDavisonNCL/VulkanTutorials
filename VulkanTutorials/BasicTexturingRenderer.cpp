@@ -17,23 +17,19 @@ BasicTexturingRenderer::BasicTexturingRenderer(Window& window) : VulkanTutorialR
 void BasicTexturingRenderer::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 
-	textures[0] = VulkanTexture::TextureFromFile("Vulkan.png");
-	textures[1] = VulkanTexture::TextureFromFile("Doge.png");
+	textures[0] = VulkanTexture::TextureFromFile(this, "Vulkan.png");
+	textures[1] = VulkanTexture::TextureFromFile(this, "Doge.png");
 
 	defaultMesh = GenerateTriangle();
 
 	defaultShader = VulkanShaderBuilder("Texturing Shader!")
 		.WithVertexBinary("BasicTexturing.vert.spv")
 		.WithFragmentBinary("BasicTexturing.frag.spv")
-	.Build(device);
+	.Build(GetDevice());
 
-	BuildPipeline();
-}
-
-void	BasicTexturingRenderer::BuildPipeline() {
 	descriptorLayout = VulkanDescriptorSetLayoutBuilder("Texture Layout A")
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.Build(device);
+	.Build(GetDevice());
 
 	texturePipeline = VulkanPipelineBuilder("Texturing Pipeline")
 		.WithVertexInputState(defaultMesh->GetVertexInputState())
@@ -43,7 +39,7 @@ void	BasicTexturingRenderer::BuildPipeline() {
 		.WithDescriptorSetLayout(1,*descriptorLayout)
 		.WithColourFormats({ surfaceFormat })
 		.WithDepthFormat(depthBuffer->GetFormat())
-	.Build(device);
+	.Build(GetDevice());
 
 	for (int i = 0; i < 2; ++i) {
 		descriptorSets[i] = BuildUniqueDescriptorSet(*descriptorLayout);
@@ -52,19 +48,10 @@ void	BasicTexturingRenderer::BuildPipeline() {
 }
 
 void BasicTexturingRenderer::RenderFrame() {
-	TransitionSwapchainForRendering(defaultCmdBuffer);
+	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, texturePipeline);
 
-	VulkanDynamicRenderBuilder()
-		.WithColourAttachment(swapChainList[currentSwap]->view)
-		.WithRenderArea(defaultScreenRect)
-	.BeginRendering(defaultCmdBuffer);
+	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *texturePipeline.layout, 0, 1, &*descriptorSets[0], 0, nullptr);
+	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *texturePipeline.layout, 1, 1, &*descriptorSets[1], 0, nullptr);
 
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *texturePipeline.pipeline);
-
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *texturePipeline.layout, 0, 1, &*descriptorSets[0], 0, nullptr);
-	defaultCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *texturePipeline.layout, 1, 1, &*descriptorSets[1], 0, nullptr);
-
-	SubmitDrawCall(*defaultMesh, defaultCmdBuffer);
-
-	EndRendering(defaultCmdBuffer);
+	SubmitDrawCall(frameCmds, *defaultMesh);
 }

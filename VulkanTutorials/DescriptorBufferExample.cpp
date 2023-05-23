@@ -11,18 +11,23 @@ using namespace NCL;
 using namespace Rendering;
 
 DescriptorBufferExample::DescriptorBufferExample(Window& window) : VulkanTutorialRenderer(window) {
+}
+
+void DescriptorBufferExample::SetupDevice(vk::PhysicalDeviceFeatures2& deviceFeatures) {
+	static vk::PhysicalDeviceDescriptorBufferFeaturesEXT	descriptorBufferfeature(true);
+	static vk::PhysicalDeviceBufferDeviceAddressFeaturesKHR deviceAddressfeature(true);
+
+	deviceAddressfeature.bufferDeviceAddress = true;
+
+	deviceFeatures.pNext = (void*)&descriptorBufferfeature;
+	descriptorBufferfeature.pNext = (void*)&deviceAddressfeature;	
+	
 	deviceExtensions.emplace_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
 	deviceExtensions.emplace_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
 	deviceExtensions.emplace_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-	deviceExtensions.emplace_back(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
-}
-
-void DescriptorBufferExample::SetupDeviceInfo(vk::DeviceCreateInfo& createInfo) {
-	static vk::PhysicalDeviceDescriptorBufferFeaturesEXT	descriptorBufferfeature(true);
-	static vk::PhysicalDeviceBufferDeviceAddressFeaturesEXT deviceAddressfeature(true);
-
-	createInfo.pNext = (void*)&descriptorBufferfeature;
-	descriptorBufferfeature.pNext = (void*)&deviceAddressfeature;
+	deviceExtensions.emplace_back(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);	
+	
+	allocatorInfo.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 }
 
 void DescriptorBufferExample::SetupTutorial() {
@@ -31,38 +36,44 @@ void DescriptorBufferExample::SetupTutorial() {
 	vk::PhysicalDeviceProperties2 props;
 	props.pNext = &descriptorProperties;
 
-	gpu.getProperties2(&props, *Vulkan::dispatcher);
+	GetPhysicalDevice().getProperties2(&props, *Vulkan::dispatcher);
 
 	triMesh = GenerateTriangle();
 
 	shader = VulkanShaderBuilder("Basic Descriptor Shader!")
 		.WithVertexBinary("BasicDescriptor.vert.spv")
 		.WithFragmentBinary("BasicDescriptor.frag.spv")
-		.Build(device);
+		.Build(GetDevice());
 
 	descriptorLayout = VulkanDescriptorSetLayoutBuilder("Uniform Data")
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
-		.WithDescriptorBufferAccess() //New!
-		.Build(device);
+		.WithCreationFlags(vk::DescriptorSetLayoutCreateFlagBits::eDescriptorBufferEXT)	//New!
+		.Build(GetDevice());
 
-	device.getDescriptorSetLayoutSizeEXT(*descriptorLayout, &descriptorBufferSize, *Vulkan::dispatcher);
-	//Now we can construct a buffer for our descriptor set!
-	descriptorBuffer = CreateBuffer(descriptorBufferSize, 
-		vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eSamplerDescriptorBufferEXT | vk::BufferUsageFlagBits::eResourceDescriptorBufferEXT,
-		vk::MemoryPropertyFlagBits::eHostVisible);
+	GetDevice().getDescriptorSetLayoutSizeEXT(*descriptorLayout, &descriptorBufferSize, *Vulkan::dispatcher);
 
-	Vulkan::SetDebugName(device, vk::ObjectType::eBuffer, Vulkan::GetVulkanHandle(*descriptorBuffer.buffer), "Descriptor Buffer");
+	descriptorBuffer = VulkanBufferBuilder(descriptorBufferSize, "Descriptor Buffer")
+		.WithBufferUsage(vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eSamplerDescriptorBufferEXT | vk::BufferUsageFlagBits::eResourceDescriptorBufferEXT)
+		.WithHostVisibility()
+		.Build(GetDevice(), GetMemoryAllocator());
 
-	uniformData[0] = CreateBuffer(sizeof(positionUniform)	, vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible);
-	uniformData[1] = CreateBuffer(sizeof(colourUniform)		, vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible);
+	uniformData[0] = VulkanBufferBuilder(sizeof(positionUniform), "Position Uniform")
+		.WithBufferUsage(vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eUniformBuffer)
+		.WithHostVisibility()
+		.Build(GetDevice(), GetMemoryAllocator());
 
-	uniformDataAddresses[0] = device.getBufferAddress(vk::BufferDeviceAddressInfo(*uniformData[0].buffer), *Vulkan::dispatcher);
-	uniformDataAddresses[1] = device.getBufferAddress(vk::BufferDeviceAddressInfo(*uniformData[1].buffer), *Vulkan::dispatcher);
+	uniformData[1] = VulkanBufferBuilder(sizeof(colourUniform), "Colour Uniform")
+		.WithBufferUsage(vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eUniformBuffer)
+		.WithHostVisibility()
+		.Build(GetDevice(), GetMemoryAllocator());
+
+	uniformDataAddresses[0] = GetDevice().getBufferAddress(vk::BufferDeviceAddressInfo(uniformData[0].buffer));
+	uniformDataAddresses[1] = GetDevice().getBufferAddress(vk::BufferDeviceAddressInfo(uniformData[1].buffer));
 
 	vk::DescriptorAddressInfoEXT testAddresses[2] = {
-		vk::DescriptorAddressInfoEXT(uniformDataAddresses[0], uniformData[0].requestedSize), //make this 12 to break everything!
-		vk::DescriptorAddressInfoEXT(uniformDataAddresses[1], uniformData[1].requestedSize)
+		vk::DescriptorAddressInfoEXT(uniformDataAddresses[0], uniformData[0].size), //make this 12 to break everything!
+		vk::DescriptorAddressInfoEXT(uniformDataAddresses[1], uniformData[1].size)
 	};
 
 	vk::DescriptorGetInfoEXT getInfos[2] = {
@@ -71,47 +82,40 @@ void DescriptorBufferExample::SetupTutorial() {
 	};	
 	
 	vk::DeviceSize		offsets[2] = {
-		device.getDescriptorSetLayoutBindingOffsetEXT(*descriptorLayout, 0, *Vulkan::dispatcher),
-		device.getDescriptorSetLayoutBindingOffsetEXT(*descriptorLayout, 1, *Vulkan::dispatcher)
+		GetDevice().getDescriptorSetLayoutBindingOffsetEXT(*descriptorLayout, 0, *Vulkan::dispatcher),
+		GetDevice().getDescriptorSetLayoutBindingOffsetEXT(*descriptorLayout, 1, *Vulkan::dispatcher)
 	};
-	//This DEFINITELY gets written to all 16 bytes, with different data
-	void* descriptorBufferMemory  = device.mapMemory(*descriptorBuffer.deviceMem, 0, descriptorBuffer.allocInfo.allocationSize);
-	device.getDescriptorEXT(&getInfos[0], descriptorProperties.uniformBufferDescriptorSize, ((char*)descriptorBufferMemory) + offsets[0], *Vulkan::dispatcher);
-	device.getDescriptorEXT(&getInfos[1], descriptorProperties.uniformBufferDescriptorSize, ((char*)descriptorBufferMemory) + offsets[1], *Vulkan::dispatcher);
-	device.unmapMemory(descriptorBuffer.deviceMem.get());
+	void* descriptorBufferMemory = descriptorBuffer.Map();
+	GetDevice().getDescriptorEXT(&getInfos[0], descriptorProperties.uniformBufferDescriptorSize, ((char*)descriptorBufferMemory) + offsets[0], *Vulkan::dispatcher);
+	GetDevice().getDescriptorEXT(&getInfos[1], descriptorProperties.uniformBufferDescriptorSize, ((char*)descriptorBufferMemory) + offsets[1], *Vulkan::dispatcher);
+	descriptorBuffer.Unmap();
 
-	descriptorBufferAddress = device.getBufferAddress(vk::BufferDeviceAddressInfo(*descriptorBuffer.buffer), *Vulkan::dispatcher);
+	descriptorBufferAddress = GetDevice().getBufferAddress(vk::BufferDeviceAddressInfo(descriptorBuffer.buffer));
 
 	pipeline = VulkanPipelineBuilder()
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shader)
 		.WithDescriptorSetLayout(0, *descriptorLayout)
+		.WithDepthFormat(depthBuffer->GetFormat())
 		.WithDescriptorBuffers() //New!
-	.Build(device);
+	.Build(GetDevice());
 }
 
 void DescriptorBufferExample::RenderFrame() {
-	TransitionSwapchainForRendering(defaultCmdBuffer);
-
 	Vector3 positionUniform = Vector3(sin(runTime), 0.0, 0.0f);
 	Vector4 colourUniform	= Vector4(sin(runTime), 0, 1, 1);
 
-	VulkanDynamicRenderBuilder()
-		.WithColourAttachment(swapChainList[currentSwap]->view)
-		.WithRenderArea(defaultScreenRect)
-		.BeginRendering(defaultCmdBuffer);
+	uniformData[0].CopyData((void*)&positionUniform, sizeof(positionUniform));
+	uniformData[1].CopyData((void*)&colourUniform, sizeof(colourUniform));
 
-	UploadBufferData(uniformData[0], (void*)&positionUniform, sizeof(positionUniform));
-	UploadBufferData(uniformData[1], (void*)&colourUniform, sizeof(colourUniform));
-
-	defaultCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.pipeline);
+	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
 	vk::DescriptorBufferBindingInfoEXT bindingInfo;
 	bindingInfo.usage		= vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eSamplerDescriptorBufferEXT | vk::BufferUsageFlagBits::eResourceDescriptorBufferEXT;
 	bindingInfo.address		= descriptorBufferAddress;
 
-	defaultCmdBuffer.bindDescriptorBuffersEXT(1, &bindingInfo, *Vulkan::dispatcher);
+	frameCmds.bindDescriptorBuffersEXT(1, &bindingInfo, *Vulkan::dispatcher);
 
 	uint32_t indices[1] = {
 		0 //Which buffers are each set being taken from?
@@ -120,7 +124,7 @@ void DescriptorBufferExample::RenderFrame() {
 		0 //How many bytes into the bound buffer is each descriptor set?
 	};
 
-	defaultCmdBuffer.setDescriptorBufferOffsetsEXT(vk::PipelineBindPoint::eGraphics,
+	frameCmds.setDescriptorBufferOffsetsEXT(vk::PipelineBindPoint::eGraphics,
 		*pipeline.layout,
 		0,	//First descriptor set
 		1,	//Number of descriptor sets 
@@ -128,7 +132,5 @@ void DescriptorBufferExample::RenderFrame() {
 		offsets,
 		*Vulkan::dispatcher);
 
-	SubmitDrawCall(*triMesh, defaultCmdBuffer);
-
- 	EndRendering(defaultCmdBuffer);
+	SubmitDrawCall(frameCmds, *triMesh);
 }

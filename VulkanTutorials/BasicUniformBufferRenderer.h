@@ -12,7 +12,7 @@ namespace NCL::Rendering {
 	class BasicUniformBufferRenderer : public VulkanTutorialRenderer {
 	public:
 		BasicUniformBufferRenderer(Window& window);
-		~BasicUniformBufferRenderer() {}
+		~BasicUniformBufferRenderer();
 
 		void SetupTutorial() override;
 
@@ -20,7 +20,6 @@ namespace NCL::Rendering {
 		void Update(float dt)	override;
 
 	protected:
-		void	BuildPipeline();
 		void	UpdateCameraUniform();
 
 		UniqueVulkanMesh 		triMesh;
