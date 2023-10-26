@@ -9,6 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 PrerecordedCmdListRenderer::PrerecordedCmdListRenderer(Window& window) : VulkanTutorialRenderer(window)	{
 }
@@ -20,15 +21,15 @@ void PrerecordedCmdListRenderer::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 	triMesh = GenerateTriangle();
 
-	shader = VulkanShaderBuilder("Basic Shader!")
+	shader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.Build(GetDevice());
+	.Build("Basic Shader!");
 	 
 	BuildPipeline();
 
 	auto buffers = GetDevice().allocateCommandBuffers(vk::CommandBufferAllocateInfo(
-		GetCommandPool(CommandBufferType::Graphics), vk::CommandBufferLevel::eSecondary, 1));
+		GetCommandPool(CommandBuffer::Graphics), vk::CommandBufferLevel::eSecondary, 1));
 
 	recordedBuffer = buffers[0];
 
@@ -39,17 +40,18 @@ void PrerecordedCmdListRenderer::SetupTutorial() {
 	recordedBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 	recordedBuffer.setViewport(0, 1, &defaultViewport);
 	recordedBuffer.setScissor(0, 1, &defaultScissor);
-	SubmitDrawCall(recordedBuffer, *triMesh);
+	DrawMesh(recordedBuffer, *triMesh);
 	recordedBuffer.end();
 }
 
 void PrerecordedCmdListRenderer::BuildPipeline() {
-	pipeline = VulkanPipelineBuilder()
+	pipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithDepthFormat(depthBuffer->GetFormat())
+		//.WithDepthFormat(depthBuffer->GetFormat())
+		.WithDepthAttachment(depthBuffer->GetFormat())
 		.WithShader(shader)
-	.Build(GetDevice());
+	.Build("Prerecorded cmd list pipeline");
 }
 
 void PrerecordedCmdListRenderer::RenderFrame() {

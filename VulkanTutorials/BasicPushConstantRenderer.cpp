@@ -9,6 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 BasicPushConstantRenderer::BasicPushConstantRenderer(Window& window) : VulkanTutorialRenderer(window)	{
 }
@@ -18,20 +19,20 @@ void BasicPushConstantRenderer::SetupTutorial()	{
 
 	triMesh = GenerateTriangle();
 
-	shader = VulkanShaderBuilder("Testing push constants!")
+	shader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicPushConstant.vert.spv")
 		.WithFragmentBinary("BasicPushConstant.frag.spv")
-	.Build(GetDevice());
+	.Build("Testing push constants!");
 
-	pipeline = VulkanPipelineBuilder("Basic Push Constant Pipeline")
+	pipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shader)
-		//.WithColourFormats({ surfaceFormat })
-		.WithDepthFormat(depthBuffer->GetFormat())
+		.WithColourAttachment(GetSurfaceFormat())
+		.WithDepthAttachment(depthBuffer->GetFormat())
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(positionUniform))
 		.WithPushConstant(vk::ShaderStageFlagBits::eFragment, sizeof(Vector4), sizeof(colourUniform))
-	.Build(GetDevice());
+	.Build("Basic Push Constant Pipeline");
 }
 
 void BasicPushConstantRenderer::RenderFrame() {
@@ -43,5 +44,5 @@ void BasicPushConstantRenderer::RenderFrame() {
 	frameCmds.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(positionUniform), (void*)&positionUniform);
 	frameCmds.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eFragment, sizeof(Vector4), sizeof(colourUniform), (void*)&colourUniform);
 
-	SubmitDrawCall(frameCmds, *triMesh);
+	DrawMesh(frameCmds, *triMesh);
 }

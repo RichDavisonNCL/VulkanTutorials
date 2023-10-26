@@ -10,6 +10,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 GeometryShaderExample::GeometryShaderExample(Window& window) : VulkanTutorialRenderer(window) {
 }
@@ -22,21 +23,21 @@ void GeometryShaderExample::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 	mesh = GenerateTriangle();
 
-	shader = VulkanShaderBuilder("Geometry Shader!")
+	shader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithGeometryBinary("BasicGeom.geom.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.Build(GetDevice());
+	.Build("Geometry Shader!");
 
-	pipeline = VulkanPipelineBuilder("Geometry Shader Example Pipeline")
-		.WithDepthFormat(depthBuffer->GetFormat())
+	pipeline = PipelineBuilder(GetDevice())
+		.WithDepthAttachment(depthBuffer->GetFormat())
 		.WithVertexInputState(mesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::ePointList)
 		.WithShader(shader)
-	.Build(GetDevice());
+	.Build("Geometry Shader Example Pipeline");
 }
 
 void GeometryShaderExample::RenderFrame() {
 	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
-	SubmitDrawCall(frameCmds, *mesh);
+	DrawMesh(frameCmds, *mesh);
 }

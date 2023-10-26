@@ -9,8 +9,9 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
-const int PARTICLE_COUNT = 320 * 10000;
+const int PARTICLE_COUNT = 32 * 1000;
 
 AsyncComputeExample::AsyncComputeExample(Window& window) : VulkanTutorialRenderer(window) {
 	autoBeginDynamicRendering = false;
@@ -20,73 +21,77 @@ AsyncComputeExample::AsyncComputeExample(Window& window) : VulkanTutorialRendere
 void AsyncComputeExample::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 
-	particlePositions = VulkanBufferBuilder(sizeof(Vector4) * PARTICLE_COUNT, "Particles!")
+	particlePositions = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer)
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(sizeof(Vector4) * PARTICLE_COUNT, "Particles!");
 
-	frameIDBuffer = VulkanBufferBuilder(sizeof(uint32_t), "Frame ID")
+	frameIDBuffer = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer)
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(sizeof(uint32_t), "Frame ID");
 
-	dataLayout = VulkanDescriptorSetLayoutBuilder("Compute Data")
+	dataLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithStorageBuffers(1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eCompute)
 		.WithStorageBuffers(1, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute)
-		.Build(GetDevice()); //Get our camera matrices...
+		.Build("Compute Data"); //Get our camera matrices...
 
 	bufferDescriptor = BuildUniqueDescriptorSet(*dataLayout);
-	UpdateBufferDescriptor(*bufferDescriptor, 0, vk::DescriptorType::eStorageBuffer, particlePositions);
-	UpdateBufferDescriptor(*bufferDescriptor, 1, vk::DescriptorType::eStorageBuffer, frameIDBuffer);
+	WriteBufferDescriptor(*bufferDescriptor, 0, vk::DescriptorType::eStorageBuffer, particlePositions);
+	WriteBufferDescriptor(*bufferDescriptor, 1, vk::DescriptorType::eStorageBuffer, frameIDBuffer);
 
 	BuildComputePipeline();
 	BuildRasterPipeline();
+
+	vk::CommandPool asyncPool = GetCommandPool(CommandBuffer::AsyncCompute);
+	asyncBuffer = CmdBufferBegin(GetDevice(), asyncPool, "Async cmds");
 }
 
 void	AsyncComputeExample::BuildRasterPipeline() {
-	rasterShader = VulkanShaderBuilder("Shader using compute data!")
+	rasterShader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicCompute.vert.spv")
 		.WithFragmentBinary("AsyncCompute.frag.spv")
-		.Build(GetDevice());
+		.Build("Shader using compute data!");
 
-	basicPipeline = VulkanPipelineBuilder("Raster Pipeline")
+	basicPipeline = PipelineBuilder(GetDevice())
 		.WithTopology(vk::PrimitiveTopology::ePointList)
 		.WithDescriptorSetLayout(0, *dataLayout)
 		.WithShader(rasterShader)
-		.WithDepthFormat(depthBuffer->GetFormat())
 		.WithPushConstant(vk::ShaderStageFlagBits::eFragment, 0, sizeof(uint32_t))
-		.Build(GetDevice());
+		.Build("Raster Pipeline");
 }
 
 void	AsyncComputeExample::BuildComputePipeline() {
 	computeShader = UniqueVulkanCompute(new VulkanCompute(GetDevice(), "AsyncCompute.comp.spv"));
 
-	computePipeline = VulkanComputePipelineBuilder("Compute Pipeline")
+	computePipeline = ComputePipelineBuilder(GetDevice())
 		.WithShader(computeShader)
 		.WithDescriptorSetLayout(0, *dataLayout)
 		.WithPushConstant(vk::ShaderStageFlagBits::eCompute, 0, sizeof(float) + sizeof(uint32_t))
-		.Build(GetDevice());
+		.Build("Compute Pipeline");
 }
 
 void AsyncComputeExample::RenderFrame() {
 	//Compute goes outside of a render pass...
+	vk::Queue		asyncQueue = GetQueue(CommandBuffer::AsyncCompute);
 
-	vk::CommandBuffer asyncBuffer = BeginCmdBuffer(CommandBufferType::AsyncCompute);
+	asyncQueue.waitIdle();
 
-	asyncBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, computePipeline);
-	asyncBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *computePipeline.layout, 0, 1, &*bufferDescriptor, 0, nullptr);
-	asyncBuffer.pushConstants(*computePipeline.layout, vk::ShaderStageFlagBits::eCompute, 0, sizeof(float), (void*)&runTime);
-	asyncBuffer.pushConstants(*computePipeline.layout, vk::ShaderStageFlagBits::eCompute, sizeof(float), sizeof(uint32_t), (void*)&frameID);
+	asyncBuffer->reset();
+	asyncBuffer->begin(vk::CommandBufferBeginInfo());
+	asyncBuffer->bindPipeline(vk::PipelineBindPoint::eCompute, computePipeline);
+	asyncBuffer->bindDescriptorSets(vk::PipelineBindPoint::eCompute, *computePipeline.layout, 0, 1, &*bufferDescriptor, 0, nullptr);
+	asyncBuffer->pushConstants(*computePipeline.layout, vk::ShaderStageFlagBits::eCompute, 0, sizeof(float), (void*)&runTime);
+	asyncBuffer->pushConstants(*computePipeline.layout, vk::ShaderStageFlagBits::eCompute, sizeof(float), sizeof(uint32_t), (void*)&frameID);
 
-	asyncBuffer.dispatch(PARTICLE_COUNT / 32, 1, 1);
+	asyncBuffer->dispatch(PARTICLE_COUNT / 32, 1, 1);
+	CmdBufferEndSubmit(*asyncBuffer, asyncQueue);
 
-	SubmitCmdBuffer(asyncBuffer, CommandBufferType::AsyncCompute);
+	frameCmds.pipelineBarrier(
+		vk::PipelineStageFlagBits::eComputeShader,
+		vk::PipelineStageFlagBits::eVertexShader,
+		vk::DependencyFlags(), 0, nullptr, 0, nullptr, 0, nullptr
+	);
 
-	//frameCmds.pipelineBarrier(
-	//	vk::PipelineStageFlagBits::eComputeShader,
-	//	vk::PipelineStageFlagBits::eVertexShader,
-	//	vk::DependencyFlags(), 0, nullptr, 0, nullptr, 0, nullptr
-	//);
-
-	VulkanDynamicRenderBuilder()
+	DynamicRenderBuilder()
 		.WithColourAttachment(GetCurrentSwapView())
 		.WithRenderArea(defaultScreenRect)
 		.BeginRendering(frameCmds);
@@ -96,6 +101,6 @@ void AsyncComputeExample::RenderFrame() {
 	frameCmds.pushConstants(*basicPipeline.layout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(uint32_t), (void*)&frameID);
 	frameCmds.draw(PARTICLE_COUNT, 1, 0, 0);
 
-	EndRendering(frameCmds);
+	frameCmds.endRendering();
 	frameID++;
 }

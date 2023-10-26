@@ -9,6 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 const int PARTICLE_COUNT = 320 * 10;
 
@@ -19,43 +20,43 @@ BasicComputeUsage::BasicComputeUsage(Window& window) : VulkanTutorialRenderer(wi
 void BasicComputeUsage::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 
-	particlePositions = VulkanBufferBuilder(sizeof(Vector4) * PARTICLE_COUNT, "Particles!")
+	particlePositions = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer)
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(sizeof(Vector4) * PARTICLE_COUNT, "Particles!");
 
-	dataLayout = VulkanDescriptorSetLayoutBuilder("Compute Data")
+	dataLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithStorageBuffers(1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eCompute)
-	.Build(GetDevice()); //Get our camera matrices...
+	.Build("Compute Data"); //Get our camera matrices...
 
 	bufferDescriptor = BuildUniqueDescriptorSet(*dataLayout);
-	UpdateBufferDescriptor(*bufferDescriptor, 0, vk::DescriptorType::eStorageBuffer, particlePositions);
+	WriteBufferDescriptor(*bufferDescriptor, 0, vk::DescriptorType::eStorageBuffer, particlePositions);
 
 	BuildComputePipeline();
 	BuildRasterPipeline();
 }
 
 void	BasicComputeUsage::BuildRasterPipeline() {
-	rasterShader = VulkanShaderBuilder("Shader using compute data!")
+	rasterShader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicCompute.vert.spv")
 		.WithFragmentBinary("BasicCompute.frag.spv")
-	.Build(GetDevice());
+	.Build("Shader using compute data!");
 
-	basicPipeline = VulkanPipelineBuilder("Raster Pipeline")
+	basicPipeline = PipelineBuilder(GetDevice())
 		.WithTopology(vk::PrimitiveTopology::ePointList)
 		.WithDescriptorSetLayout(0, *dataLayout)
 		.WithShader(rasterShader)
-		.WithDepthFormat(depthBuffer->GetFormat())
-	.Build(GetDevice());
+		.WithColourAttachment(GetSurfaceFormat())
+	.Build("Raster Pipeline");
 }
 
 void	BasicComputeUsage::BuildComputePipeline() {
 	computeShader = UniqueVulkanCompute(new VulkanCompute(GetDevice(), "BasicCompute.comp.spv"));
 
-	computePipeline = VulkanComputePipelineBuilder("Compute Pipeline")
+	computePipeline = ComputePipelineBuilder(GetDevice())
 		.WithShader(computeShader)
 		.WithDescriptorSetLayout(0, *dataLayout)
 		.WithPushConstant(vk::ShaderStageFlagBits::eCompute, 0, sizeof(float))
-	.Build(GetDevice());
+	.Build("Compute Pipeline");
 }
 
 void BasicComputeUsage::RenderFrame() {
@@ -64,7 +65,7 @@ void BasicComputeUsage::RenderFrame() {
 	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *computePipeline.layout, 0, 1, &*bufferDescriptor, 0, nullptr);
 	frameCmds.pushConstants(*computePipeline.layout, vk::ShaderStageFlagBits::eCompute, 0, sizeof(float), (void*)&runTime);
 
-	Vulkan::DispatchCompute(frameCmds, PARTICLE_COUNT / 32, 1, 1);
+	frameCmds.dispatch(PARTICLE_COUNT / 32, 1, 1);
 
 	frameCmds.pipelineBarrier(
 		vk::PipelineStageFlagBits::eComputeShader, 
@@ -72,7 +73,7 @@ void BasicComputeUsage::RenderFrame() {
 		vk::DependencyFlags(), 0, nullptr, 0, nullptr, 0, nullptr
 	);
 
-	VulkanDynamicRenderBuilder()
+	DynamicRenderBuilder()
 		.WithColourAttachment(GetCurrentSwapView())
 		.WithRenderArea(defaultScreenRect)
 		.BeginRendering(frameCmds);
@@ -81,5 +82,5 @@ void BasicComputeUsage::RenderFrame() {
 	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *basicPipeline.layout, 0, 1, &*bufferDescriptor, 0, nullptr);
 	frameCmds.draw(PARTICLE_COUNT, 1, 0, 0);
 
-	EndRendering(frameCmds);
+	frameCmds.endRendering();
 }

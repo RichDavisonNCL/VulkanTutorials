@@ -1,8 +1,14 @@
-#version 400
+/******************************************************************************
+This file is part of the Newcastle Vulkan Tutorial Series
+
+Author:Rich Davison
+Contact:richgdavison@gmail.com
+License: MIT (see LICENSE file at the top of the source tree)
+*//////////////////////////////////////////////////////////////////////////////
+
+#version 450
 #extension GL_ARB_separate_shader_objects  : enable
 #extension GL_ARB_shading_language_420pack : enable
-
-//layout (binding  = 0) uniform  sampler2D tex[2]; //same descriptor
 
 layout (binding  = 0, set = 0) uniform  sampler2D tex1; //Diff descriptor
 layout (binding  = 0, set = 1) uniform  sampler2D tex2; //Diff descriptor   

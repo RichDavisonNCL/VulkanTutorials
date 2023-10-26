@@ -9,6 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 CubeMapRenderer::CubeMapRenderer(Window& window) : VulkanTutorialRenderer(window) {
 }
@@ -18,11 +19,11 @@ void CubeMapRenderer::SetupTutorial() {
 	quadMesh	= GenerateQuad();
 	sphereMesh	= LoadMesh("Sphere.msh");
 
-	cubemapLayout = VulkanDescriptorSetLayoutBuilder("Cubemap Layout")
+	cubemapLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.Build(GetDevice());
+	.Build("Cubemap Layout");
 
-	cubeTex = VulkanTexture::CubemapFromFiles(this,
+	cubeTex = LoadCubemap(
 		"Cubemap/skyrender0004.png", "Cubemap/skyrender0001.png",
 		"Cubemap/skyrender0003.png", "Cubemap/skyrender0006.png",
 		"Cubemap/skyrender0002.png", "Cubemap/skyrender0005.png",
@@ -32,55 +33,53 @@ void CubeMapRenderer::SetupTutorial() {
 	camera.SetPosition({ 0, 0, 10 });
 	
 	cubemapDescriptor = BuildUniqueDescriptorSet(*cubemapLayout);
-	UpdateImageDescriptor(*cubemapDescriptor, 0, 0, cubeTex->GetDefaultView(), *defaultSampler);
+	WriteImageDescriptor(*cubemapDescriptor, 0, 0, cubeTex->GetDefaultView(), *defaultSampler);
 
-	cameraPosLayout = VulkanDescriptorSetLayoutBuilder("Camera Position Layout")
+	cameraPosLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-	.Build(GetDevice());
+	.Build("Camera Position Layout");
 
 	cameraPosDescriptor = BuildUniqueDescriptorSet(*cameraPosLayout);
 
-	camPosUniform = VulkanBufferBuilder(sizeof(Vector3), "Camera Position")
+	camPosUniform = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
 		.WithHostVisibility()
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(sizeof(Vector3), "Camera Position");
 
-	skyboxShader = VulkanShaderBuilder("Basic Shader!")
+	skyboxShader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("skybox.vert.spv")
 		.WithFragmentBinary("skybox.frag.spv")
-	.Build(GetDevice());
+	.Build("Basic Shader!");
 
-	objectShader = VulkanShaderBuilder("Basic Shader!")
+	objectShader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("cubemapObject.vert.spv")
 		.WithFragmentBinary("cubemapObject.frag.spv")
-	.Build(GetDevice());
+	.Build("Basic Shader!");
 
-	skyboxPipeline = VulkanPipelineBuilder("CubeMapRenderer Skybox Pipeline")
+	skyboxPipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(quadMesh->GetVertexInputState())
 		.WithTopology(quadMesh->GetVulkanTopology())
 		.WithShader(skyboxShader)
-		.WithDepthState(vk::CompareOp::eAlways, false, false, false)
-		.WithColourFormats({ surfaceFormat })
-		.WithDepthStencilFormat(depthBuffer->GetFormat())
+		.WithColourAttachment(GetSurfaceFormat())
+		.WithDepthAttachment(depthBuffer->GetFormat())	
 		.WithDescriptorSetLayout(0,*cameraLayout)
 		.WithDescriptorSetLayout(1,*cubemapLayout)
-	.Build(GetDevice());
+	.Build("CubeMapRenderer Skybox Pipeline");
 
-	objectPipeline = VulkanPipelineBuilder("CubeMapRenderer Object Pipeline")
+	objectPipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(sphereMesh->GetVertexInputState())
 		.WithTopology(sphereMesh->GetVulkanTopology())
-		.WithShader(objectShader)
-		.WithDepthState(vk::CompareOp::eLessOrEqual, true, true)
-		.WithColourFormats({ surfaceFormat })
-		.WithDepthStencilFormat(depthBuffer->GetFormat())
+		.WithShader(objectShader)	
+		.WithColourAttachment(GetSurfaceFormat())
+		.WithDepthAttachment(depthBuffer->GetFormat(), vk::CompareOp::eLessOrEqual, true, true)
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4))
 		.WithDescriptorSetLayout(0,*cameraLayout)
 		.WithDescriptorSetLayout(1,*cubemapLayout)
 		.WithDescriptorSetLayout(2,*cameraPosLayout)
-	.Build(GetDevice());
+	.Build("CubeMapRenderer Object Pipeline");
 
-	UpdateBufferDescriptor(*cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
-	UpdateBufferDescriptor(*cameraPosDescriptor, 0, vk::DescriptorType::eUniformBuffer, camPosUniform);
+	WriteBufferDescriptor(*cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
+	WriteBufferDescriptor(*cameraPosDescriptor, 0, vk::DescriptorType::eUniformBuffer, camPosUniform);
 }
 
 void CubeMapRenderer::Update(float dt) {
@@ -93,17 +92,25 @@ void CubeMapRenderer::Update(float dt) {
 void CubeMapRenderer::RenderFrame()		 {
 	//First bit: Draw skybox!
 	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, skyboxPipeline);
-	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *skyboxPipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
-	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *skyboxPipeline.layout, 1, 1, &*cubemapDescriptor, 0, nullptr);
-	SubmitDrawCall(frameCmds, *quadMesh);
+
+	vk::DescriptorSet skyboxSets[] = {
+		*cameraDescriptor, //Set 0
+		*cubemapDescriptor //Set 1
+	};
+
+	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *skyboxPipeline.layout, 0, 2, skyboxSets, 0, nullptr);
+	DrawMesh(frameCmds, *quadMesh);
 
 	//Then draw a 'reflective' sphere!
 	Matrix4 objectModelMatrix;
 	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, objectPipeline);
 	frameCmds.pushConstants(*objectPipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4), (void*)&objectModelMatrix);
-	//
-	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *objectPipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
-	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *objectPipeline.layout, 1, 1, &*cubemapDescriptor, 0, nullptr);
-	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *objectPipeline.layout, 2, 1, &*cameraPosDescriptor, 0, nullptr);
-	SubmitDrawCall(frameCmds, *sphereMesh);
+
+	vk::DescriptorSet objectSets[] = {
+		*cameraDescriptor,		//Set 0
+		*cubemapDescriptor,		//Set 1
+		*cameraPosDescriptor	//Set 2
+	};
+	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *objectPipeline.layout, 0, 3, objectSets, 0, nullptr);
+	DrawMesh(frameCmds, *sphereMesh);
 }

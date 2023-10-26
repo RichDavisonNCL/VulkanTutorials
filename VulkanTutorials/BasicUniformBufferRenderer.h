@@ -8,7 +8,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #pragma once
 #include "VulkanTutorialRenderer.h"
 
-namespace NCL::Rendering {
+namespace NCL::Rendering::Vulkan {
 	class BasicUniformBufferRenderer : public VulkanTutorialRenderer {
 	public:
 		BasicUniformBufferRenderer(Window& window);
@@ -22,16 +22,15 @@ namespace NCL::Rendering {
 	protected:
 		void	UpdateCameraUniform();
 
-		UniqueVulkanMesh 		triMesh;
+		UniqueVulkanMesh 	triMesh;
 		UniqueVulkanShader	shader;
-		VulkanPipeline	pipeline;
+		VulkanPipeline		pipeline;
 
-		vk::UniqueDescriptorSet	descriptorSet;
-		vk::UniqueDescriptorSetLayout matrixLayout;
+		vk::UniqueDescriptorSet			descriptorSet;
+		vk::UniqueDescriptorSetLayout	matrixLayout;
 
-		VulkanBuffer	cameraData;
-		Camera			camera;
-
-		Matrix4* cameraMemory;
+		VulkanBuffer		cameraData;
+		PerspectiveCamera	camera;
+		Matrix4*			cameraMemory;
 	};
 }

@@ -6,14 +6,15 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
+#include "../NCLCoreClasses/KeyboardMouseController.h"
 #include "../NCLCoreClasses/TextureLoader.h"
 #include "../VulkanRendering/VulkanUtils.h"
 
-namespace NCL::Rendering {
+namespace NCL::Rendering::Vulkan {
 	struct RenderObject {
 		VulkanMesh* mesh;
 		Matrix4 transform;
-		vk::UniqueDescriptorSet objectDescriptorSet;
+		vk::UniqueDescriptorSet descriptorSet;
 	};
 
 	struct Light {
@@ -53,14 +54,22 @@ namespace NCL::Rendering {
 
 		void RenderSingleObject(RenderObject& o, vk::CommandBuffer  toBuffer, VulkanPipeline& toPipeline, int descriptorSet = 0);
 
-		UniqueVulkanMesh LoadMesh(const string& filename);
+		UniqueVulkanMesh LoadMesh(const string& filename, vk::BufferUsageFlags bufferUsage = {});
+		UniqueVulkanTexture LoadTexture(const string& filename);
+
+		UniqueVulkanTexture LoadCubemap(
+			const std::string& negativeXFile, const std::string& positiveXFile,
+			const std::string& negativeYFile, const std::string& positiveYFile,
+			const std::string& negativeZFile, const std::string& positiveZFile,
+			const std::string& debugName = "CubeMap");
+
 
 		UniqueVulkanMesh GenerateTriangle();
 		UniqueVulkanMesh GenerateQuad();
 		UniqueVulkanMesh GenerateGrid();
 
-		Camera			camera;
-		VulkanBuffer	cameraBuffer;
+		PerspectiveCamera	camera;
+		VulkanBuffer		cameraBuffer;
 
 		vk::UniqueDescriptorSetLayout nullLayout;
 
@@ -68,6 +77,8 @@ namespace NCL::Rendering {
 		vk::UniqueDescriptorSetLayout	cameraLayout;
 
 		vk::UniqueSampler		defaultSampler;
+
+		KeyboardMouseController controller;
 
 		float runTime;
 	};

@@ -9,6 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 BasicGeometryRenderer::BasicGeometryRenderer(Window& window) : VulkanTutorialRenderer(window)	{
 }
@@ -17,21 +18,21 @@ void BasicGeometryRenderer::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 	triMesh = GenerateTriangle();
 
-	shader = VulkanShaderBuilder("Basic Shader!")
+	shader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.Build(GetDevice());
+	.Build("Basic Shader!");
 
-	basicPipeline = VulkanPipelineBuilder("Basic Pipeline")
+	basicPipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		//.WithColourFormats({ surfaceFormat })
-		.WithDepthFormat(depthBuffer->GetFormat())
+		.WithColourAttachment(GetSurfaceFormat())
+		.WithDepthAttachment(depthBuffer->GetFormat())
 		.WithShader(shader)
-	.Build(GetDevice());
+	.Build("Basic Pipeline");
 }
 
 void BasicGeometryRenderer::RenderFrame() {
 	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline);
-	SubmitDrawCall(frameCmds, *triMesh);
+	DrawMesh(frameCmds, *triMesh);
 }

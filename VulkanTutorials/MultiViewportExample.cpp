@@ -9,26 +9,27 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 MultiViewportExample::MultiViewportExample(Window& window) : VulkanTutorialRenderer(window) {
-
 }
 
 void MultiViewportExample::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 	triMesh = GenerateTriangle();
 
-	shader = VulkanShaderBuilder("Basic Shader!")
+	shader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.Build(GetDevice());
+	.Build("Basic Shader!");
 
-	pipeline = VulkanPipelineBuilder("Test Pipeline")
+	pipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithDepthFormat(depthBuffer->GetFormat())
+		.WithColourAttachment(GetSurfaceFormat())
+		.WithDepthAttachment(depthBuffer->GetFormat())
 		.WithShader(shader)
-	.Build(GetDevice());
+	.Build("Multi Viewport Pipeline");
 }
 
 void MultiViewportExample::RenderFrame() {
@@ -37,11 +38,11 @@ void MultiViewportExample::RenderFrame() {
 		float xOffset = (float)(i % 2);
 		float yOffset = (float)(i / 2);
 
-		float xSize = (float)(windowWidth / 2);
-		float ySize = (float)(windowHeight / 2);
+		float xSize = ((float)windowSize.x / 2.0f);
+		float ySize = ((float)windowSize.y / 2.0f);
 
 		vk::Viewport viewport = vk::Viewport(xSize * xOffset, ySize * yOffset, xSize, ySize, 0.0f, 1.0f);
 		frameCmds.setViewport(0, 1, &viewport);
-		SubmitDrawCall(frameCmds, *triMesh);
+		DrawMesh(frameCmds, *triMesh);
 	}
 }

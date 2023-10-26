@@ -6,25 +6,21 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanTutorialRenderer.h"
-#include "../VulkanRendering/VulkanBVHBuilder.h"
 
 namespace NCL::Rendering {
-	class TestRayTrace : public VulkanTutorialRenderer
+	class VulkanRTShader
 	{
 	public:
-		TestRayTrace(Window& window);
-		~TestRayTrace();
-
-		void SetupTutorial() override;
-
-		void RenderFrame() override;
-		void Update(float dt) override;
+		VulkanRTShader(const std::string& filename, vk::Device device);
+	
+		const vk::UniqueShaderModule& GetModule() const {
+			return shaderModule;
+		}
 
 	protected:
-		VulkanPipeline		pipeline;
-		UniqueVulkanMesh	triMesh;
-		VulkanBVH			sceneBVH;
+		vk::UniqueShaderModule shaderModule;
+		std::string entryPoint;
+
+	
 	};
 }
-

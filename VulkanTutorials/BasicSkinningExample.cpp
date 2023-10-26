@@ -10,6 +10,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 BasicSkinningExample::BasicSkinningExample(Window& window) : VulkanTutorialRenderer(window)
 {
@@ -19,8 +20,8 @@ void BasicSkinningExample::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 
 	loader.Load("CesiumMan/CesiumMan.gltf",
-		[](void) ->  MeshGeometry* {return new VulkanMesh(); },
-		[&](std::string& input) ->  VulkanTexture* {return VulkanTexture::TextureFromFile(this, input).release(); }
+		[](void) ->  Mesh* {return new VulkanMesh(); },
+		[&](std::string& input) ->  VulkanTexture* {return LoadTexture(input).release(); }
 	);
 
 	camera.SetPitch(0.0f)
@@ -29,60 +30,58 @@ void BasicSkinningExample::SetupTutorial() {
 		.SetFarPlane(5000.0f);
 
 	for (const auto& m : loader.outMeshes) {
-		VulkanMesh* loadedMesh = (VulkanMesh*)m;
+		VulkanMesh* loadedMesh = (VulkanMesh*)m.get();
 		loadedMesh->UploadToGPU(this);
 	}
 
-	textureLayout = VulkanDescriptorSetLayoutBuilder("Object Textures")
+	textureLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-		.Build(GetDevice());
+		.Build("Object Textures");
 
 	for (const auto& m : loader.outMats) {	//Build descriptors for each mesh and its sublayers
 		layerDescriptors.push_back({});
-		vector<vk::UniqueDescriptorSet>& matSet = layerDescriptors.back();
+		std::vector<vk::UniqueDescriptorSet>& matSet = layerDescriptors.back();
 		for (const auto& l : m.allLayers) {
 			matSet.push_back(BuildUniqueDescriptorSet(*textureLayout));
-			UpdateImageDescriptor(*matSet.back(), 0, 0,((VulkanTexture*)l.diffuse)->GetDefaultView(), *defaultSampler);
+			WriteImageDescriptor(*matSet.back(), 0, 0,((VulkanTexture*)l.diffuse.get())->GetDefaultView(), *defaultSampler);
 		}
 	}
-	shader = VulkanShaderBuilder("Texturing Shader")
+	shader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicSkinning.vert.spv")
 		.WithFragmentBinary("SingleTexture.frag.spv")
-	.Build(GetDevice());
+	.Build("Texturing Shader");
 
-	jointsLayout = VulkanDescriptorSetLayoutBuilder("Joint Data")
+	jointsLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithStorageBuffers(1, vk::ShaderStageFlagBits::eVertex)
-		.Build(GetDevice()); //Get our camera matrices...
+		.Build("Joint Data"); //Get our camera matrices...
 
 	jointsDescriptor = BuildUniqueDescriptorSet(*jointsLayout);
 
-	VulkanMesh* m = (VulkanMesh*)loader.outMeshes[0];
+	VulkanMesh* m = (VulkanMesh*)loader.outMeshes[0].get();
 
-	pipeline = VulkanPipelineBuilder("Main Scene Pipeline")
+	pipeline = PipelineBuilder(GetDevice())
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4))
 		.WithVertexInputState(m->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shader)
-		.WithColourFormats({ surfaceFormat })
-		.WithDepthStencilFormat(depthBuffer->GetFormat())
-		.WithBlendState(vk::BlendFactor::eOne, vk::BlendFactor::eOne, false)
-		.WithDepthState(vk::CompareOp::eLessOrEqual, true, true, false)
+		.WithColourAttachment(GetSurfaceFormat())
+		.WithDepthAttachment(depthBuffer->GetFormat(), vk::CompareOp::eLessOrEqual, true, true)
 		.WithDescriptorSetLayout(0,*cameraLayout)	//Camera is set 0
 		.WithDescriptorSetLayout(1,*textureLayout)//Textures are set 1
 		.WithDescriptorSetLayout(2,*jointsLayout)	//Joints are set 2
-	.Build(GetDevice());
+	.Build("Main Scene Pipeline");
 
 	int matCount = loader.outMeshes[0]->GetJointCount();
 
-	jointsBuffer = VulkanBufferBuilder(sizeof(Matrix4) * matCount, "Joint Matrices")
+	jointsBuffer = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer)
 		.WithHostVisibility()
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(sizeof(Matrix4) * matCount, "Joint Matrices");
 
-	vector<Matrix4> bindPose	= loader.outMeshes[0]->GetBindPose();
-	vector<Matrix4> invBindPos	= loader.outMeshes[0]->GetInverseBindPose();
+	std::vector<Matrix4> bindPose	= loader.outMeshes[0]->GetBindPose();
+	std::vector<Matrix4> invBindPos	= loader.outMeshes[0]->GetInverseBindPose();
 
-	vector<Matrix4> testData;
+	std::vector<Matrix4> testData;
 
 	for (size_t i = 0; i < bindPose.size(); ++i) {
 		testData.push_back(bindPose[i] * invBindPos[i]);
@@ -90,8 +89,8 @@ void BasicSkinningExample::SetupTutorial() {
 
 	jointsBuffer.CopyData(testData.data(), sizeof(Matrix4) * matCount);
 
-	UpdateBufferDescriptor(*jointsDescriptor, 0, vk::DescriptorType::eStorageBuffer, jointsBuffer);
-	UpdateBufferDescriptor(*cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
+	WriteBufferDescriptor(*jointsDescriptor, 0, vk::DescriptorType::eStorageBuffer, jointsBuffer);
+	WriteBufferDescriptor(*cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
 }
 
 void BasicSkinningExample::Update(float dt) {
@@ -99,17 +98,17 @@ void BasicSkinningExample::Update(float dt) {
 
 	frameTime -= dt;
 
-	MeshGeometry*  mesh = loader.outMeshes[0];
-	MeshAnimation* anim = loader.outAnims[0];
+	Mesh*  mesh = loader.outMeshes[0].get();
+	MeshAnimation* anim = loader.outAnims[0].get();
 
 	if (frameTime <= 0.0f) {
 		currentFrame = (currentFrame + 1) % anim->GetFrameCount();
 		frameTime += anim->GetFrameTime();
-		vector<Matrix4> invBindPos = mesh->GetInverseBindPose();
+		std::vector<Matrix4> invBindPos = mesh->GetInverseBindPose();
 
 		const Matrix4* frameMats = anim->GetJointData(currentFrame);
 
-		vector<Matrix4> jointData(invBindPos.size());
+		std::vector<Matrix4> jointData(invBindPos.size());
 
 		for (int i = 0; i < invBindPos.size(); ++i) {
 			jointData[i] = (frameMats[i] * invBindPos[i]);
@@ -124,13 +123,13 @@ void BasicSkinningExample::RenderFrame() {
 	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 2, 1, &*jointsDescriptor, 0, nullptr);
 
 	for (size_t i = 0; i < loader.outMeshes.size(); ++i) {
-		VulkanMesh* loadedMesh = (VulkanMesh*)loader.outMeshes[i];
-		vector<vk::UniqueDescriptorSet>& set = layerDescriptors[i];
+		VulkanMesh* loadedMesh = (VulkanMesh*)loader.outMeshes[i].get();
+		std::vector<vk::UniqueDescriptorSet>& set = layerDescriptors[i];
 
 		for (unsigned int j = 0; j < loadedMesh->GetSubMeshCount(); ++j) {
 			frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 1, 1, &*set[j], 0, nullptr);
 
-			SubmitDrawCallLayer(*loadedMesh, j, frameCmds);
+			DrawMeshLayer(*loadedMesh, j, frameCmds);
 		}
 	}
 }

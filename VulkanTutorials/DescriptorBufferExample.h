@@ -8,7 +8,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #pragma once
 #include "VulkanTutorialRenderer.h"
 
-namespace NCL::Rendering {
+namespace NCL::Rendering::Vulkan {
 	class DescriptorBufferExample : public VulkanTutorialRenderer
 	{
 	public:
@@ -27,13 +27,11 @@ namespace NCL::Rendering {
 		UniqueVulkanShader	shader;
 
 		VulkanBuffer	uniformData[2];
-		vk::DeviceAddress uniformDataAddresses[2];
 		vk::UniqueDescriptorSet			descriptorSet;
 		vk::UniqueDescriptorSetLayout	descriptorLayout;
 
 		VulkanBuffer		descriptorBuffer;
 		vk::DeviceSize		descriptorBufferSize;
-		vk::DeviceAddress	descriptorBufferAddress;
 
 		Vector4	colourUniform;
 		Vector4 positionUniform;

@@ -1,0 +1,53 @@
+/******************************************************************************
+This file is part of the Newcastle Vulkan Tutorial Series
+
+Author:Rich Davison
+Contact:richgdavison@gmail.com
+License: MIT (see LICENSE file at the top of the source tree)
+*//////////////////////////////////////////////////////////////////////////////
+#version 460
+#extension GL_ARB_separate_shader_objects  : enable
+#extension GL_ARB_shading_language_420pack : enable
+#extension GL_ARB_compute_shader : enable
+#extension GL_EXT_scalar_block_layout: require
+
+layout(local_size_x = 32, local_size_y = 1) in;  
+
+layout (scalar, set = 0, binding  = 0) buffer InputPositionData 
+{
+	vec3 inPositions[];
+};
+
+layout (set = 0, binding  = 1) buffer InputWeightData 
+{
+	vec4 inWeights[];
+};
+
+layout (set = 0, binding  = 2) buffer InputIndexData 
+{
+	ivec4 inIndices[];
+};
+
+layout (scalar, set = 0, binding  = 3) buffer OutputPositionData 
+{
+	vec3 outPositions[];
+};
+
+layout (set = 0, binding  = 4) buffer JointData 
+{
+	mat4 matrices[];
+};
+
+void main() {
+	vec3	vertex	= inPositions[gl_GlobalInvocationID.x];
+	vec4	weights = inWeights[gl_GlobalInvocationID.x];
+	ivec4	indices = inIndices[gl_GlobalInvocationID.x];
+
+	vec3 outputVec = vec3(0,0,0);
+
+	for(int i = 0; i < 4; ++i) {
+		outputVec += vec3(matrices[indices[i]] * vec4(vertex,1.0f)) * weights[i];
+	}
+	
+	outPositions[gl_GlobalInvocationID.x] = outputVec;
+}

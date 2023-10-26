@@ -41,25 +41,34 @@ add_executable(${PROJECT_NAME} ${ALL_FILES})
 
 target_precompile_headers(${PROJECT_NAME} PRIVATE
     <vulkan/vulkan.hpp>
-    <memory>
+    <memory>    
+	<set>
     <unordered_set>
+	<map>
     <vector>
     <string>
     <fstream>
     <iostream>
     <string>
     <iosfwd>
-    <set>
 
     <Matrix2.h>
     <Matrix3.h>
     <Matrix4.h>
+
     <Vector2.h>
     <Vector3.h>
     <Vector4.h>
+
+    <Vector2i.h>
+    <Vector3i.h>
+    <Vector4i.h>
+
     <Quaternion.h>
 
     <Camera.h>
+    <GameTimer.h>
+
     <TextureLoader.h>
 
     <SmartTypes.h>
@@ -70,6 +79,8 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
     <VulkanMesh.h>
     <VulkanPipelineBuilder.h>
     <VulkanDynamicRenderBuilder.h>
+
+    <VulkanTextureBuilder.h>
 
     <VulkanDescriptorSetLayoutBuilder.h>
     <VulkanRenderPassBuilder.h>
@@ -115,7 +126,7 @@ foreach (file ${ALL_SHADERS})
 		OUTPUT ${SPIRV_ABS_OUTPUT}
 		
 		COMMENT "Compiling GLSL shader:"
-		COMMAND ${Vulkan_GLSLANG_VALIDATOR_EXECUTABLE} -V  ${SPIRV_ABS_INPUT} -o ${SPIRV_ABS_OUTPUT}
+		COMMAND ${Vulkan_GLSLANG_VALIDATOR_EXECUTABLE} -V  --target-env vulkan1.2 ${SPIRV_ABS_INPUT} -o ${SPIRV_ABS_OUTPUT}
 		DEPENDS ${file}
 		VERBATIM
 	)
@@ -148,6 +159,9 @@ add_dependencies(${PROJECT_NAME}
     ${PROJECT_DEPENDENCIES}
     Shaders
 )
+
+add_compile_definitions(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC)
+add_compile_definitions(VK_NO_PROTOTYPES)
 
 target_link_libraries(${PROJECT_NAME} 
     PRIVATE ${PROJECT_DEPENDENCIES}

@@ -6,11 +6,13 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #include "VulkanTutorialRenderer.h"
+#include "MshLoader.h"
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
-VulkanTutorialRenderer::VulkanTutorialRenderer(Window& window) : VulkanRenderer(window) {
+VulkanTutorialRenderer::VulkanTutorialRenderer(Window& window) : VulkanRenderer(window), controller(*window.GetKeyboard(), *window.GetMouse()) {
 	majorVersion = 1;
 	minorVersion = 3;
 }
@@ -30,30 +32,43 @@ void VulkanTutorialRenderer::SetupTutorial() {
 		.setMaxLod(80.0f)
 	);
 
-	cameraLayout = VulkanDescriptorSetLayoutBuilder("CameraMatrices")
+	cameraLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-		.Build(GetDevice()); //Get our camera matrices...
+		.Build("CameraMatrices"); //Get our camera matrices...
 	cameraDescriptor = BuildUniqueDescriptorSet(*cameraLayout);
 
-	UpdateBufferDescriptor(*cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
+	WriteBufferDescriptor(*cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
 
 	runTime = 0.0f;
 
-	nullLayout = VulkanDescriptorSetLayoutBuilder().Build(GetDevice());
+	nullLayout = DescriptorSetLayoutBuilder(GetDevice()).Build("null layout");
 
-	Vulkan::SetNullDescriptor(GetDevice(), *nullLayout);
+	SetNullDescriptor(GetDevice(), *nullLayout);
 }
 
 void VulkanTutorialRenderer::BuildCamera() {
-	camera			= Camera::BuildPerspectiveCamera(Vector3(0, 0, 1), 0, 0, 45.0f, 0.1f, 1000.0f);
-	cameraBuffer = VulkanBufferBuilder(sizeof(Matrix4) * 2)
+	camera.SetFieldOfVision(45.0f)
+		.SetNearPlane(0.1f)
+		.SetFarPlane(1000.0f);
+		
+	cameraBuffer = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
 		.WithHostVisibility()
 		.WithPersistentMapping()
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(sizeof(Matrix4) * 2, "Camera Buffer");
+
+	camera.SetController(controller);
+
+	controller.MapAxis(0, "Sidestep");
+	controller.MapAxis(1, "UpDown");
+	controller.MapAxis(2, "Forward");
+
+	controller.MapAxis(3, "XLook");
+	controller.MapAxis(4, "YLook");
 }
 
 void VulkanTutorialRenderer::UpdateCamera(float dt) {
+	controller.Update(dt);
 	camera.UpdateCamera(dt);
 }
 
@@ -71,7 +86,7 @@ UniqueVulkanMesh VulkanTutorialRenderer::GenerateTriangle() {
 	triMesh->SetVertexIndices({ 0,1,2 });
 
 	triMesh->SetDebugName("Triangle");
-	triMesh->SetPrimitiveType(NCL::GeometryPrimitive::TriangleStrip);
+	triMesh->SetPrimitiveType(NCL::GeometryPrimitive::Triangles);
 	triMesh->UploadToGPU(this);
 
 	return UniqueVulkanMesh(triMesh);
@@ -101,22 +116,52 @@ UniqueVulkanMesh VulkanTutorialRenderer::GenerateGrid() {
 	return UniqueVulkanMesh(gridMesh);
 }
 
-UniqueVulkanMesh VulkanTutorialRenderer::LoadMesh(const string& filename) {
-	VulkanMesh* newMesh = new VulkanMesh(filename);
-	newMesh->UploadToGPU(this);
+UniqueVulkanMesh VulkanTutorialRenderer::LoadMesh(const string& filename, vk::BufferUsageFlags flags) {
+	VulkanMesh* newMesh = new VulkanMesh();
+
+	MshLoader::LoadMesh(filename, *newMesh);
+
+	newMesh->UploadToGPU(this, flags);
+
 	return UniqueVulkanMesh(newMesh);
 }
 
+UniqueVulkanTexture VulkanTutorialRenderer::LoadTexture(const string& filename) {
+	return TextureBuilder(GetDevice(), GetMemoryAllocator())
+		.WithPool(GetCommandPool(CommandBuffer::Graphics))
+		.WithQueue(GetQueue(CommandBuffer::Graphics))
+		//.WithMips(false)
+		.BuildFromFile(filename);
+}
+
+UniqueVulkanTexture VulkanTutorialRenderer::LoadCubemap(
+	const std::string& negativeXFile, const std::string& positiveXFile,
+	const std::string& negativeYFile, const std::string& positiveYFile,
+	const std::string& negativeZFile, const std::string& positiveZFile,
+	const std::string& debugName) {
+
+	return TextureBuilder(GetDevice(), GetMemoryAllocator())
+		.WithPool(GetCommandPool(CommandBuffer::Graphics))
+		.WithQueue(GetQueue(CommandBuffer::Graphics))
+		//.WithMips(false)
+		.BuildCubemapFromFile(negativeXFile, positiveXFile,
+			negativeYFile, positiveYFile,
+			negativeZFile, positiveZFile,
+			debugName
+		);
+}
+
+
 void VulkanTutorialRenderer::RenderSingleObject(RenderObject& o, vk::CommandBuffer  toBuffer, VulkanPipeline& toPipeline, int descriptorSet) {
 	toBuffer.pushConstants(*toPipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4), (void*)&o.transform);
-	toBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *toPipeline.layout, descriptorSet, 1, &*o.objectDescriptorSet, 0, nullptr);
+	toBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *toPipeline.layout, descriptorSet, 1, &*o.descriptorSet, 0, nullptr);
 	
 	if (o.mesh->GetSubMeshCount() == 0) {
-		SubmitDrawCall(toBuffer, *o.mesh);
+		DrawMesh(toBuffer, *o.mesh);
 	}
 	else {
 		for (unsigned int i = 0; i < o.mesh->GetSubMeshCount(); ++i) {
-			SubmitDrawCallLayer(*o.mesh, i, toBuffer);
+			DrawMeshLayer(*o.mesh, i, toBuffer);
 		}
 	}
 }

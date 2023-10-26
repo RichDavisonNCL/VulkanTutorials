@@ -9,7 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanTutorialRenderer.h"
 #include "../GLTFLoader/GLTFLoader.h"
 
-namespace NCL::Rendering {
+namespace NCL::Rendering::Vulkan {
     class BasicSkinningExample : public VulkanTutorialRenderer
     {
     public:
@@ -29,9 +29,9 @@ namespace NCL::Rendering {
         vk::UniqueDescriptorSetLayout   jointsLayout;
 
         vk::UniqueDescriptorSetLayout	textureLayout;
-        vector<vector<vk::UniqueDescriptorSet>>	 layerDescriptors;
+        std::vector<std::vector<vk::UniqueDescriptorSet>>	 layerDescriptors;
 
-        vector < vk::UniqueDescriptorSet > layerSets;
+        std::vector < vk::UniqueDescriptorSet > layerSets;
 
         VulkanPipeline		pipeline;
 

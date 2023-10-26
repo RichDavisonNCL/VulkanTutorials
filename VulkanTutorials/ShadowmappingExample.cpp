@@ -9,6 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 const int SHADOWSIZE = 2048;
 
@@ -22,22 +23,31 @@ void ShadowMappingExample::SetupTutorial() {
 
 	cubeMesh	= LoadMesh("Cube.msh");
 	
-	shadowFillShader = VulkanShaderBuilder("Shadow Fill Shader")
+	shadowFillShader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("ShadowFill.vert.spv")
 		.WithFragmentBinary("ShadowFill.frag.spv")
-	.Build(GetDevice());
+	.Build("Shadow Fill Shader");
 
-	shadowUseShader = VulkanShaderBuilder("Shadow Use Shader")
+	shadowUseShader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("ShadowUse.vert.spv")
 		.WithFragmentBinary("ShadowUse.frag.spv")
-	.Build(GetDevice());
+	.Build("Shadow Use Shader");
 
-	shadowMap = VulkanTexture::CreateDepthTexture(this, SHADOWSIZE, SHADOWSIZE, "Shadow Map", false);
+	shadowMap = TextureBuilder(GetDevice(), GetMemoryAllocator())
+		.WithPool(GetCommandPool(CommandBuffer::Graphics))
+		.WithQueue(GetQueue(CommandBuffer::Graphics))
+		.WithDimension(SHADOWSIZE, SHADOWSIZE)
+		.WithAspects(vk::ImageAspectFlagBits::eDepth)
+		.WithFormat(vk::Format::eD32Sfloat)
+		.WithLayout(vk::ImageLayout::eDepthAttachmentOptimal)
+		.WithUsages(vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled)
+		.WithMips(false)
+	.Build("Shadowmap");
 
-	shadowMatUniform = VulkanBufferBuilder(sizeof(Matrix4), "Shadow Matrix")
+	shadowMatUniform = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
 		.WithHostVisibility()
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(sizeof(Matrix4), "Shadow Matrix");
 
 	shadowMatrix = (Matrix4*)shadowMatUniform.Map(); 
 	*shadowMatrix = 	//Let's make the shadow casting light look at something!
@@ -45,17 +55,17 @@ void ShadowMappingExample::SetupTutorial() {
 		Matrix4::BuildViewMatrix(Vector3(-50, 50, -50), Vector3(0, 0, 0), Vector3(0, 1, 0));
 	shadowMatUniform.Unmap();
 
-	shadowMatrixLayout = VulkanDescriptorSetLayoutBuilder("ShadowMatrix")
+	shadowMatrixLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-	.Build(GetDevice()); //Get our camera matrices...
+	.Build("ShadowMatrix"); //Get our camera matrices...
 
 	shadowMatrixDescriptor = BuildUniqueDescriptorSet(*shadowMatrixLayout);
-	UpdateBufferDescriptor(*shadowMatrixDescriptor, 0, vk::DescriptorType::eUniformBuffer, shadowMatUniform);
+	WriteBufferDescriptor(*shadowMatrixDescriptor, 0, vk::DescriptorType::eUniformBuffer, shadowMatUniform);
 
 	BuildMainPipeline();
 	BuildShadowPipeline();
 
-	UpdateImageDescriptor(*sceneShadowTexDescriptor, 0, 0, shadowMap->GetDefaultView(), *defaultSampler, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+	WriteImageDescriptor(*sceneShadowTexDescriptor, 0, 0, shadowMap->GetDefaultView(), *defaultSampler, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
 
 	sceneObjects[0].mesh = &*cubeMesh;
 	sceneObjects[0].transform = Matrix4::Translation({ -20, 25, -20 });
@@ -65,44 +75,42 @@ void ShadowMappingExample::SetupTutorial() {
 }
 
 void	ShadowMappingExample::BuildShadowPipeline() {
-	shadowPipeline = VulkanPipelineBuilder("Shadow Map Pipeline")
+	shadowPipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(cubeMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shadowFillShader)
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4))
 		.WithDescriptorSetLayout(0, *shadowMatrixLayout)
-		.WithDepthState(vk::CompareOp::eLessOrEqual, true, true)
-		.WithDepthFormat(shadowMap->GetFormat())
-	.Build(GetDevice());
+		.WithDepthAttachment(shadowMap->GetFormat(), vk::CompareOp::eLessOrEqual, true, true)
+	.Build("Shadow Map Fill Pipeline");
 }
 
 void	ShadowMappingExample::BuildMainPipeline() {
-	diffuseLayout = VulkanDescriptorSetLayoutBuilder("DiffuseTex")
+	diffuseLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)	
-		.Build(GetDevice()); //And a diffuse texture
+		.Build("DiffuseTex"); //And a diffuse texture
 
-	shadowTexLayout = VulkanDescriptorSetLayoutBuilder("ShadowTex")
+	shadowTexLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-		.Build(GetDevice()); //And our shadow map!
+		.Build("ShadowTex"); //And our shadow map!
 
-	scenePipeline = VulkanPipelineBuilder("Main Scene Pipeline")
+	scenePipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(cubeMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shadowUseShader)
-		.WithDepthState(vk::CompareOp::eLessOrEqual, true, true)
-		.WithColourFormats({ surfaceFormat })
-		.WithDepthStencilFormat(depthBuffer->GetFormat())
+		.WithDepthAttachment(depthBuffer->GetFormat(), vk::CompareOp::eLessOrEqual, true, true)
+		.WithColourAttachment(GetSurfaceFormat())
 		.WithDescriptorSetLayout(0, *cameraLayout)
 		.WithDescriptorSetLayout(1, *shadowMatrixLayout)
 		.WithDescriptorSetLayout(2, *diffuseLayout)
 		.WithDescriptorSetLayout(3, *shadowTexLayout)
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4))
-	.Build(GetDevice());
+	.Build("Main Scene Draw Pipeline");
 
 	sceneShadowTexDescriptor	= BuildUniqueDescriptorSet(*shadowTexLayout);
 
 	for (auto& o : sceneObjects) {
-		o.objectDescriptorSet = BuildUniqueDescriptorSet(*diffuseLayout);
+		o.descriptorSet = BuildUniqueDescriptorSet(*diffuseLayout);
 	}
 }
 
@@ -119,7 +127,7 @@ void ShadowMappingExample::RenderFrame()	{
 void ShadowMappingExample::DrawObjects(VulkanPipeline& toPipeline) {
 	for (auto& o : sceneObjects) {
 		frameCmds.pushConstants(*toPipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4), (void*)&o.transform);
-		SubmitDrawCall(frameCmds, *o.mesh);
+		DrawMesh(frameCmds, *o.mesh);
 	}
 }
 
@@ -129,7 +137,7 @@ void ShadowMappingExample::RenderShadowMap() {
 	vk::Viewport shadowViewport = vk::Viewport(0.0f, (float)SHADOWSIZE, (float)SHADOWSIZE, -(float)SHADOWSIZE, 0.0f, 1.0f);
 	vk::Rect2D	 shadowScissor	= vk::Rect2D(vk::Offset2D(0, 0), vk::Extent2D(SHADOWSIZE, SHADOWSIZE));
 
-	VulkanDynamicRenderBuilder()
+	DynamicRenderBuilder()
 		.WithDepthAttachment(shadowMap->GetDefaultView())
 		.WithRenderArea(shadowScissor)
 	.BeginRendering(frameCmds);
@@ -139,11 +147,11 @@ void ShadowMappingExample::RenderShadowMap() {
 	frameCmds.setScissor(0, 1, &shadowScissor);
 
 	DrawObjects(shadowPipeline);
-	EndRendering(frameCmds);
+	frameCmds.endRendering();
 }
 
 void ShadowMappingExample::RenderScene() {
-	Vulkan::TransitionDepthToSampler(frameCmds, *shadowMap);
+	TransitionDepthToSampler(frameCmds, *shadowMap);
 
 	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, scenePipeline);
 	BeginDefaultRendering(frameCmds);
@@ -157,6 +165,6 @@ void ShadowMappingExample::RenderScene() {
 
 	DrawObjects(scenePipeline);
 
-	EndRendering(frameCmds);	
-	Vulkan::TransitionSamplerToDepth(frameCmds, *shadowMap);
+	frameCmds.endRendering();
+	TransitionSamplerToDepth(frameCmds, *shadowMap);
 }

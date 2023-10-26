@@ -9,6 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 const int NUM_OBJECTS = 4;
 
@@ -21,20 +22,18 @@ OffsetUniformBufferRenderer::~OffsetUniformBufferRenderer() {
 void OffsetUniformBufferRenderer::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 
-	camera	= Camera::BuildPerspectiveCamera(Vector3(0, 0, 10.0f), 0, 0, 45.0f, 1.0f, 100.0f);
-
 	triMesh = GenerateTriangle();
 
-	objectMatrixLayout = VulkanDescriptorSetLayoutBuilder("Object Matrices")
+	objectMatrixLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithDynamicUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-	.Build(GetDevice());
+	.Build("Object Matrices");
 
 	size_t uboSize = GetDeviceProperties().limits.minUniformBufferOffsetAlignment;
 
-	objectMatrixData = VulkanBufferBuilder(uboSize * NUM_OBJECTS, "Object Matrices")
+	objectMatrixData = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
 		.WithHostVisibility()
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(uboSize * NUM_OBJECTS, "Object Matrices");
 
 	char* objectMats = (char*)objectMatrixData.Map();
 
@@ -45,24 +44,24 @@ void OffsetUniformBufferRenderer::SetupTutorial() {
 
 	objectMatrixData.Unmap();
 
-	shader = VulkanShaderBuilder("Offset Uniform Buffer Usage!")
+	shader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("OffsetUniformBuffer.vert.spv")
 		.WithFragmentBinary("BasicUniformBuffer.frag.spv")
-	.Build(GetDevice());
+	.Build("Offset Uniform Buffer Usage!");
 
-	pipeline = VulkanPipelineBuilder("UBOPipeline")
+	pipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shader)
-		.WithColourFormats({ surfaceFormat })
-		.WithDepthFormat(depthBuffer->GetFormat())
+		.WithColourAttachment(GetSurfaceFormat())
+		.WithDepthAttachment(depthBuffer->GetFormat())
 		.WithDescriptorSetLayout(0, *cameraLayout)
 		.WithDescriptorSetLayout(1, *objectMatrixLayout)
-		.Build(GetDevice());
+		.Build("UBO Pipeline");
 
 	objectMatrixSet = BuildUniqueDescriptorSet(*objectMatrixLayout);
 
-	UpdateBufferDescriptor(*objectMatrixSet, 0, vk::DescriptorType::eUniformBufferDynamic,  objectMatrixData , 0, sizeof(Matrix4));
+	WriteBufferDescriptor(*objectMatrixSet, 0, vk::DescriptorType::eUniformBufferDynamic,  objectMatrixData , 0, sizeof(Matrix4));
 }
 
 void OffsetUniformBufferRenderer::Update(float dt) {
@@ -80,6 +79,6 @@ void OffsetUniformBufferRenderer::RenderFrame() {
 		uint32_t uboOffset = uboSize * i;
 
 		frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 1, 1, &*objectMatrixSet, 1, &uboOffset);
-		SubmitDrawCall(frameCmds, *triMesh);
+		DrawMesh(frameCmds, *triMesh);
 	}
 }

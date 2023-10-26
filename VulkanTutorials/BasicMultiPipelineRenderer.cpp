@@ -9,6 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 BasicMultiPipelineRenderer::BasicMultiPipelineRenderer(Window& window) : VulkanTutorialRenderer(window)	{
 }
@@ -16,57 +17,56 @@ BasicMultiPipelineRenderer::BasicMultiPipelineRenderer(Window& window) : VulkanT
 void BasicMultiPipelineRenderer::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 
-	textures[0] = VulkanTexture::TextureFromFile(this, "Vulkan.png");
-	textures[1] = VulkanTexture::TextureFromFile(this, "doge.png");
+	textures[0] = LoadTexture("Vulkan.png");
+	textures[1] = LoadTexture("doge.png");
 
 	triangleMesh = GenerateTriangle();
 	triangleMesh = GenerateQuad();
 
-	solidColourShader = VulkanShaderBuilder("Solid Colour Shader")
+	solidColourShader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicPushConstant.vert.spv")
 		.WithFragmentBinary("SolidColour.frag.spv")
-	.Build(GetDevice());
+	.Build("Solid Colour Shader");
 
-	texturingShader = VulkanShaderBuilder("Texturing Shader")
+	texturingShader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicPushConstant.vert.spv")
 		.WithFragmentBinary("SingleTexture.frag.spv")
-	.Build(GetDevice());
+	.Build("Texturing Shader");
 
 	BuildColourPipeline();
 	BuildTexturePipeline();
 }
 
 void BasicMultiPipelineRenderer::BuildColourPipeline() {
-	solidColourPipeline = VulkanPipelineBuilder("Solid colour Pipeline!")
+	solidColourPipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(triangleMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(solidColourShader)
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex,0, sizeof(Vector4))
-		.WithBlendState(vk::BlendFactor::eOne, vk::BlendFactor::eOne, true)
-		.WithColourFormats({ surfaceFormat })
-		.WithDepthFormat(depthBuffer->GetFormat())
-	.Build(GetDevice());
+		.WithColourAttachment(GetSurfaceFormat(), vk::BlendFactor::eOne, vk::BlendFactor::eOne)
+		.WithDepthAttachment(depthBuffer->GetFormat())
+	.Build("Solid colour Pipeline!");
 }
 
 void BasicMultiPipelineRenderer::BuildTexturePipeline() {
-	vk::UniqueDescriptorSetLayout textureLayout = VulkanDescriptorSetLayoutBuilder("Texture Layout")
+	vk::UniqueDescriptorSetLayout textureLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.Build(GetDevice());
+	.Build("Texture Layout");
 
-	texturedPipeline = VulkanPipelineBuilder("Texturing Pipeline")
+	texturedPipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(triangleMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(texturingShader)
 		.WithDescriptorSetLayout(1, *textureLayout)
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Vector4))
-		.WithBlendState(vk::BlendFactor::eOne, vk::BlendFactor::eOne, true)
-		.WithDepthFormat(depthBuffer->GetFormat())
-	.Build(GetDevice());
+		.WithColourAttachment(GetSurfaceFormat(), vk::BlendFactor::eOne, vk::BlendFactor::eOne)
+		.WithDepthAttachment(depthBuffer->GetFormat())
+	.Build("Texturing Pipeline");
 
 	textureDescriptorSetA = BuildUniqueDescriptorSet(*textureLayout);
 	textureDescriptorSetB = BuildUniqueDescriptorSet(*textureLayout);
-	UpdateImageDescriptor(*textureDescriptorSetA, 0, 0, textures[0]->GetDefaultView(), *defaultSampler);
-	UpdateImageDescriptor(*textureDescriptorSetB, 0, 0, textures[1]->GetDefaultView(), *defaultSampler);
+	WriteImageDescriptor(*textureDescriptorSetA, 0, 0, textures[0]->GetDefaultView(), *defaultSampler);
+	WriteImageDescriptor(*textureDescriptorSetB, 0, 0, textures[1]->GetDefaultView(), *defaultSampler);
 }
 
 void BasicMultiPipelineRenderer::RenderFrame() {
@@ -76,16 +76,16 @@ void BasicMultiPipelineRenderer::RenderFrame() {
 	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, solidColourPipeline);
 	frameCmds.pushConstants(*solidColourPipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Vector4), (void*)&objectPositions[0]);
 
-	SubmitDrawCall(frameCmds, *triangleMesh);
+	DrawMesh(frameCmds, *triangleMesh);
 
 	////Now to draw the two textured triangles!
 	////They both use the same pipeline, but different descriptors, as they have different textures
 	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, texturedPipeline);
 	frameCmds.pushConstants(*texturedPipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Vector4), (void*)&objectPositions[1]);
 	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *texturedPipeline.layout, 1, 1, &*textureDescriptorSetA, 0, nullptr);
-	SubmitDrawCall(frameCmds, *triangleMesh);
+	DrawMesh(frameCmds, *triangleMesh);
 
 	frameCmds.pushConstants(*texturedPipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Vector4), (void*)&objectPositions[2]);
 	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *texturedPipeline.layout, 1, 1, &*textureDescriptorSetB, 0, nullptr);
-	SubmitDrawCall(frameCmds, *triangleMesh);
+	DrawMesh(frameCmds, *triangleMesh);
 }

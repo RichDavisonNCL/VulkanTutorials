@@ -9,6 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 BasicDescriptorRenderer::BasicDescriptorRenderer(Window& window) : VulkanTutorialRenderer(window)	{	
 }
@@ -17,39 +18,39 @@ void BasicDescriptorRenderer::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 	triMesh = GenerateTriangle();
 
-	shader = VulkanShaderBuilder("Basic Descriptor Shader!")
+	shader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicDescriptor.vert.spv")
 		.WithFragmentBinary("BasicDescriptor.frag.spv")
-	.Build(GetDevice());
+	.Build("Basic Descriptor Shader!");
 	
-	descriptorLayout = VulkanDescriptorSetLayoutBuilder("Uniform Data")
+	descriptorLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-	.Build(GetDevice());
+	.Build("Uniform Data");
 
-	pipeline = VulkanPipelineBuilder()
+	pipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shader)
-		//.WithColourFormats({ surfaceFormat })
-		.WithDepthFormat(depthBuffer->GetFormat())
+		.WithColourAttachment( GetSurfaceFormat() )
+		.WithDepthAttachment(depthBuffer->GetFormat())
 		.WithDescriptorSetLayout(0, *descriptorLayout)
-	.Build(GetDevice());
+	.Build("Basic Descriptor pipeline");
 
 	descriptorSet = BuildUniqueDescriptorSet(*descriptorLayout);
 
-	uniformData[0] = VulkanBufferBuilder(sizeof(positionUniform), "Positions")
+	uniformData[0] = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
 		.WithHostVisibility()
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(sizeof(positionUniform), "Positions");
 
-	uniformData[1] = VulkanBufferBuilder(sizeof(positionUniform), "Colours")
+	uniformData[1] = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
 		.WithHostVisibility()
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(sizeof(positionUniform), "Colours");
 
-	UpdateBufferDescriptor(*descriptorSet, 0, vk::DescriptorType::eUniformBuffer, uniformData[0]);
-	UpdateBufferDescriptor(*descriptorSet, 1, vk::DescriptorType::eUniformBuffer, uniformData[1]);
+	WriteBufferDescriptor(*descriptorSet, 0, vk::DescriptorType::eUniformBuffer, uniformData[0]);
+	WriteBufferDescriptor(*descriptorSet, 1, vk::DescriptorType::eUniformBuffer, uniformData[1]);
 }
 
 void BasicDescriptorRenderer::RenderFrame() {
@@ -62,5 +63,5 @@ void BasicDescriptorRenderer::RenderFrame() {
 	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*descriptorSet, 0, nullptr);
 
-	SubmitDrawCall(frameCmds, *triMesh);
+	DrawMesh(frameCmds, *triMesh);
 }

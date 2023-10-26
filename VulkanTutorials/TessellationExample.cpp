@@ -10,6 +10,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 TessellationExample::TessellationExample(Window& window) : VulkanTutorialRenderer(window) {
 }
@@ -23,22 +24,23 @@ void TessellationExample::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 	mesh = GenerateTriangle();
 
-	shader = VulkanShaderBuilder("Tessellation Shader!")
+	shader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithTessControlBinary("BasicTCS.tesc.spv")
 		.WithTessEvalBinary("BasicTES.tese.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-		.Build(GetDevice());
+	.Build("Tessellation Shader!");
 
-	pipeline = VulkanPipelineBuilder("Tessellation Shader Example Pipeline")
-		.WithDepthFormat(depthBuffer->GetFormat())
+	pipeline = PipelineBuilder(GetDevice())
+		.WithColourAttachment(GetSurfaceFormat())
+		.WithDepthAttachment(depthBuffer->GetFormat())
 		.WithVertexInputState(mesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::ePatchList)
 		.WithRaster({}, vk::PolygonMode::eLine)
 		.WithShader(shader)
 		.WithTessellationPatchVertexCount(3)
 		.WithPushConstant(vk::ShaderStageFlagBits::eTessellationControl, 0, sizeof(Vector4))
-		.Build(GetDevice());
+	.Build("Tessellation Shader Example Pipeline");
 }
 
 void TessellationExample::RenderFrame() {
@@ -48,5 +50,5 @@ void TessellationExample::RenderFrame() {
 
 	frameCmds.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eTessellationControl, 0, sizeof(Vector4), &tessValues);
 
-	SubmitDrawCall(frameCmds, *mesh);
+	DrawMesh(frameCmds, *mesh);
 }

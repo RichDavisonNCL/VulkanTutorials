@@ -9,6 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 LightingExample::LightingExample(Window& window) : VulkanTutorialRenderer(window) {
 	autoBeginDynamicRendering = true;
@@ -27,29 +28,29 @@ void LightingExample::SetupTutorial() {
 	floorObject.mesh		= &*cubeMesh;
 	floorObject.transform = Matrix4::Scale({ 100.0f, 1.0f, 100.0f });
 
-	lightingShader = VulkanShaderBuilder("Lighting Shader")
+	lightingShader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("Lighting.vert.spv")
 		.WithFragmentBinary("Lighting.frag.spv")
-	.Build(GetDevice());
+	.Build("Lighting Shader");
 
 	Light testLight(Vector3(10, 20, -30), 150.0f, Vector4(1, 0.8f, 0.5f, 1));
 
-	lightUniform = VulkanBufferBuilder(sizeof(Light), "Light Uniform")
+	lightUniform = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
 		.WithHostVisibility()
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(sizeof(Light), "Light Uniform");
 
-	camPosUniform = VulkanBufferBuilder(sizeof(Vector3), "Camera Position Uniform")
+	camPosUniform = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
 		.WithHostVisibility()
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(sizeof(Vector3), "Camera Position Uniform");
 
 	lightUniform.CopyData((void*)&testLight, sizeof(testLight));
 
-	allTextures[0] = VulkanTexture::TextureFromFile(this,  "rust_diffuse.png");
-	allTextures[1] = VulkanTexture::TextureFromFile(this,  "rust_bump.png");
-	allTextures[2] = VulkanTexture::TextureFromFile(this,  "concrete_diffuse.png");
-	allTextures[3] = VulkanTexture::TextureFromFile(this,  "concrete_bump.png");
+	allTextures[0] = LoadTexture("rust_diffuse.png");
+	allTextures[1] = LoadTexture("rust_bump.png");
+	allTextures[2] = LoadTexture("concrete_diffuse.png");
+	allTextures[3] = LoadTexture("concrete_bump.png");
 	BuildPipeline();
 }
 
@@ -61,46 +62,45 @@ void LightingExample::Update(float dt) {
 }
 
 void	LightingExample::BuildPipeline() {
-	texturesLayout = VulkanDescriptorSetLayoutBuilder("Object Textures")
+	texturesLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.Build(GetDevice());
+	.Build("Object Textures");
 
-	lightLayout = VulkanDescriptorSetLayoutBuilder("Active Light")
+	lightLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-	.Build(GetDevice()); //Get our camera matrices...
+	.Build("Active Light"); //Get our camera matrices...
 
-	cameraPosLayout = VulkanDescriptorSetLayoutBuilder("Camera Position")
+	cameraPosLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eFragment)
-	.Build(GetDevice()); //Get our camera matrices...
+	.Build("Camera Position"); //Get our camera matrices...
 
-	pipeline = VulkanPipelineBuilder("Lighting Pipeline")
+	pipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(cubeMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(lightingShader)	
-		.WithDepthState(vk::CompareOp::eLessOrEqual, true, true)
+		.WithDepthAttachment(depthBuffer->GetFormat(), vk::CompareOp::eLessOrEqual, true, true)
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4))
-		.WithDepthFormat(depthBuffer->GetFormat())
 		.WithDescriptorSetLayout(0, *cameraLayout)		//Camera is set 0
 		.WithDescriptorSetLayout(1, *lightLayout)		//Light is set 1
 		.WithDescriptorSetLayout(2, *texturesLayout)	//Textures are set 2
 		.WithDescriptorSetLayout(3, *cameraPosLayout)	//Cam Pos is set 3
-	.Build(GetDevice());
+	.Build("Lighting Pipeline");
 
 	lightDescriptor			= BuildUniqueDescriptorSet(*lightLayout);
-	boxObject.objectDescriptorSet	= BuildUniqueDescriptorSet(*texturesLayout);
-	floorObject.objectDescriptorSet	= BuildUniqueDescriptorSet(*texturesLayout);
+	boxObject.descriptorSet	= BuildUniqueDescriptorSet(*texturesLayout);
+	floorObject.descriptorSet	= BuildUniqueDescriptorSet(*texturesLayout);
 	cameraPosDescriptor		= BuildUniqueDescriptorSet(*cameraPosLayout);
 
-	UpdateImageDescriptor(*boxObject.objectDescriptorSet, 0, 0, allTextures[0]->GetDefaultView(), *defaultSampler);
-	UpdateImageDescriptor(*boxObject.objectDescriptorSet, 1, 0, allTextures[1]->GetDefaultView(), *defaultSampler);
+	WriteImageDescriptor(*boxObject.descriptorSet, 0, 0, allTextures[0]->GetDefaultView(), *defaultSampler);
+	WriteImageDescriptor(*boxObject.descriptorSet, 1, 0, allTextures[1]->GetDefaultView(), *defaultSampler);
 
-	UpdateImageDescriptor(*floorObject.objectDescriptorSet, 0, 0, allTextures[2]->GetDefaultView(), *defaultSampler);
-	UpdateImageDescriptor(*floorObject.objectDescriptorSet, 1, 0, allTextures[3]->GetDefaultView(), *defaultSampler);
+	WriteImageDescriptor(*floorObject.descriptorSet, 0, 0, allTextures[2]->GetDefaultView(), *defaultSampler);
+	WriteImageDescriptor(*floorObject.descriptorSet, 1, 0, allTextures[3]->GetDefaultView(), *defaultSampler);
 
-	UpdateBufferDescriptor(*cameraDescriptor	, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
-	UpdateBufferDescriptor(*lightDescriptor		, 0, vk::DescriptorType::eUniformBuffer, lightUniform);
-	UpdateBufferDescriptor(*cameraPosDescriptor	, 0, vk::DescriptorType::eUniformBuffer, camPosUniform);
+	WriteBufferDescriptor(*cameraDescriptor		, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
+	WriteBufferDescriptor(*lightDescriptor		, 0, vk::DescriptorType::eUniformBuffer, lightUniform);
+	WriteBufferDescriptor(*cameraPosDescriptor	, 0, vk::DescriptorType::eUniformBuffer, camPosUniform);
 }
 
 void LightingExample::RenderFrame() {

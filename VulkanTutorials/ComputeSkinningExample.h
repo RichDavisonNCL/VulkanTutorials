@@ -9,7 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanTutorialRenderer.h"
 #include "../GLTFLoader/GLTFLoader.h"
 
-namespace NCL::Rendering {
+namespace NCL::Rendering::Vulkan {
     class ComputeSkinningExample : public VulkanTutorialRenderer
     {
     public:
@@ -28,12 +28,12 @@ namespace NCL::Rendering {
         GLTFLoader loader;
 
         VulkanBuffer		            jointsBuffer;
-        VulkanBuffer		            verticesBuffer;
+        VulkanBuffer		            outputVertices;
 
         vk::UniqueDescriptorSetLayout	textureLayout;
-        vector<vector<vk::UniqueDescriptorSet>>	 layerDescriptors;
+        std::vector<std::vector<vk::UniqueDescriptorSet>>	 layerDescriptors;
 
-        vector < vk::UniqueDescriptorSet > layerSets;
+        std::vector < vk::UniqueDescriptorSet > layerSets;
 
         vk::UniqueDescriptorSet		    computeDescriptor;
         vk::UniqueDescriptorSetLayout   computeLayout;
@@ -42,6 +42,9 @@ namespace NCL::Rendering {
 
         VulkanPipeline		drawPipeline;
         VulkanPipeline		computePipeline;
+
+        vk::UniqueCommandBuffer asyncCmds;
+        vk::UniqueCommandBuffer renderCmds;
 
         float   frameTime       = 0.0f;
         int     currentFrame    = 0;

@@ -9,6 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 BasicUniformBufferRenderer::BasicUniformBufferRenderer(Window& window) : VulkanTutorialRenderer(window)	{
 
@@ -21,38 +22,37 @@ BasicUniformBufferRenderer::~BasicUniformBufferRenderer() {
 void BasicUniformBufferRenderer::SetupTutorial() {
 	VulkanTutorialRenderer::SetupTutorial();
 
-	camera	= Camera::BuildPerspectiveCamera(Vector3(0, 0, 10.0f), 0, 0, 45.0f, 1.0f, 100.0f);
-
 	triMesh = GenerateTriangle();
 
-	shader = VulkanShaderBuilder("Basic Uniform Buffer Usage!")
+	shader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("BasicUniformBuffer.vert.spv")
 		.WithFragmentBinary("BasicUniformBuffer.frag.spv")
-	.Build(GetDevice());
+	.Build("Basic Uniform Buffer Usage!");
 
-	cameraData = VulkanBufferBuilder(sizeof(Matrix4) * 2, "Camera Data")
+	cameraData = BufferBuilder(GetDevice(), GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
 		.WithHostVisibility()
-		.Build(GetDevice(), GetMemoryAllocator());
+		.Build(sizeof(Matrix4) * 2, "Camera Data");
 
 	cameraMemory = (Matrix4*)cameraData.Map();
+	camera.SetPosition({0,0,10});
 	
-	matrixLayout = VulkanDescriptorSetLayoutBuilder("Matrices")
+	matrixLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-		.Build(GetDevice());
+		.Build("Matrices");
 
-	pipeline = VulkanPipelineBuilder("UBOPipeline")
+	pipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shader)
-		.WithColourFormats({ surfaceFormat })
-		.WithDepthFormat(depthBuffer->GetFormat())
+		.WithColourAttachment(GetSurfaceFormat())
+		.WithDepthAttachment(depthBuffer->GetFormat())
 		.WithDescriptorSetLayout(0, *matrixLayout)
-		.Build(GetDevice());
+		.Build("UBO Pipeline");
 
 	descriptorSet = BuildUniqueDescriptorSet(*matrixLayout);
 
-	UpdateBufferDescriptor(*descriptorSet, 0, vk::DescriptorType::eUniformBuffer, cameraData);
+	WriteBufferDescriptor(*descriptorSet, 0, vk::DescriptorType::eUniformBuffer, cameraData);
 }
 
 void BasicUniformBufferRenderer::Update(float dt) {
@@ -66,7 +66,7 @@ void BasicUniformBufferRenderer::RenderFrame() {
 
 	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*descriptorSet, 0, nullptr);
 
-	SubmitDrawCall(frameCmds, *triMesh);
+	DrawMesh(frameCmds, *triMesh);
 }
 
 void BasicUniformBufferRenderer::UpdateCameraUniform() {

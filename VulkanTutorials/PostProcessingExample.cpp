@@ -9,6 +9,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 using namespace NCL;
 using namespace Rendering;
+using namespace Vulkan;
 
 PostProcessingExample::PostProcessingExample(Window& window) : VulkanTutorialRenderer(window) {
 	autoBeginDynamicRendering = false;
@@ -19,17 +20,29 @@ void PostProcessingExample::SetupTutorial() {
 	quadMesh = GenerateQuad();
 	gridMesh = GenerateGrid();
 
-	postTexture = VulkanTexture::CreateColourTexture(this, windowWidth, windowHeight, "Post Process Image");
+	//postTexture = VulkanTexture::CreateColourTexture(this, windowSize.x, windowSize.y, "Post Process Image");
 
-	gridShader = VulkanShaderBuilder("Grid Shader")
+	postTexture = TextureBuilder(GetDevice(), GetMemoryAllocator())
+		.WithPool(GetCommandPool(CommandBuffer::Graphics))
+		.WithQueue(GetQueue(CommandBuffer::Graphics))
+		.WithDimension(windowSize.x, windowSize.y, 1)
+		.WithMips(false)
+		.WithUsages(vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled /*| vk::ImageUsageFlagBits::eStorage*/)
+		.WithPipeFlags(vk::PipelineStageFlagBits::eColorAttachmentOutput)
+		.WithLayout(vk::ImageLayout::eColorAttachmentOptimal)
+		.WithFormat(vk::Format::eB8G8R8A8Unorm)
+	.Build("Post Process Image");
+
+
+	gridShader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("SimpleVertexTransform.vert.spv")
 		.WithFragmentBinary("BasicUniformBuffer.frag.spv")
-	.Build(GetDevice());
+	.Build("Grid Shader");
 
-	invertShader = VulkanShaderBuilder("Post process shader!")
+	invertShader = ShaderBuilder(GetDevice())
 		.WithVertexBinary("PostProcess.vert.spv")
 		.WithFragmentBinary("PostProcess.frag.spv")
-	.Build(GetDevice());
+	.Build("Post process shader!");
 
 	BuildMainPipeline();
 	BuildProcessPipeline();
@@ -39,39 +52,39 @@ void PostProcessingExample::SetupTutorial() {
 }
 
 void	PostProcessingExample::BuildMainPipeline() {		
-	matrixLayout = VulkanDescriptorSetLayoutBuilder("Matrices")
+	matrixLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithUniformBuffers(1, vk::ShaderStageFlagBits::eVertex)
-	.Build(GetDevice());
+	.Build("Matrices");
 
-	gridPipeline = VulkanPipelineBuilder("Main Scene Pipeline")
+	gridPipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(gridMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(gridShader)
 		.WithDescriptorSetLayout(0, *matrixLayout)
 		.WithPushConstant(vk::ShaderStageFlagBits::eVertex,0, sizeof(Matrix4))
-	.Build(GetDevice());
+	.Build("Main Scene Pipeline");
 
-	gridObject.objectDescriptorSet = BuildUniqueDescriptorSet(*matrixLayout);
-	UpdateBufferDescriptor(*gridObject.objectDescriptorSet, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
+	gridObject.descriptorSet = BuildUniqueDescriptorSet(*matrixLayout);
+	WriteBufferDescriptor(*gridObject.descriptorSet, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
 }
 
 void	PostProcessingExample::BuildProcessPipeline() {
-	processLayout = VulkanDescriptorSetLayoutBuilder("Texture Layout")
+	processLayout = DescriptorSetLayoutBuilder(GetDevice())
 		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-	.Build(GetDevice());
+	.Build("Texture Layout");
 
-	invertPipeline = VulkanPipelineBuilder("Post process pipeline")
+	invertPipeline = PipelineBuilder(GetDevice())
 		.WithVertexInputState(quadMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleStrip)
 		.WithShader(invertShader)
-		.WithColourFormats({ surfaceFormat })
-		.WithDepthStencilFormat(depthBuffer->GetFormat())
+		.WithColourAttachment(GetSurfaceFormat())
+		.WithDepthAttachment(depthBuffer->GetFormat())
 		.WithDescriptorSetLayout(0, *processLayout)
-	.Build(GetDevice());
+	.Build("Post process pipeline");
 
 	processDescriptor = BuildUniqueDescriptorSet(*processLayout);
 
-	UpdateImageDescriptor(*processDescriptor, 0, 0, postTexture->GetDefaultView(), *defaultSampler);
+	WriteImageDescriptor(*processDescriptor, 0, 0, postTexture->GetDefaultView(), *defaultSampler);
 
 	processSampler = GetDevice().createSamplerUnique(
 		vk::SamplerCreateInfo()
@@ -81,25 +94,25 @@ void	PostProcessingExample::BuildProcessPipeline() {
 }
 
 void PostProcessingExample::RenderFrame() {
-	VulkanDynamicRenderBuilder()
+	DynamicRenderBuilder()
 		.WithColourAttachment(postTexture->GetDefaultView())
 		.WithRenderArea(defaultScreenRect)
 	.BeginRendering(frameCmds);
 
 	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, gridPipeline);
 	RenderSingleObject(gridObject, frameCmds, gridPipeline);
-	EndRendering(frameCmds);
+	frameCmds.endRendering();
 
 	//Invert post process pass!
-	Vulkan::TransitionColourToSampler(frameCmds, *postTexture); //Sample first pass texture
+	TransitionColourToSampler(frameCmds, *postTexture); //Sample first pass texture
 	BeginDefaultRendering(frameCmds);
 
 	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, invertPipeline);
 	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *invertPipeline.layout, 0, 1, &*processDescriptor, 0, nullptr);
-	SubmitDrawCall(frameCmds, *quadMesh);
+	DrawMesh(frameCmds, *quadMesh);
 
-	EndRendering(frameCmds);
+	frameCmds.endRendering();
 
 	//Get read for the next frame's rendering!
-	Vulkan::TransitionSamplerToColour(frameCmds, *postTexture);
+	TransitionSamplerToColour(frameCmds, *postTexture);
 }

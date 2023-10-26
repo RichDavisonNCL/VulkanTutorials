@@ -13,6 +13,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "BasicMultiPipelineRenderer.h"
 #include "PrerecordedCmdListRenderer.h"
 #include "DescriptorBufferExample.h"
+#include "PushDescriptorExample.h"
 
 #include "AsyncComputeExample.h"
 
@@ -39,9 +40,13 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 #ifdef USE_RAY_TRACING
 #include "../VulkanRayTracing/TestRayTrace.h"
+#include "../VulkanRayTracing/TestGLTFRayTrace.h"
+#include "../VulkanRayTracing/TestRayTracedSkinning.h"
 #endif
 
 using namespace NCL;
+using namespace Rendering;
+using namespace Vulkan;
 
 int main() {
 	Window* w = Window::CreateGameWindow("Welcome to Vulkan!", 1120, 768);
@@ -60,24 +65,24 @@ int main() {
 	//auto* renderer = new BasicDescriptorRenderer(*w);
 	//auto* renderer = new BasicTexturingRenderer(*w);
 	//auto* renderer = new BasicUniformBufferRenderer(*w);
-	//auto* renderer = new PrerecordedCmdListRenderer(*w);
+	////auto* renderer = new PrerecordedCmdListRenderer(*w);
 	//auto* renderer = new BasicMultiPipelineRenderer(*w);
 	//auto* renderer = new BasicComputeUsage(*w);
 	//auto* renderer = new MultiViewportExample(*w);
 	//auto* renderer = new BindlessExample(*w);
 	//auto* renderer = new DescriptorBufferExample(*w);
-	//auto* renderer = new AsyncComputeUsage(*w);
+	//auto* renderer = new PushDescriptorExample(*w);
+//	auto* renderer = new AsyncComputeUsage(*w);
 	//auto* renderer = new OffsetUniformBufferRenderer(*w);
 	
 	/*
 	Rendering Technique Tutorials
 	*/
-	//auto* renderer = new PostProcessingExample(*w);
+	////auto* renderer = new PostProcessingExample(*w);
 	//auto* renderer = new ShadowMappingExample(*w);
 	//auto* renderer = new LightingExample(*w);
 	//auto* renderer = new DeferredExample(*w);
-	//auto* renderer = new GLTFExample(*w);
-	//auto* renderer = new TestRayTrace(*w);
+	auto* renderer = new GLTFExample(*w);
 	//auto* renderer = new BasicSkinningExample(*w);
 	//auto* renderer = new CubeMapRenderer(*w);
 
@@ -85,13 +90,15 @@ int main() {
 	//auto* renderer = new GeometryShaderExample(*w);
 
 	//auto* renderer = new AsyncComputeExample(*w);
-	auto* renderer = new ComputeSkinningExample(*w);
+	//auto* renderer = new ComputeSkinningExample(*w);
 
 #ifdef USE_RAY_TRACING
 	/*
 	Ray Tracing Tutorials
 	*/
 	//auto* renderer = new TestRayTrace(*w);
+	//auto* renderer = new TestGLTFRayTrace(*w);
+	//auto* renderer = new TestRayTracedSkinning(*w);
 #endif
 
 	if (!renderer->Init()) {
@@ -102,8 +109,8 @@ int main() {
 	w->LockMouseToWindow(true);
 	w->ShowOSPointer(false);
 
-	while (w->UpdateWindow() && !Window::GetKeyboard()->KeyDown(KeyboardKeys::ESCAPE)) {
-		renderer->Update(w->GetTimer()->GetTimeDeltaSeconds());
+	while (w->UpdateWindow() && !Window::GetKeyboard()->KeyDown(KeyCodes::ESCAPE)) {
+		renderer->Update(w->GetTimer().GetTimeDeltaSeconds());
 		renderer->Render();
 	}
 
