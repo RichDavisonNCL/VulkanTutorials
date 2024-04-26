@@ -6,20 +6,25 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanShaderBase.h"
+#include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-	class VulkanRTShader : public VulkanShaderBase
-	{
+	class PrerecordedCmdListExample : public VulkanTutorial	{
 	public:
-		VulkanRTShader(const std::string& filename, vk::Device device);
-	
-		const vk::UniqueShaderModule& GetModule() const {
-			return shaderModule;
-		}
+		PrerecordedCmdListExample(Window& window);
+		~PrerecordedCmdListExample();
+
+//		void SetupTutorial() override;
+
+		//void RenderFrame() override;
 
 	protected:
-		vk::UniqueShaderModule shaderModule;
-		std::string entryPoint;
+		void BuildPipeline();
+		VulkanPipeline		pipeline;
+
+		UniqueVulkanMesh		triMesh;
+		UniqueVulkanShader		shader;
+
+		vk::CommandBuffer	recordedBuffer;
 	};
 }

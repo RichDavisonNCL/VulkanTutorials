@@ -8,25 +8,25 @@ License: MIT (see LICENSE file at the top of the source tree)
 #pragma once
 #include "VulkanBVHBuilder.h"
 #include "VulkanRTShader.h"
-#include "../VulkanTutorials/VulkanTutorialRenderer.h"
+#include "../VulkanTutorials/VulkanTutorial.h"
 #include "VulkanShaderBindingTableBuilder.h"
 
 namespace NCL::Rendering::Vulkan {
 	using UniqueVulkanRTShader = std::unique_ptr<VulkanRTShader>;
 	using SharedVulkanRTShader = std::shared_ptr<VulkanRTShader>;
 
-	class TestRayTrace : public VulkanTutorialRenderer	{
+	class TestRayTrace : public VulkanTutorial	{
 	public:
 		TestRayTrace(Window& window);
 		~TestRayTrace();
 
-		void SetupTutorial() override;
+		//void SetupTutorial() override;
 
-		void RenderFrame() override;
-		void Update(float dt) override;
+		//void RenderFrame() override;
+		//void Update(float dt) override;
 
 	protected:
-		void SetupDevice(vk::PhysicalDeviceFeatures2& deviceFeatures) override;
+		//void SetupDevice(vk::PhysicalDeviceFeatures2& deviceFeatures) override;
 
 		VulkanPipeline		displayPipeline;
 		UniqueVulkanShader	displayShader;

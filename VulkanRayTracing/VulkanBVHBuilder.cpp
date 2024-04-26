@@ -91,14 +91,21 @@ void VulkanBVHBuilder::BuildBLAS(vk::Device device, VmaAllocator allocator, vk::
 		vk::IndexType	iFormat;
 		bool hasIndices = i.first->GetIndexInformation(iBuffer, iOffset, iRange, iFormat);
 
+		//vk::AccelerationStructureGeometryTrianglesDataKHR triData;
+		//triData.vertexFormat = vFormat;
+		//triData.vertexData.deviceAddress = device.getBufferAddress(vk::BufferDeviceAddressInfo(vBuffer)) + vOffset;
+		//triData.vertexStride = sizeof(Vector3);
+
 		vk::AccelerationStructureGeometryTrianglesDataKHR triData;
 		triData.vertexFormat = vFormat;
-		triData.vertexData.deviceAddress = device.getBufferAddress(vk::BufferDeviceAddressInfo(vBuffer)) + vOffset;
+		triData.vertexData.deviceAddress = device.getBufferAddress({.buffer = vBuffer }) + vOffset;
 		triData.vertexStride = sizeof(Vector3);
 
-		if (hasIndices) {		
+
+
+		if (hasIndices) {
 			triData.indexType = iFormat;
-			triData.indexData.deviceAddress = device.getBufferAddress(vk::BufferDeviceAddressInfo(iBuffer)) + iOffset;		
+			triData.indexData.deviceAddress = device.getBufferAddress({ .buffer = iBuffer} ) + iOffset;
 		}
 
 		triData.maxVertex = i.first->GetVertexCount();
@@ -153,7 +160,7 @@ void VulkanBVHBuilder::BuildBLAS(vk::Device device, VmaAllocator allocator, vk::
 							vk::BufferUsageFlagBits::eStorageBuffer)
 		.Build(scratchSize, "Scratch Buffer");
 
-	vk::DeviceAddress scratchAddr = device.getBufferAddress(scratchBuff.buffer);
+	vk::DeviceAddress scratchAddr = device.getBufferAddress({ .buffer = scratchBuff.buffer });
 
 	vk::UniqueCommandBuffer buffer = CmdBufferBegin(device, pool, "Making BLAS");
 
@@ -179,13 +186,18 @@ void VulkanBVHBuilder::BuildBLAS(vk::Device device, VmaAllocator allocator, vk::
 
 		buffer->buildAccelerationStructuresKHR(1, &i.buildInfo, &rangeInfo);
 					
-		buffer->pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-			vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, 
-			{}, 
-			vk::MemoryBarrier(	vk::AccessFlagBits::eAccelerationStructureWriteKHR,
-								vk::AccessFlagBits::eAccelerationStructureReadKHR),
-			{}, 
-			{}
+		buffer->pipelineBarrier(
+			vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, //Source
+			vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, //Dest
+			{}, //Dependency Flags
+			{//MemoryBarriers
+				{
+					.srcAccessMask = vk::AccessFlagBits::eAccelerationStructureWriteKHR,
+					.dstAccessMask = vk::AccessFlagBits::eAccelerationStructureWriteKHR
+				}
+				},
+			{}, //bufferMemoryBarriers
+			{} //imageMemoryBarriers
 		);
 	}
 	CmdBufferEndSubmitWait(*buffer, device, queue);
@@ -199,6 +211,8 @@ void VulkanBVHBuilder::BuildTLAS(vk::Device device, VmaAllocator allocator, vk::
 	tlasEntries.resize(instanceCount);
 
 	for (int i = 0; i < instanceCount; ++i) {
+		//VkTransformMatrixKHR has 3 rows of 4 columns each. upper 3x3 remains rotation
+		//Row major memory layout! Matrix class is column major...
 		tlasEntries[i].transform.matrix[0][0] = entries[i].modelMat.array[0][0];
 		tlasEntries[i].transform.matrix[0][1] = entries[i].modelMat.array[1][0];
 		tlasEntries[i].transform.matrix[0][2] = entries[i].modelMat.array[2][0];
@@ -218,7 +232,9 @@ void VulkanBVHBuilder::BuildTLAS(vk::Device device, VmaAllocator allocator, vk::
 
 		tlasEntries[i].instanceCustomIndex = meshID;
 
-		tlasEntries[i].accelerationStructureReference = device.getBufferAddress(blasBuildInfo[meshID].buffer.buffer);
+		tlasEntries[i].accelerationStructureReference = device.getBufferAddress({ .buffer = blasBuildInfo[meshID].buffer.buffer });
+
+
 		tlasEntries[i].flags = (VkGeometryInstanceFlagBitsKHR)vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable;
 		tlasEntries[i].mask = entries[i].mask;
 		tlasEntries[i].instanceShaderBindingTableRecordOffset = entries[i].hitID;
@@ -237,7 +253,7 @@ void VulkanBVHBuilder::BuildTLAS(vk::Device device, VmaAllocator allocator, vk::
 	vk::AccelerationStructureGeometryKHR tlasGeometry;
 	tlasGeometry.geometryType = vk::GeometryTypeKHR::eInstances;
 	tlasGeometry.geometry = vk::AccelerationStructureGeometryInstancesDataKHR();
-	tlasGeometry.geometry.instances.data = device.getBufferAddress(instanceBuffer.buffer);
+	tlasGeometry.geometry.instances.data = device.getBufferAddress({ .buffer = instanceBuffer.buffer });
 
 	vk::AccelerationStructureBuildGeometryInfoKHR geomInfo;
 	geomInfo.flags			= flags;
@@ -269,7 +285,7 @@ void VulkanBVHBuilder::BuildTLAS(vk::Device device, VmaAllocator allocator, vk::
 		.WithDeviceAddress()
 		.Build(sizesInfo.buildScratchSize, "Scratch Buffer");
 
-	vk::DeviceAddress scratchAddr = device.getBufferAddress(scratchBuffer.buffer);
+	vk::DeviceAddress scratchAddr = device.getBufferAddress({ .buffer = scratchBuffer.buffer });
 
 	geomInfo.srcAccelerationStructure = nullptr;
 	geomInfo.dstAccelerationStructure = *tlas;

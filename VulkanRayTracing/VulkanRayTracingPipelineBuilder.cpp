@@ -69,6 +69,7 @@ VulkanRayTracingPipelineBuilder& VulkanRayTracingPipelineBuilder::WithProcedural
 
 	shaderGroups.push_back(groupCreateInfo);
 
+
 	return *this;
 }
 
@@ -79,6 +80,9 @@ VulkanRayTracingPipelineBuilder& VulkanRayTracingPipelineBuilder::WithShader(Vul
 	entryInfo.stage = stage;
 
 	entries.push_back(entryInfo);
+
+	shader.FillDescriptorSetLayouts(reflectionLayouts);
+	shader.FillPushConstants(allPushConstants);
 	
 	return *this;
 }
@@ -92,6 +96,8 @@ VulkanPipeline VulkanRayTracingPipelineBuilder::Build(const std::string& debugNa
 		stageInfo.module = *i.shader->GetModule();
 		shaderStages.push_back(stageInfo);
 	}
+
+	FinaliseDescriptorLayouts();
 
 	pipelineCreate.groupCount	= shaderGroups.size();
 	pipelineCreate.pGroups		= shaderGroups.data();
@@ -107,6 +113,7 @@ VulkanPipeline VulkanRayTracingPipelineBuilder::Build(const std::string& debugNa
 	output.layout = sourceDevice.createPipelineLayoutUnique(pipeLayoutCreate);
 
 	pipelineCreate.layout = *output.layout;
+	pipelineCreate.setPDynamicState(&dynamicCreate);
 
 	output.pipeline = sourceDevice.createRayTracingPipelineKHRUnique({}, cache, pipelineCreate).value;
 

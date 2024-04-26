@@ -52,17 +52,8 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
     <string>
     <iosfwd>
 	
-	<Matrix2.h>
-    <Matrix3.h>
-    <Matrix4.h>
-
-    <Vector2.h>
-    <Vector3.h>
-    <Vector4.h>
-
-    <Vector2i.h>
-    <Vector3i.h>
-    <Vector4i.h>
+    <Vector.h>
+    <Matrix.h>
 	
 	<Quaternion.h>
 	
@@ -88,6 +79,7 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
 
 add_compile_definitions(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC)
 add_compile_definitions(VK_NO_PROTOTYPES)
+add_compile_definitions(VULKAN_HPP_NO_STRUCT_CONSTRUCTORS)
 
 ################################################################################
 # Compile and link options

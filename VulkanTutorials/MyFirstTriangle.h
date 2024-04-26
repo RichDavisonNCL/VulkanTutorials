@@ -6,20 +6,18 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanShaderBase.h"
+#include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-	class VulkanRTShader : public VulkanShaderBase
-	{
+	class MyFirstTriangle : public VulkanTutorial	{
 	public:
-		VulkanRTShader(const std::string& filename, vk::Device device);
-	
-		const vk::UniqueShaderModule& GetModule() const {
-			return shaderModule;
-		}
-
+		MyFirstTriangle(Window& window);
+		~MyFirstTriangle() {} //Nothing to delete in this one!
 	protected:
-		vk::UniqueShaderModule shaderModule;
-		std::string entryPoint;
+		void RenderFrame(float dt) override;
+
+		UniqueVulkanMesh 	triMesh;
+		UniqueVulkanShader	shader;
+		VulkanPipeline		basicPipeline;
 	};
 }

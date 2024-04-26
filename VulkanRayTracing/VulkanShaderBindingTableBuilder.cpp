@@ -108,7 +108,7 @@ ShaderBindingTable VulkanShaderBindingTableBuilder::Build(vk::Device device, Vma
 		.WithHostVisibility()
 		.Build(totalAllocSize, debugName + " SBT Buffer");
 
-	vk::DeviceAddress address = device.getBufferAddress(vk::BufferDeviceAddressInfo(table.tableBuffer.buffer));
+	vk::DeviceAddress address = device.getBufferAddress({ .buffer = table.tableBuffer.buffer });
 
 	char* bufData = (char*)table.tableBuffer.Map();
 	int dataOffset = 0;
