@@ -6,17 +6,17 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanTutorialRenderer.h"
+#include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-	class PostProcessingExample : public VulkanTutorialRenderer {
+	class PostProcessingExample : public VulkanTutorial {
 	public:
 		PostProcessingExample(Window& window);
 		~PostProcessingExample() {}
 
-		void SetupTutorial() override;
+//		void SetupTutorial() override;
 
-		void RenderFrame()		override;	
+		//void RenderFrame()		override;	
 	protected:
 		void	BuildMainPipeline();
 		void	BuildProcessPipeline();
@@ -35,10 +35,7 @@ namespace NCL::Rendering::Vulkan {
 		VulkanPipeline	gridPipeline;
 		VulkanPipeline	invertPipeline;
 
-		vk::UniqueDescriptorSetLayout	processLayout;
 		vk::UniqueDescriptorSet			processDescriptor;
-
-		vk::UniqueDescriptorSetLayout	matrixLayout;
 
 		RenderObject gridObject;
 	};

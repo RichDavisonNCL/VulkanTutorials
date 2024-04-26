@@ -6,26 +6,23 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanTutorialRenderer.h"
+#include "VulkanTutorial.h"
 #include "../GLTFLoader/GLTFLoader.h"
 
 namespace NCL::Rendering::Vulkan {
-    class ComputeSkinningExample : public VulkanTutorialRenderer
+    class ComputeSkinningExample : public VulkanTutorial
     {
     public:
         ComputeSkinningExample(Window& window);
         ~ComputeSkinningExample();
 
-        void SetupTutorial() override;
-
-        void RenderFrame()		override;
-        void Update(float dt)	override;
     protected:
-        void SetupDevice(vk::PhysicalDeviceFeatures2& deviceFeatures) override;
+        void RenderFrame(float dt) override;
 
         UniqueVulkanShader  drawShader;
         UniqueVulkanCompute skinShader;
-        GLTFLoader loader;
+
+        GLTFScene scene;
 
         VulkanBuffer		            jointsBuffer;
         VulkanBuffer		            outputVertices;

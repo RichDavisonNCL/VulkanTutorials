@@ -6,19 +6,17 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanTutorialRenderer.h"
+#include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-    class MultiViewportExample : public VulkanTutorialRenderer
+    class MultiViewportExample : public VulkanTutorial
     {
     public:
         MultiViewportExample(Window& window);
         ~MultiViewportExample() {}
 
-        void SetupTutorial() override;
-
     protected:
-        virtual void RenderFrame();
+        void RenderFrame(float dt) override;
 
         UniqueVulkanMesh    triMesh;
         UniqueVulkanShader  shader;

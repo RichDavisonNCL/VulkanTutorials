@@ -11,74 +11,71 @@ using namespace NCL;
 using namespace Rendering;
 using namespace Vulkan;
 
-GLTFExample::GLTFExample(Window& window) : VulkanTutorialRenderer(window)
-{
-}
+GLTFExample::GLTFExample(Window& window) : VulkanTutorial(window)	{
+	VulkanInitialisation vkInit = DefaultInitialisation();
+	renderer = new VulkanRenderer(window, vkInit);
+	InitTutorialObjects();
 
-void GLTFExample::SetupTutorial() {
-	VulkanTutorialRenderer::SetupTutorial();
+	FrameState const& frameState = renderer->GetFrameState();
+	vk::Device device = renderer->GetDevice();
+	vk::DescriptorPool pool = renderer->GetDescriptorPool();
 
-	loader.Load("Sponza/Sponza.gltf",
-		[](void) ->  Mesh* {return new VulkanMesh(); },
-		[&](std::string& input) ->  VulkanTexture* {return LoadTexture(input).release(); }
-	);
+	GLTFLoader::Load("Sponza/Sponza.gltf",scene);
 
 	camera.SetPitch(-20.0f)
 		.SetYaw(90.0f)
 		.SetPosition({ 850, 840, -30 })
 		.SetFarPlane(5000.0f);
 
-	for (const auto& m : loader.outMeshes) {
+	for (const auto& m : scene.meshes) {
 		VulkanMesh* loadedMesh = (VulkanMesh*)m.get();
-		loadedMesh->UploadToGPU(this);
+		loadedMesh->UploadToGPU(renderer);
 	}
 
-	textureLayout = DescriptorSetLayoutBuilder(GetDevice())
-		.WithSamplers(1, vk::ShaderStageFlagBits::eFragment)
-		.Build("Object Textures");
-
-	for (const auto& m : loader.outMats) {	//Build descriptors for each mesh and its sublayers
-		layerDescriptors.push_back({});
-		std::vector<vk::UniqueDescriptorSet>& matSet = layerDescriptors.back();
-		for (const auto& l : m.allLayers) {
-			matSet.push_back(BuildUniqueDescriptorSet(*textureLayout));
-			WriteImageDescriptor(*matSet.back(), 0, 0, ((VulkanTexture*)l.diffuse.get())->GetDefaultView(), *defaultSampler);
-		}
-	}
-
-	shader = ShaderBuilder(GetDevice())
+	shader = ShaderBuilder(device)
 		.WithVertexBinary("SimpleVertexTransform.vert.spv")
 		.WithFragmentBinary("SingleTexture.frag.spv")
 	.Build("Texturing Shader");
 
-	VulkanMesh* m = (VulkanMesh*)loader.outMeshes[0].get();
-	pipeline = PipelineBuilder(GetDevice())
-		.WithPushConstant(vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4))
+	for (const auto& m : scene.materials) {	//Build descriptors for each mesh and its sublayers
+		layerDescriptors.push_back({});
+		std::vector<vk::UniqueDescriptorSet>& matSet = layerDescriptors.back();
+		for (const auto& l : m.allLayers) {
+			matSet.push_back(CreateDescriptorSet(device, pool, shader->GetLayout(1)));
+			WriteImageDescriptor(device , *matSet.back(), 0, ((VulkanTexture*)l.albedo.get())->GetDefaultView(), *defaultSampler);
+		}
+	}
+
+	VulkanMesh* m = (VulkanMesh*)scene.meshes[0].get();
+	pipeline = PipelineBuilder(device)
 		.WithVertexInputState(m->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 		.WithShader(shader)
-		.WithColourAttachment(GetSurfaceFormat())
-		.WithDepthAttachment(depthBuffer->GetFormat(), vk::CompareOp::eLessOrEqual, true, true)
-		.WithDescriptorSetLayout(0, *cameraLayout)	//Camera is set 0
-		.WithDescriptorSetLayout(1, *textureLayout)	//Textures are set 1
+		.WithColourAttachment(frameState.colourFormat)
+		.WithDepthAttachment(frameState.depthFormat, vk::CompareOp::eLessOrEqual, true, true)
 	.Build("Main Scene Pipeline");
 }
 
-void GLTFExample::RenderFrame() {
-	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
-	Matrix4 identity;
-	frameCmds.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4), (void*)&identity);
+void GLTFExample::RenderFrame(float dt) {
+	FrameState const& state = renderer->GetFrameState();
 
-	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
-	WriteBufferDescriptor(*cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
-	for(size_t i = 0; i < loader.outMeshes.size(); ++i) {
-		VulkanMesh* loadedMesh = (VulkanMesh*)loader.outMeshes[i].get();
+	vk::Device device = renderer->GetDevice();
+	vk::CommandBuffer cmdBuffer = state.cmdBuffer;
+
+	cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	Matrix4 identity;
+	cmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4), (void*)&identity);
+
+	cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
+	WriteBufferDescriptor(device, *cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
+	for(size_t i = 0; i < scene.meshes.size(); ++i) {
+		VulkanMesh* loadedMesh = (VulkanMesh*)scene.meshes[i].get();
 		std::vector<vk::UniqueDescriptorSet>& set = layerDescriptors[i];
 
 		for (unsigned int j = 0; j < loadedMesh->GetSubMeshCount(); ++j) {
-			frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 1, 1, &*set[j], 0, nullptr);
+			cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 1, 1, &*set[j], 0, nullptr);
 		
-			DrawMeshLayer(*loadedMesh, j, frameCmds);
+			loadedMesh->DrawLayer(j, cmdBuffer);
 		}
 	}
 }

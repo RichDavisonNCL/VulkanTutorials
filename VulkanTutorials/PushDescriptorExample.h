@@ -6,19 +6,16 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanTutorialRenderer.h"
+#include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-	class PushDescriptorExample : public VulkanTutorialRenderer
+	class PushDescriptorExample : public VulkanTutorial
 	{
 	public:
 		PushDescriptorExample(Window& window);
 
-		void SetupTutorial()	override;
-		void RenderFrame()		override;
-
 	protected:
-		void SetupDevice(vk::PhysicalDeviceFeatures2& deviceFeatures) override;
+		void RenderFrame(float dt) override;
 
 		VulkanPipeline		pipeline;
 

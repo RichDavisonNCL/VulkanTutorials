@@ -12,32 +12,32 @@ using namespace NCL;
 using namespace Rendering;
 using namespace Vulkan;
 
-GeometryShaderExample::GeometryShaderExample(Window& window) : VulkanTutorialRenderer(window) {
-}
+GeometryShaderExample::GeometryShaderExample(Window& window) : VulkanTutorial(window) {
+	VulkanInitialisation vkInit = DefaultInitialisation();
+	renderer = new VulkanRenderer(window, vkInit);
+	InitTutorialObjects();
 
-void GeometryShaderExample::SetupDevice(vk::PhysicalDeviceFeatures2& deviceFeatures) {
-	deviceFeatures.features.setGeometryShader(true);
-}
-
-void GeometryShaderExample::SetupTutorial() {
-	VulkanTutorialRenderer::SetupTutorial();
 	mesh = GenerateTriangle();
 
-	shader = ShaderBuilder(GetDevice())
+	FrameState const& frameState = renderer->GetFrameState();
+
+	shader = ShaderBuilder(renderer->GetDevice())
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithGeometryBinary("BasicGeom.geom.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
 	.Build("Geometry Shader!");
 
-	pipeline = PipelineBuilder(GetDevice())
-		.WithDepthAttachment(depthBuffer->GetFormat())
+	pipeline = PipelineBuilder(renderer->GetDevice())
+		.WithColourAttachment(frameState.colourFormat)
+		.WithDepthAttachment(frameState.depthFormat)
 		.WithVertexInputState(mesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::ePointList)
 		.WithShader(shader)
 	.Build("Geometry Shader Example Pipeline");
 }
 
-void GeometryShaderExample::RenderFrame() {
-	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
-	DrawMesh(frameCmds, *mesh);
+void GeometryShaderExample::RenderFrame(float dt) {
+	FrameState const& state = renderer->GetFrameState();
+	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	mesh->Draw(state.cmdBuffer);
 }

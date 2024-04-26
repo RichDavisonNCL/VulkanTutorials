@@ -6,21 +6,16 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanTutorialRenderer.h"
+#include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-	class LightingExample : public VulkanTutorialRenderer {
+	class LightingExample : public VulkanTutorial {
 	public:
 		LightingExample(Window& window);
 		~LightingExample() {}
 
-		void SetupTutorial() override;
-
-		void RenderFrame()		override;
-		void Update(float dt)	override;
-
 	protected:
-		void	BuildPipeline();
+		void RenderFrame(float dt) override;
 
 		VulkanPipeline pipeline;
 
@@ -28,12 +23,7 @@ namespace NCL::Rendering::Vulkan {
 		UniqueVulkanMesh	cubeMesh;
 
 		vk::UniqueDescriptorSet			lightDescriptor;
-		vk::UniqueDescriptorSetLayout	lightLayout;
-
 		vk::UniqueDescriptorSet			cameraPosDescriptor;
-		vk::UniqueDescriptorSetLayout	cameraPosLayout;
-
-		vk::UniqueDescriptorSetLayout	texturesLayout;
 
 		VulkanBuffer lightUniform;
 		VulkanBuffer camPosUniform;

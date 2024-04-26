@@ -13,65 +13,71 @@ using namespace Vulkan;
 
 const int PARTICLE_COUNT = 32 * 1000;
 
-AsyncComputeExample::AsyncComputeExample(Window& window) : VulkanTutorialRenderer(window) {
-	autoBeginDynamicRendering = false;
+AsyncComputeExample::AsyncComputeExample(Window& window) : VulkanTutorial(window) {
+	VulkanInitialisation vkInit = DefaultInitialisation();
+	vkInit.autoBeginDynamicRendering = false;
+	renderer = new VulkanRenderer(window, vkInit);
+	InitTutorialObjects();
+
 	frameID = 0;
-}
 
-void AsyncComputeExample::SetupTutorial() {
-	VulkanTutorialRenderer::SetupTutorial();
+	vk::Device device = renderer->GetDevice();
+	vk::DescriptorPool pool = renderer->GetDescriptorPool();
 
-	particlePositions = BufferBuilder(GetDevice(), GetMemoryAllocator())
+	particlePositions = BufferBuilder(device, renderer->GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer)
 		.Build(sizeof(Vector4) * PARTICLE_COUNT, "Particles!");
 
-	frameIDBuffer = BufferBuilder(GetDevice(), GetMemoryAllocator())
+	frameIDBuffer = BufferBuilder(device, renderer->GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer)
 		.Build(sizeof(uint32_t), "Frame ID");
 
-	dataLayout = DescriptorSetLayoutBuilder(GetDevice())
-		.WithStorageBuffers(1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eCompute)
-		.WithStorageBuffers(1, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute)
+	dataLayout = DescriptorSetLayoutBuilder(device)
+		.WithStorageBuffers(0, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eCompute)
+		.WithStorageBuffers(1, 1, vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute)
 		.Build("Compute Data"); //Get our camera matrices...
 
-	bufferDescriptor = BuildUniqueDescriptorSet(*dataLayout);
-	WriteBufferDescriptor(*bufferDescriptor, 0, vk::DescriptorType::eStorageBuffer, particlePositions);
-	WriteBufferDescriptor(*bufferDescriptor, 1, vk::DescriptorType::eStorageBuffer, frameIDBuffer);
+	bufferDescriptor = CreateDescriptorSet(device, pool, *dataLayout);
+	WriteBufferDescriptor(device,*bufferDescriptor, 0, vk::DescriptorType::eStorageBuffer, particlePositions);
+	WriteBufferDescriptor(device,*bufferDescriptor, 1, vk::DescriptorType::eStorageBuffer, frameIDBuffer);
 
 	BuildComputePipeline();
 	BuildRasterPipeline();
 
-	vk::CommandPool asyncPool = GetCommandPool(CommandBuffer::AsyncCompute);
-	asyncBuffer = CmdBufferBegin(GetDevice(), asyncPool, "Async cmds");
+	vk::CommandPool asyncPool = renderer->GetCommandPool(CommandBuffer::AsyncCompute);
+	asyncBuffer = CmdBufferBegin(device, asyncPool, "Async cmds");
 }
 
 void	AsyncComputeExample::BuildRasterPipeline() {
-	rasterShader = ShaderBuilder(GetDevice())
+	rasterShader = ShaderBuilder(renderer->GetDevice())
 		.WithVertexBinary("BasicCompute.vert.spv")
 		.WithFragmentBinary("AsyncCompute.frag.spv")
 		.Build("Shader using compute data!");
 
-	basicPipeline = PipelineBuilder(GetDevice())
+	basicPipeline = PipelineBuilder(renderer->GetDevice())
 		.WithTopology(vk::PrimitiveTopology::ePointList)
 		.WithDescriptorSetLayout(0, *dataLayout)
 		.WithShader(rasterShader)
-		.WithPushConstant(vk::ShaderStageFlagBits::eFragment, 0, sizeof(uint32_t))
 		.Build("Raster Pipeline");
 }
 
 void	AsyncComputeExample::BuildComputePipeline() {
-	computeShader = UniqueVulkanCompute(new VulkanCompute(GetDevice(), "AsyncCompute.comp.spv"));
+	computeShader = UniqueVulkanCompute(new VulkanCompute(renderer->GetDevice(), "AsyncCompute.comp.spv"));
 
-	computePipeline = ComputePipelineBuilder(GetDevice())
+	computePipeline = ComputePipelineBuilder(renderer->GetDevice())
 		.WithShader(computeShader)
 		.WithDescriptorSetLayout(0, *dataLayout)
-		.WithPushConstant(vk::ShaderStageFlagBits::eCompute, 0, sizeof(float) + sizeof(uint32_t))
 		.Build("Compute Pipeline");
 }
 
-void AsyncComputeExample::RenderFrame() {
+void AsyncComputeExample::RenderFrame(float dt) {
 	//Compute goes outside of a render pass...
-	vk::Queue		asyncQueue = GetQueue(CommandBuffer::AsyncCompute);
+
+	FrameState const& state = renderer->GetFrameState();
+	vk::DescriptorPool pool = renderer->GetDescriptorPool();
+	vk::Queue		asyncQueue = renderer->GetQueue(CommandBuffer::AsyncCompute);
+
+	vk::CommandBuffer cmdBuffer = state.cmdBuffer;
 
 	asyncQueue.waitIdle();
 
@@ -85,22 +91,24 @@ void AsyncComputeExample::RenderFrame() {
 	asyncBuffer->dispatch(PARTICLE_COUNT / 32, 1, 1);
 	CmdBufferEndSubmit(*asyncBuffer, asyncQueue);
 
-	frameCmds.pipelineBarrier(
+	cmdBuffer.pipelineBarrier(
 		vk::PipelineStageFlagBits::eComputeShader,
 		vk::PipelineStageFlagBits::eVertexShader,
 		vk::DependencyFlags(), 0, nullptr, 0, nullptr, 0, nullptr
 	);
 
-	DynamicRenderBuilder()
-		.WithColourAttachment(GetCurrentSwapView())
-		.WithRenderArea(defaultScreenRect)
-		.BeginRendering(frameCmds);
+	cmdBuffer.beginRendering(
+		DynamicRenderBuilder()
+			.WithColourAttachment(state.colourView)
+			.WithRenderArea(state.defaultScreenRect)
+			.Build()
+	);
 
-	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline);
-	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *basicPipeline.layout, 0, 1, &*bufferDescriptor, 0, nullptr);
-	frameCmds.pushConstants(*basicPipeline.layout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(uint32_t), (void*)&frameID);
-	frameCmds.draw(PARTICLE_COUNT, 1, 0, 0);
+	cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline);
+	cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *basicPipeline.layout, 0, 1, &*bufferDescriptor, 0, nullptr);
+	cmdBuffer.pushConstants(*basicPipeline.layout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(uint32_t), (void*)&frameID);
+	cmdBuffer.draw(PARTICLE_COUNT, 1, 0, 0);
 
-	frameCmds.endRendering();
+	cmdBuffer.endRendering();
 	frameID++;
 }

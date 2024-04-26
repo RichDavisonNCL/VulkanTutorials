@@ -13,48 +13,59 @@ using namespace Vulkan;
 
 const int _NumSamplers = 1024;
 
-BindlessExample::BindlessExample(Window& window) : VulkanTutorialRenderer(window){
-}
+BindlessExample::BindlessExample(Window& window) : VulkanTutorial(window){
+	VulkanInitialisation vkInit = DefaultInitialisation();
 
-void BindlessExample::SetupTutorial() {
-	VulkanTutorialRenderer::SetupTutorial();
+	static vk::PhysicalDeviceDescriptorIndexingFeatures indexingFeatures;
+	indexingFeatures.descriptorBindingUniformBufferUpdateAfterBind = true;
+	indexingFeatures.descriptorBindingSampledImageUpdateAfterBind = true;
+	indexingFeatures.descriptorBindingPartiallyBound = true;
+	indexingFeatures.descriptorBindingVariableDescriptorCount = true;
+	indexingFeatures.runtimeDescriptorArray = true;
+
+	vkInit.features.push_back(&indexingFeatures);
+
+	vkInit.deviceExtensions.emplace_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+
+	renderer = new VulkanRenderer(window, vkInit);
+	InitTutorialObjects();
+
+	FrameState const& frameState = renderer->GetFrameState();
+	vk::Device device = renderer->GetDevice();
+	vk::DescriptorPool pool = renderer->GetDescriptorPool();
+
 	camera.SetYaw(270.0f).SetPitch(-50.0f).SetPosition({-10, 24, 15});
 	textures[0] = LoadTexture("Vulkan.png");
 	textures[1] = LoadTexture("Doge.png");
 
 	cubeMesh = LoadMesh("Cube.msh");
 
-	shader = ShaderBuilder(GetDevice())
+	shader = ShaderBuilder(device)
 		.WithVertexBinary("BindlessExample.vert.spv")
 		.WithFragmentBinary("BindlessExample.frag.spv")
 		.Build("Bindless Example Shader!");
 
 	CreateBindlessDescriptorPool();
-	descriptorLayout = DescriptorSetLayoutBuilder(GetDevice())
-		.WithStorageBuffers(1, vk::ShaderStageFlagBits::eVertex)
-		.Build("Matrix Data");
 
-	bindlessLayout = DescriptorSetLayoutBuilder(GetDevice())
-		.WithSamplers(_NumSamplers, vk::ShaderStageFlagBits::eFragment)
-		.WithSamplers(_NumSamplers, vk::ShaderStageFlagBits::eFragment, vk::DescriptorBindingFlagBits::ePartiallyBound | vk::DescriptorBindingFlagBits::eVariableDescriptorCount)
+	bindlessLayout = DescriptorSetLayoutBuilder(device)
+		//.WithImageSamplers(0, _NumSamplers, vk::ShaderStageFlagBits::eFragment)
+		.WithImageSamplers(0, _NumSamplers, vk::ShaderStageFlagBits::eFragment, vk::DescriptorBindingFlagBits::ePartiallyBound | vk::DescriptorBindingFlagBits::eVariableDescriptorCount)
 		.WithCreationFlags(vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool)
 		.Build("Bindless Data");
 
-	pipeline = PipelineBuilder(GetDevice())
+	pipeline = PipelineBuilder(device)
 		.WithVertexInputState(cubeMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
+		.WithColourAttachment(frameState.colourFormat)
+		.WithDepthAttachment(frameState.depthFormat, vk::CompareOp::eLessOrEqual, true, true)
 		.WithShader(shader)
-		.WithColourAttachment(GetSurfaceFormat())
-		.WithDepthAttachment(depthBuffer->GetFormat(), vk::CompareOp::eLessOrEqual, true, true)
-		.WithDescriptorSetLayout(0, *cameraLayout)		//Camera is set 0
-		.WithDescriptorSetLayout(1, *descriptorLayout)	//All matrices are 1
 		.WithDescriptorSetLayout(2, *bindlessLayout)	//All textures Set 2
 		.Build("Bindless Pipeline");
 
-	descriptorSet	= BuildUniqueDescriptorSet(*descriptorLayout);
-	bindlessSet		= BuildUniqueDescriptorSet(*bindlessLayout, *bindlessDescriptorPool, _NumSamplers);
+	descriptorSet	= CreateDescriptorSet(device, pool, shader->GetLayout(1));
+	bindlessSet		= CreateDescriptorSet(device, *bindlessDescriptorPool, *bindlessLayout, _NumSamplers);
 
-	matrices = BufferBuilder(GetDevice(), GetMemoryAllocator())
+	matrices = BufferBuilder(device, renderer->GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer)
 		.WithHostVisibility()
 		.WithPersistentMapping()
@@ -63,23 +74,11 @@ void BindlessExample::SetupTutorial() {
 	Matrix4* mappedData = (Matrix4*)matrices.Data();
 	int axis = (int)sqrt(_NumSamplers);
 	for (int i = 0; i < _NumSamplers; ++i) {
-		mappedData[i] = Matrix4::Translation({float(i / axis), 0, float(i % axis)});
-		WriteImageDescriptor(*bindlessSet, 1, i, *textures[rand() % 2], *defaultSampler);
+		mappedData[i] = Matrix::Translation(Vector3{float(i / axis), 0, float(i % axis)});
+		WriteImageDescriptor(device , *bindlessSet, 0, i, *textures[rand() % 2], *defaultSampler);
 	}
 
-	WriteBufferDescriptor(*descriptorSet, 0, vk::DescriptorType::eStorageBuffer, matrices);
-}
-
-void BindlessExample::SetupDevice(vk::PhysicalDeviceFeatures2& deviceFeatures) {
-	static vk::PhysicalDeviceDescriptorIndexingFeatures indexingFeatures;
-	indexingFeatures.descriptorBindingUniformBufferUpdateAfterBind = true;
-	indexingFeatures.descriptorBindingSampledImageUpdateAfterBind = true;
-	indexingFeatures.descriptorBindingPartiallyBound = true;
-	indexingFeatures.descriptorBindingVariableDescriptorCount = true;
-	indexingFeatures.runtimeDescriptorArray = true;
-	deviceFeatures.setPNext((void*)&indexingFeatures);
-
-	deviceExtensions.emplace_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+	WriteBufferDescriptor(device , *descriptorSet, 0, vk::DescriptorType::eStorageBuffer, matrices);
 }
 
 void BindlessExample::CreateBindlessDescriptorPool() {
@@ -93,11 +92,13 @@ void BindlessExample::CreateBindlessDescriptorPool() {
 	poolCreate.setMaxSets(128);//how many times can we ask the pool for a descriptor set?
 	poolCreate.setFlags(vk::DescriptorPoolCreateFlagBits::eUpdateAfterBindEXT | vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
 
-	bindlessDescriptorPool = GetDevice().createDescriptorPoolUnique(poolCreate);
+	bindlessDescriptorPool = renderer->GetDevice().createDescriptorPoolUnique(poolCreate);
 }
 
-void BindlessExample::RenderFrame() {
-	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+void BindlessExample::RenderFrame(float dt) {
+	FrameState const& state = renderer->GetFrameState();
+
+	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
 	vk::DescriptorSet sets[3] = {
 		*cameraDescriptor,
@@ -105,7 +106,7 @@ void BindlessExample::RenderFrame() {
 		*bindlessSet
 	};
 
-	frameCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 3, sets, 0, nullptr);
+	state.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 3, sets, 0, nullptr);
 
-	DrawMesh(frameCmds, *cubeMesh, _NumSamplers);
+	cubeMesh->Draw(state.cmdBuffer, _NumSamplers);
 }

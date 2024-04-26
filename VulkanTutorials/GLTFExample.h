@@ -6,25 +6,23 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanTutorialRenderer.h"
+#include "VulkanTutorial.h"
 #include "../GLTFLoader/GLTFLoader.h"
 
 namespace NCL::Rendering::Vulkan {
-	class GLTFExample : public VulkanTutorialRenderer
+	class GLTFExample : public VulkanTutorial
 	{
 	public:
 		GLTFExample(Window& window);
 		~GLTFExample() {}
 
-		void SetupTutorial() override;
-
-		void RenderFrame()		override;
 	protected:
+		void RenderFrame(float dt) override;
+
 		UniqueVulkanShader shader;
 
-		GLTFLoader loader;
+		GLTFScene  scene;
 
-		vk::UniqueDescriptorSetLayout	textureLayout;
 		std::vector<std::vector<vk::UniqueDescriptorSet>>	 layerDescriptors;
 
 		std::vector < vk::UniqueDescriptorSet > layerSets;

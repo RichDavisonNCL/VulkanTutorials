@@ -6,21 +6,18 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanTutorialRenderer.h"
+#include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-    class BindlessExample : public VulkanTutorialRenderer   {
+    class BindlessExample : public VulkanTutorial   {
     public:
         BindlessExample(Window& window);
         ~BindlessExample() {}
 
-        void SetupTutorial() override;
-        void RenderFrame()		override;
-
     protected:
         void CreateBindlessDescriptorPool();
 
-        void SetupDevice(vk::PhysicalDeviceFeatures2& deviceFeatures) override;
+        void RenderFrame(float dt) override;
 
         vk::UniqueDescriptorPool		bindlessDescriptorPool;	//descriptor sets come from here! Specific placement for destructors
 
@@ -32,7 +29,7 @@ namespace NCL::Rendering::Vulkan {
         VulkanBuffer	matrices;
 
         vk::UniqueDescriptorSet			descriptorSet;
-        vk::UniqueDescriptorSetLayout	descriptorLayout;
+
 
         vk::UniqueDescriptorSet			bindlessSet;
         vk::UniqueDescriptorSetLayout	bindlessLayout;

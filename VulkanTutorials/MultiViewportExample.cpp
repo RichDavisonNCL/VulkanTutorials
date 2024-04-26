@@ -11,29 +11,35 @@ using namespace NCL;
 using namespace Rendering;
 using namespace Vulkan;
 
-MultiViewportExample::MultiViewportExample(Window& window) : VulkanTutorialRenderer(window) {
-}
+MultiViewportExample::MultiViewportExample(Window& window) : VulkanTutorial(window) {
+	VulkanInitialisation vkInit = DefaultInitialisation();
+	renderer = new VulkanRenderer(window, vkInit);
+	InitTutorialObjects();
 
-void MultiViewportExample::SetupTutorial() {
-	VulkanTutorialRenderer::SetupTutorial();
 	triMesh = GenerateTriangle();
 
-	shader = ShaderBuilder(GetDevice())
+	shader = ShaderBuilder(renderer->GetDevice())
 		.WithVertexBinary("BasicGeometry.vert.spv")
 		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.Build("Basic Shader!");
+		.Build("Basic Shader!");
 
-	pipeline = PipelineBuilder(GetDevice())
+	FrameState const& frameState = renderer->GetFrameState();
+
+	pipeline = PipelineBuilder(renderer->GetDevice())
 		.WithVertexInputState(triMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithColourAttachment(GetSurfaceFormat())
-		.WithDepthAttachment(depthBuffer->GetFormat())
+		.WithColourAttachment(frameState.colourFormat)
+		.WithDepthAttachment(frameState.depthFormat)
 		.WithShader(shader)
-	.Build("Multi Viewport Pipeline");
+		.Build("Multi Viewport Pipeline");
 }
 
-void MultiViewportExample::RenderFrame() {
-	frameCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+void MultiViewportExample::RenderFrame(float dt) {
+	FrameState const& state = renderer->GetFrameState();
+	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+
+	Vector2i windowSize = hostWindow.GetScreenSize();
+
 	for (int i = 0; i < 4; ++i) {
 		float xOffset = (float)(i % 2);
 		float yOffset = (float)(i / 2);
@@ -42,7 +48,7 @@ void MultiViewportExample::RenderFrame() {
 		float ySize = ((float)windowSize.y / 2.0f);
 
 		vk::Viewport viewport = vk::Viewport(xSize * xOffset, ySize * yOffset, xSize, ySize, 0.0f, 1.0f);
-		frameCmds.setViewport(0, 1, &viewport);
-		DrawMesh(frameCmds, *triMesh);
+		state.cmdBuffer.setViewport(0, 1, &viewport);
+		triMesh->Draw(state.cmdBuffer);
 	}
 }

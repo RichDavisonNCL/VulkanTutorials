@@ -29,8 +29,12 @@ file(GLOB_RECURSE ALL_SHADERS CONFIGURE_DEPENDS
 source_group("Shader Files" FILES ${ALL_SHADERS})
 
 set(ALL_FILES
+    ${Graphics_Techniques}
+    ${Vulkan_API}
+
     ${Header_Files}
     ${Source_Files}
+
 	${ALL_SHADERS}
 )
 
@@ -51,20 +55,11 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
     <iostream>
     <string>
     <iosfwd>
-
-    <Matrix2.h>
-    <Matrix3.h>
-    <Matrix4.h>
-
-    <Vector2.h>
-    <Vector3.h>
-    <Vector4.h>
-
-    <Vector2i.h>
-    <Vector3i.h>
-    <Vector4i.h>
+    <chrono>
 
     <Quaternion.h>
+    <Vector.h>
+    <Matrix.h>
 
     <Camera.h>
     <GameTimer.h>
@@ -87,6 +82,10 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
     <VulkanCompute.h>
     <VulkanComputePipelineBuilder.h>
 	<VulkanBufferBuilder.h>
+
+    <VulkanDescriptorSetWriter.h>
+    <VulkanDescriptorSetBinder.h>   
+    <VulkanDescriptorBufferWriter.h>
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -162,6 +161,7 @@ add_dependencies(${PROJECT_NAME}
 
 add_compile_definitions(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC)
 add_compile_definitions(VK_NO_PROTOTYPES)
+add_compile_definitions(VULKAN_HPP_NO_STRUCT_CONSTRUCTORS)
 
 target_link_libraries(${PROJECT_NAME} 
     PRIVATE ${PROJECT_DEPENDENCIES}

@@ -6,19 +6,16 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanTutorialRenderer.h"
+#include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-    class AsyncComputeExample : public VulkanTutorialRenderer
+    class AsyncComputeExample : public VulkanTutorial
     {
 	public:
 		AsyncComputeExample(Window& window);
 		~AsyncComputeExample() {}
-
-		void SetupTutorial() override;
-
 	protected:
-		virtual void RenderFrame();
+		void RenderFrame(float dt) override;
 
 		void	BuildRasterPipeline();
 		void	BuildComputePipeline();

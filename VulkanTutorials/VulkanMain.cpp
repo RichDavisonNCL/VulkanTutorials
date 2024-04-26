@@ -5,13 +5,13 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #include "../NCLCoreClasses/Window.h"
-#include "BasicDescriptorRenderer.h"
-#include "BasicTexturingRenderer.h"
-#include "BasicGeometryRenderer.h"
-#include "BasicPushConstantRenderer.h"
-#include "BasicUniformBufferRenderer.h"
-#include "BasicMultiPipelineRenderer.h"
-#include "PrerecordedCmdListRenderer.h"
+#include "DescriptorExample.h"
+#include "TexturingExample.h"
+#include "MyFirstTriangle.h"
+#include "PushConstantExample.h"
+#include "UniformBufferExample.h"
+#include "MultiPipelineExample.h"
+#include "PrerecordedCmdListExample.h"
 #include "DescriptorBufferExample.h"
 #include "PushDescriptorExample.h"
 
@@ -19,7 +19,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 #include "MultiViewportExample.h"
 
-#include "BasicComputeUsage.h"
+#include "ComputeExample.h"
 
 #include "PostProcessingExample.h"
 #include "ShadowMappingExample.h"
@@ -29,13 +29,13 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "GLTFExample.h"
 #include "BindlessExample.h"
 
-#include "BasicSkinningExample.h"
+#include "SkinningExample.h"
 
-#include "CubeMapRenderer.h"
+#include "CubeMapExample.h"
 
 #include "TessellationExample.h"
 #include "GeometryShaderExample.h"
-#include "OffsetUniformBufferRenderer.h"
+#include "OffsetUniformBufferExample.h"
 #include "ComputeSkinningExample.h"
 
 #ifdef USE_RAY_TRACING
@@ -60,61 +60,54 @@ int main() {
 	/*
 	API Functionality Tutorials
 	*/
-	//auto* renderer = new BasicGeometryRenderer(*w);	
-	//auto* renderer = new BasicPushConstantRenderer(*w);
-	//auto* renderer = new BasicDescriptorRenderer(*w);
-	//auto* renderer = new BasicTexturingRenderer(*w);
-	//auto* renderer = new BasicUniformBufferRenderer(*w);
-	////auto* renderer = new PrerecordedCmdListRenderer(*w);
-	//auto* renderer = new BasicMultiPipelineRenderer(*w);
-	//auto* renderer = new BasicComputeUsage(*w);
-	//auto* renderer = new MultiViewportExample(*w);
-	//auto* renderer = new BindlessExample(*w);
-	//auto* renderer = new DescriptorBufferExample(*w);
-	//auto* renderer = new PushDescriptorExample(*w);
-//	auto* renderer = new AsyncComputeUsage(*w);
-	//auto* renderer = new OffsetUniformBufferRenderer(*w);
+	//auto* tutorial = new MyFirstTriangle (*w);
+	//auto* tutorial = new PushConstantExample(*w);
+	//auto* tutorial = new DescriptorExample(*w);
+	//auto* tutorial = new TexturingExample(*w);
+	//auto* tutorial = new UniformBufferExample(*w);
+	////auto* tutorial = new PrerecordedCmdListRenderer(*w);
+//	auto* tutorial = new MultiPipelineExample(*w);
+	//
+	//auto* tutorial = new MultiViewportExample(*w);
+	//auto* tutorial = new BindlessExample(*w);
+	//auto* tutorial = new DescriptorBufferExample(*w);
+	//auto* tutorial = new PushDescriptorExample(*w);
+	//auto* tutorial = new OffsetUniformBufferExample(*w);
 	
 	/*
 	Rendering Technique Tutorials
 	*/
-	////auto* renderer = new PostProcessingExample(*w);
-	//auto* renderer = new ShadowMappingExample(*w);
-	//auto* renderer = new LightingExample(*w);
-	//auto* renderer = new DeferredExample(*w);
-	auto* renderer = new GLTFExample(*w);
-	//auto* renderer = new BasicSkinningExample(*w);
-	//auto* renderer = new CubeMapRenderer(*w);
+	//auto* tutorial = new PostProcessingExample(*w);
+	//auto* tutorial = new ShadowMappingExample(*w);
+	//auto* tutorial = new LightingExample(*w);
+	auto* tutorial = new DeferredExample(*w);
+	//auto* tutorial = new GLTFExample(*w);
+	//auto* tutorial = new SkinningExample(*w);
+	//auto* tutorial = new CubeMapExample(*w);
 
-	//auto* renderer = new TessellationExample(*w);
-	//auto* renderer = new GeometryShaderExample(*w);
-
-	//auto* renderer = new AsyncComputeExample(*w);
-	//auto* renderer = new ComputeSkinningExample(*w);
+	//auto* tutorial = new TessellationExample(*w);
+	//auto* tutorial = new GeometryShaderExample(*w);
+	//auto* tutorial = new ComputeExample(*w);
+	//auto* tutorial = new AsyncComputeExample(*w);
+	//auto* tutorial = new ComputeSkinningExample(*w);
 
 #ifdef USE_RAY_TRACING
 	/*
 	Ray Tracing Tutorials
 	*/
-	//auto* renderer = new TestRayTrace(*w);
-	//auto* renderer = new TestGLTFRayTrace(*w);
-	//auto* renderer = new TestRayTracedSkinning(*w);
+	//auto* tutorial = new TestRayTrace(*w);
+	//auto* tutorial = new TestGLTFRayTrace(*w);
+	//auto* tutorial = new TestRayTracedSkinning(*w);
 #endif
-
-	if (!renderer->Init()) {
-		return -1;
-	}
-	renderer->SetupTutorial();
 
 	w->LockMouseToWindow(true);
 	w->ShowOSPointer(false);
 
 	while (w->UpdateWindow() && !Window::GetKeyboard()->KeyDown(KeyCodes::ESCAPE)) {
-		renderer->Update(w->GetTimer().GetTimeDeltaSeconds());
-		renderer->Render();
+		tutorial->RunFrame(w->GetTimer().GetTimeDeltaSeconds());
 	}
 
-	delete renderer;
+	delete tutorial;
 
 	Window::DestroyGameWindow();
 }

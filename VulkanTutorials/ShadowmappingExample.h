@@ -6,27 +6,20 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanTutorialRenderer.h"
+#include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-	class ShadowMappingExample : public VulkanTutorialRenderer	{
+	class ShadowMappingExample : public VulkanTutorial	{
 	public:
 		ShadowMappingExample(Window& window);
 		~ShadowMappingExample() {}
-
-		void SetupTutorial() override;
-
-		void RenderFrame()		override;
-		void Update(float dt)	override;
-
 	protected:
-		void	BuildMainPipeline();
-		void	BuildShadowPipeline();
+		void RenderFrame(float dt) override;
 
 		void	RenderShadowMap();
 		void	RenderScene();
 
-		void DrawObjects(VulkanPipeline& toPipeline);
+		void DrawObjects(vk::CommandBuffer buffer, VulkanPipeline& pipeline);
 
 		UniqueVulkanMesh	cubeMesh;
 
@@ -40,14 +33,10 @@ namespace NCL::Rendering::Vulkan {
 
 		RenderObject	sceneObjects[2];
 
-		vk::UniqueDescriptorSetLayout shadowTexLayout;
-		vk::UniqueDescriptorSetLayout shadowMatrixLayout;
-		vk::UniqueDescriptorSetLayout diffuseLayout;
-
 		vk::UniqueDescriptorSet	sceneShadowTexDescriptor;
 		vk::UniqueDescriptorSet shadowMatrixDescriptor;
 
-		VulkanBuffer shadowMatUniform;
-		Matrix4*	shadowMatrix;
+		VulkanBuffer shadowMatBuffer;
+		Matrix4*	 shadowMatrix;
 	};
 }

@@ -6,27 +6,21 @@ Contact:richgdavison@gmail.com
 License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "VulkanTutorialRenderer.h"
+#include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-	class DeferredExample : public VulkanTutorialRenderer {
+	class DeferredExample : public VulkanTutorial {
 
 	public:
 		DeferredExample(Window& window);
 		~DeferredExample() {}
 
-		void SetupTutorial() override;
-
-		void RenderFrame()		override;
-		void Update(float dt)	override;
-		void OnWindowResize(int w, int h)	override;
-
 	protected:
+		void	RenderFrame(float dt) override;
 		void	LoadShaders();
 		void	CreateFrameBuffers(uint32_t width, uint32_t height);
-		void	BuildGBufferPipeline();
-		void	BuildLightPassPipeline();
-		void	BuildCombinePipeline();
+		void	BuildPipelines();
+
 
 		void	FillGBuffer();
 		void	RenderLights();
@@ -47,24 +41,27 @@ namespace NCL::Rendering::Vulkan {
 		UniqueVulkanMesh cubeMesh;
 		UniqueVulkanMesh quadMesh;
 
-		UniqueVulkanTexture bufferTextures[5];
+		enum ScreenTextures {
+			Albedo,
+			Normals,
+			Depth,
+			Diffuse,
+			Specular,
+			MAX_TEXTURES
+		};
+
+		enum Descriptors {
+			Lighting,
+			Combine,
+			LightState,
+			LightTexture,
+			MAX_DESCRIPTORS
+		};
+
+		UniqueVulkanTexture bufferTextures[ScreenTextures::MAX_TEXTURES];
 		UniqueVulkanTexture objectTextures[4];
 
-		vk::UniqueDescriptorSet			lightDescriptor;
-		vk::UniqueDescriptorSetLayout	lightLayout;
-
-		vk::UniqueDescriptorSetLayout	lightCameraLayout;
-
-		vk::UniqueDescriptorSetLayout	combineTextureLayout;
-		vk::UniqueDescriptorSet			combineTextureDescriptor;
-
-		vk::UniqueDescriptorSet			lightStageDescriptor;
-		vk::UniqueDescriptorSetLayout	lightStageLayout;
-		vk::UniqueDescriptorSetLayout	lightTextureLayout;
-
-		vk::UniqueDescriptorSet			lightTextureDescriptor;
-
-		vk::UniqueDescriptorSetLayout	objectTextureLayout;
+		vk::UniqueDescriptorSet	descriptors[Descriptors::MAX_DESCRIPTORS];
 
 		VulkanPipeline	gBufferPipeline;
 		VulkanPipeline	lightPipeline;
