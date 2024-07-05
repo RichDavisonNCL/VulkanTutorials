@@ -7,6 +7,3 @@
 [submodule "GLTFLoader"]
 	path = GLTFLoader
 	url = https://github.com/RichDavisonNCL/GLTFLoader
-[submodule "VulkanRayTracing"]
-	path = VulkanRayTracing
-	url = https://github.com/RichDavisonNCL/VulkanRayTracing
