@@ -7,17 +7,27 @@ License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "VulkanTutorial.h"
+#include "../GLTFLoader/GLTFLoader.h"
 
 namespace NCL::Rendering::Vulkan {
-	class MyFirstTriangle : public VulkanTutorial	{
+	class GLTFExample : public VulkanTutorial
+	{
 	public:
-		MyFirstTriangle(Window& window, VulkanInitialisation& vkInit);
-		~MyFirstTriangle() {} //Nothing to delete in this one!
+		GLTFExample(Window& window, VulkanInitialisation& vkInit);
+		~GLTFExample() {}
+
 	protected:
 		void RenderFrame(float dt) override;
 
-		UniqueVulkanMesh 	triMesh;
-		UniqueVulkanShader	shader;
-		VulkanPipeline		basicPipeline;
+		UniqueVulkanShader shader;
+
+		GLTFScene  scene;
+
+		std::vector<std::vector<vk::UniqueDescriptorSet>>	 layerDescriptors;
+
+		std::vector < vk::UniqueDescriptorSet > layerSets;
+
+		VulkanPipeline		pipeline;
 	};
 }
+

@@ -9,15 +9,25 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-	class MyFirstTriangle : public VulkanTutorial	{
+	class InlineUniformBufferExample : public VulkanTutorial {
 	public:
-		MyFirstTriangle(Window& window, VulkanInitialisation& vkInit);
-		~MyFirstTriangle() {} //Nothing to delete in this one!
+		InlineUniformBufferExample(Window& window, VulkanInitialisation& vkInit);
+		~InlineUniformBufferExample();
+
 	protected:
 		void RenderFrame(float dt) override;
+		void	UpdateCameraUniform(vk::CommandBuffer buffer);
 
 		UniqueVulkanMesh 	triMesh;
 		UniqueVulkanShader	shader;
-		VulkanPipeline		basicPipeline;
+		VulkanPipeline		pipeline;
+
+		vk::UniqueDescriptorSet			descriptorSet;
+
+		//VulkanBuffer		cameraData;
+		PerspectiveCamera	camera;
+
+		vk::UniqueDescriptorSetLayout inlineLayout;
+		//Matrix4*			cameraMemory;
 	};
 }

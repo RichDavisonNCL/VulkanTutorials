@@ -13,7 +13,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 namespace NCL::Rendering::Vulkan {
 	struct RenderObject {
 		VulkanMesh* mesh;
-		Matrix4 transform;
+		Matrix4		transform;
 		vk::UniqueDescriptorSet descriptorSet;
 	};
 
@@ -48,10 +48,16 @@ namespace NCL::Rendering::Vulkan {
 
 		virtual void RunFrame(float dt);
 
+		void WindowEventHandler(WindowEvent e, uint32_t w, uint32_t h);
+
+		static VulkanTutorial* CreateTutorial(const std::string& name, VulkanInitialisation& vkInit);
+		static VulkanInitialisation DefaultInitialisation();
+
 	protected:
 		virtual void RenderFrame(float dt) = 0;
+		virtual void OnWindowResize(uint32_t width, uint32_t height) {
 
-		VulkanInitialisation DefaultInitialisation();
+		}
 
 		void InitTutorialObjects();
 
@@ -61,7 +67,7 @@ namespace NCL::Rendering::Vulkan {
 
 		void RenderSingleObject(RenderObject& o, vk::CommandBuffer  toBuffer, VulkanPipeline& toPipeline, int descriptorSet = 0);
 
-		UniqueVulkanMesh LoadMesh(const string& filename, vk::BufferUsageFlags bufferUsage = {});
+		UniqueVulkanMesh	LoadMesh(const string& filename, vk::BufferUsageFlags bufferUsage = {});
 		UniqueVulkanTexture LoadTexture(const string& filename);
 
 		UniqueVulkanTexture LoadCubemap(
@@ -76,21 +82,42 @@ namespace NCL::Rendering::Vulkan {
 
 		VulkanInitialisation vkInit;
 		VulkanRenderer*		renderer;
-
-		PerspectiveCamera	camera;
-		VulkanBuffer		cameraBuffer;
-
-		vk::UniqueDescriptorSetLayout nullLayout;
+		NCL::Window&		hostWindow;
 
 		vk::UniqueDescriptorSet			cameraDescriptor;
 		vk::UniqueDescriptorSetLayout	cameraLayout;
 
-		vk::UniqueSampler		defaultSampler;
+		vk::UniqueDescriptorSetLayout	nullLayout;
+		vk::UniqueSampler				defaultSampler;
 
 		KeyboardMouseController controller;
-
-		NCL::Window& hostWindow;
+		PerspectiveCamera		camera;
+		VulkanBuffer			cameraBuffer;
 
 		float runTime;
+	};
+
+#define TUTORIAL_ENTRY(object) static VulkanTutorialEntry entry = VulkanTutorialEntry(#object, [](Window& w, VulkanInitialisation& vk) {return new object(w, vk); });
+
+	using TutorialEntryFunc = std::function < VulkanTutorial*(Window&, VulkanInitialisation&) >;
+	class VulkanTutorialEntry {
+	public:
+		VulkanTutorialEntry(const std::string& s, TutorialEntryFunc f) {
+			if (listStartPtr) {
+				nodeChain		= listStartPtr;
+				listStartPtr	= this;
+			}
+			else {
+				listStartPtr	= this;
+			}
+			name		= s;
+			creatorFunc = f;
+		}
+		std::string				name;
+		TutorialEntryFunc		creatorFunc;
+		VulkanTutorialEntry*	nodeChain = nullptr;
+
+		static VulkanTutorialEntry* listStartPtr;
+
 	};
 }

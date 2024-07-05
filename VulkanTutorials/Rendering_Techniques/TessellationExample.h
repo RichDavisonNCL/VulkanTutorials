@@ -7,17 +7,16 @@ License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "VulkanTutorial.h"
-
 namespace NCL::Rendering::Vulkan {
-	class MyFirstTriangle : public VulkanTutorial	{
+	class TessellationExample : public VulkanTutorial
+	{
 	public:
-		MyFirstTriangle(Window& window, VulkanInitialisation& vkInit);
-		~MyFirstTriangle() {} //Nothing to delete in this one!
+		TessellationExample(Window& window, VulkanInitialisation& vkInit);
 	protected:
 		void RenderFrame(float dt) override;
 
-		UniqueVulkanMesh 	triMesh;
+		VulkanPipeline		pipeline;
 		UniqueVulkanShader	shader;
-		VulkanPipeline		basicPipeline;
+		UniqueVulkanMesh 	mesh;
 	};
 }

@@ -9,15 +9,18 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-	class MyFirstTriangle : public VulkanTutorial	{
-	public:
-		MyFirstTriangle(Window& window, VulkanInitialisation& vkInit);
-		~MyFirstTriangle() {} //Nothing to delete in this one!
-	protected:
-		void RenderFrame(float dt) override;
+    class MultiViewportExample : public VulkanTutorial
+    {
+    public:
+        MultiViewportExample(Window& window, VulkanInitialisation& vkInit);
+        ~MultiViewportExample() {}
 
-		UniqueVulkanMesh 	triMesh;
-		UniqueVulkanShader	shader;
-		VulkanPipeline		basicPipeline;
-	};
+    protected:
+        void RenderFrame(float dt) override;
+
+        UniqueVulkanMesh    triMesh;
+        UniqueVulkanShader  shader;
+        VulkanPipeline	    pipeline;
+    };
 }
+

@@ -13,6 +13,8 @@ using namespace NCL;
 using namespace Rendering;
 using namespace Vulkan;
 
+VulkanTutorialEntry* VulkanTutorialEntry::listStartPtr = nullptr;
+
 VulkanTutorial::VulkanTutorial(Window& window) : hostWindow(window), controller(*window.GetKeyboard(), *window.GetMouse()) {
 	runTime			= 0.0f;
 
@@ -82,6 +84,9 @@ void VulkanTutorial::UpdateCamera(float dt) {
 }
 
 void VulkanTutorial::RunFrame(float dt) {
+	if (hostWindow.IsMinimised()) {
+		return;
+	}
 	Update(dt);
 
 	renderer->BeginFrame();
@@ -89,6 +94,11 @@ void VulkanTutorial::RunFrame(float dt) {
 	renderer->EndFrame();
 	renderer->SwapBuffers();
 };
+
+void VulkanTutorial::WindowEventHandler(WindowEvent e, uint32_t w, uint32_t h) {
+	renderer->OnWindowResize(w, h);
+	OnWindowResize(w, h);
+}
 
 void VulkanTutorial::UploadCameraUniform() {
 	Matrix4* cameraMatrices = (Matrix4*)cameraBuffer.Data();
@@ -146,8 +156,8 @@ UniqueVulkanMesh VulkanTutorial::LoadMesh(const string& filename, vk::BufferUsag
 
 UniqueVulkanTexture VulkanTutorial::LoadTexture(const string& filename) {
 	return TextureBuilder(renderer->GetDevice(), renderer->GetMemoryAllocator())
-		.UsingPool(renderer->GetCommandPool(CommandBuffer::Graphics))
-		.UsingQueue(renderer->GetQueue(CommandBuffer::Graphics))
+		.UsingPool(renderer->GetCommandPool(CommandType::Graphics))
+		.UsingQueue(renderer->GetQueue(CommandType::Graphics))
 		.BuildFromFile(filename);
 }
 
@@ -158,8 +168,8 @@ UniqueVulkanTexture VulkanTutorial::LoadCubemap(
 	const std::string& debugName) {
 
 	return TextureBuilder(renderer->GetDevice(), renderer->GetMemoryAllocator())
-		.UsingPool(renderer->GetCommandPool(CommandBuffer::Graphics))
-		.UsingQueue(renderer->GetQueue(CommandBuffer::Graphics))
+		.UsingPool(renderer->GetCommandPool(CommandType::Graphics))
+		.UsingQueue(renderer->GetQueue(CommandType::Graphics))
 		.BuildCubemapFromFile(negativeXFile, positiveXFile,
 			negativeYFile, positiveYFile,
 			negativeZFile, positiveZFile,
@@ -195,6 +205,7 @@ VulkanInitialisation VulkanTutorial::DefaultInitialisation() {
 	vkInit.deviceExtensions.push_back("VK_KHR_depth_stencil_resolve");	//Now in core 1.2
 	vkInit.deviceExtensions.push_back("VK_KHR_create_renderpass2");		//Now in core 1.2
 	vkInit.deviceExtensions.push_back("VK_KHR_synchronization2");		//Now in core 1.2
+	vkInit.deviceExtensions.push_back("VK_EXT_robustness2");
 	vkInit.deviceExtensions.emplace_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
 
 	vkInit.instanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
@@ -248,4 +259,16 @@ VulkanInitialisation VulkanTutorial::DefaultInitialisation() {
 //#endif
 
 	return vkInit;
+}
+
+VulkanTutorial* VulkanTutorial::CreateTutorial(const std::string& name, VulkanInitialisation& vkInit) {
+	VulkanTutorialEntry* e = VulkanTutorialEntry::listStartPtr;
+
+	while (e) {
+		if (e->name == name) {
+			return e->creatorFunc(*NCL::Window::GetWindow(), vkInit);
+		}
+		e = e->nodeChain;
+	}
+	return nullptr;
 }

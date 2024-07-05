@@ -9,15 +9,25 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-	class MyFirstTriangle : public VulkanTutorial	{
+	class PushDescriptorExample : public VulkanTutorial
+	{
 	public:
-		MyFirstTriangle(Window& window, VulkanInitialisation& vkInit);
-		~MyFirstTriangle() {} //Nothing to delete in this one!
+		PushDescriptorExample(Window& window, VulkanInitialisation& vkInit);
+
 	protected:
 		void RenderFrame(float dt) override;
 
+		VulkanPipeline		pipeline;
+
 		UniqueVulkanMesh 	triMesh;
 		UniqueVulkanShader	shader;
-		VulkanPipeline		basicPipeline;
+
+		VulkanBuffer		uniformData[2];
+
+		vk::UniqueDescriptorSetLayout	descriptorLayout;
+
+		Vector4	colourUniform;
+		Vector4 positionUniform;
 	};
 }
+
