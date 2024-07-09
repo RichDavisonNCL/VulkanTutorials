@@ -9,9 +9,9 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-	class TexturingExample : public VulkanTutorial	{
+	class MultiTexturingExample : public VulkanTutorial	{
 	public:
-		TexturingExample(Window& window, VulkanInitialisation& vkInit);
+		MultiTexturingExample(Window& window, VulkanInitialisation& vkInit);
 	protected:
 		void RenderFrame(float dt) override;
 
@@ -19,7 +19,7 @@ namespace NCL::Rendering::Vulkan {
 
 		UniqueVulkanShader	shader;
 		UniqueVulkanMesh 		mesh;
-		UniqueVulkanTexture	textures[2];
+		UniqueVulkanTexture	textures[4];
 
 		vk::UniqueDescriptorSet			descriptorSets[2];
 	};

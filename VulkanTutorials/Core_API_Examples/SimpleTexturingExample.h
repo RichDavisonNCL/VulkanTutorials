@@ -9,13 +9,11 @@ License: MIT (see LICENSE file at the top of the source tree)
 #include "VulkanTutorial.h"
 
 namespace NCL::Rendering::Vulkan {
-	class TextureUploadExample : public VulkanTutorial	{
+	class SimpleTexturingExample : public VulkanTutorial	{
 	public:
-		TextureUploadExample(Window& window, VulkanInitialisation& vkInit);
+		SimpleTexturingExample(Window& window, VulkanInitialisation& vkInit);
 	protected:
 		void RenderFrame(float dt) override;
-
-		void UploadTexture(vk::CommandBuffer buffer);
 
 		VulkanPipeline	pipeline;
 
@@ -24,7 +22,5 @@ namespace NCL::Rendering::Vulkan {
 		UniqueVulkanTexture	texture;
 
 		vk::UniqueDescriptorSet			descriptorSet;
-
-		VulkanBuffer stagingBuffer;
 	};
 }
