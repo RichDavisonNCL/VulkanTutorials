@@ -25,7 +25,7 @@ find_package(Vulkan REQUIRED)
 set(ASSET_ROOT "${CMAKE_SOURCE_DIR}/Assets/" CACHE STRING "" FORCE)
 add_compile_definitions(ASSETROOTLOCATION="${ASSET_ROOT}") 
 
-set(ADD_RAY_TRACING CACHE BOOL FALSE)
+set(ADD_RAY_TRACING CACHE BOOL TRUE)
 
 if(MSVC)
     add_compile_definitions("VK_USE_PLATFORM_WIN32_KHR") 

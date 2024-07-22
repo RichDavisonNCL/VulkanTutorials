@@ -65,9 +65,9 @@ int main() {
 	//auto* tutorial = new DescriptorExample(*w);
 	//auto* tutorial = new TexturingExample(*w);
 	//auto* tutorial = new UniformBufferExample(*w);
-	////auto* tutorial = new PrerecordedCmdListRenderer(*w);
-//	auto* tutorial = new MultiPipelineExample(*w);
-	//
+	//auto* tutorial = new PrerecordedCmdListRenderer(*w);
+    //auto* tutorial = new MultiPipelineExample(*w);
+	
 	//auto* tutorial = new MultiViewportExample(*w);
 	//auto* tutorial = new BindlessExample(*w);
 	//auto* tutorial = new DescriptorBufferExample(*w);
@@ -80,7 +80,7 @@ int main() {
 	//auto* tutorial = new PostProcessingExample(*w);
 	//auto* tutorial = new ShadowMappingExample(*w);
 	//auto* tutorial = new LightingExample(*w);
-	auto* tutorial = new DeferredExample(*w);
+	//auto* tutorial = new DeferredExample(*w);
 	//auto* tutorial = new GLTFExample(*w);
 	//auto* tutorial = new SkinningExample(*w);
 	//auto* tutorial = new CubeMapExample(*w);
@@ -96,7 +96,7 @@ int main() {
 	Ray Tracing Tutorials
 	*/
 	//auto* tutorial = new TestRayTrace(*w);
-	//auto* tutorial = new TestGLTFRayTrace(*w);
+	auto* tutorial = new TestGLTFRayTrace(*w);
 	//auto* tutorial = new TestRayTracedSkinning(*w);
 #endif
 
