@@ -16,6 +16,23 @@ namespace NCL::Rendering::Vulkan {
 	using UniqueVulkanRTShader = std::unique_ptr<VulkanRTShader>;
 	using SharedVulkanRTShader = std::shared_ptr<VulkanRTShader>;
 
+	struct SceneNodeDes
+	{
+		uint32_t nodeID = 0;
+		std::vector<uint32_t> matLayerId;
+
+		SceneNodeDes(uint32_t inMeshId, const std::vector<uint32_t>& inMatLayerId)
+		{
+			nodeID = inMeshId;
+			matLayerId = inMatLayerId;
+		}
+
+		SceneNodeDes(uint32_t inMeshId)
+		{
+			nodeID = inMeshId;
+		}
+	};
+
 	class TestGLTFRayTrace : public VulkanTutorial	{
 	public:
 		TestGLTFRayTrace(Window& window);
@@ -64,6 +81,9 @@ namespace NCL::Rendering::Vulkan {
 		vk::UniqueDescriptorSetLayout	defaultSamplerLayout;
 		vk::UniqueDescriptorSet		  defaultSamplerDescriptor;
 
+		vk::UniqueDescriptorSetLayout	dSamplerLayout;
+		vk::UniqueDescriptorSet		  dSamplerDescriptor;
+
 		UniqueVulkanRTShader	hitShader2;
 
 		vk::UniqueDescriptorSetLayout	texCordBufferLayout;
@@ -83,5 +103,28 @@ namespace NCL::Rendering::Vulkan {
 		vk::UniqueDescriptorSetLayout	indicesBufferLayout;
 		vk::UniqueDescriptorSet			indicesBufferDescriptor;
 		VulkanBuffer	indicesBuffer;
+
+		vk::UniqueDescriptorSetLayout	sceneDesBufferLayout;
+		vk::UniqueDescriptorSet			sceneDesBufferDescriptor;
+		VulkanBuffer	sceneDesBuffer;
+
+		void SceneDesBufferBuild(vk::Device& device, vk::DescriptorPool& pool);
+
+		/// <summary>
+		/// Buffer to store texturemap and material layer map in a big array
+		/// </summary>
+		vk::UniqueDescriptorSetLayout	textureBufferLayout;
+		vk::UniqueDescriptorSet			textureDescriptor;
+		VulkanBuffer	textureMapBuffer;
+
+		//vk::UniqueDescriptorSetLayout	matLayerBufferLayout;
+		//vk::UniqueDescriptorSet			matLayerDescriptor;
+		//VulkanBuffer	matLayerBuffer;
+
+		template <typename T>
+		void TextureMatlayerBufferBuild( vk::UniqueDescriptorSetLayout& outDesSetLayout, vk::UniqueDescriptorSet& outDesSet,
+			VulkanBuffer& outBuffer, vk::Device& device, vk::DescriptorPool& pool, std::vector<T>& inData, const bool& inIsImage);
+
+		//--------------------------------------------------------------------------------------------------
 	};
 }

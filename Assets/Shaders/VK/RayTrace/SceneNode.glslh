@@ -1,0 +1,20 @@
+struct SceneNodeDes
+{
+  uint nodeID;
+  uint matLayerId[12];
+};
+
+struct Texture 
+{
+    ivec2 dimensions; // Equivalent to Vector2i in C++
+    uint assetID;     // Equivalent to uint32_t in C++
+};
+
+struct GLTFMaterialLayer 
+{
+    int albedoId;
+    int bumpId;
+    int occlusionId;
+    int emissionId;
+    int metallicId;
+};

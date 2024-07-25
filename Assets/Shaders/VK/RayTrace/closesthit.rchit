@@ -11,26 +11,37 @@ License: MIT (see LICENSE file at the top of the source tree)
 #extension GL_ARB_shading_language_420pack	: enable
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_ray_tracing_position_fetch : require
+#extension GL_EXT_nonuniform_qualifier : enable
 
 #include "RayStructs.glslh"
+#include "SceneNode.glslh"
 
 layout(location = 0) rayPayloadInEXT BasicPayload payload;
-layout(binding  = 0, set = 4) uniform  sampler2D tex1; //Default Sampler descriptor
+//layout(binding  = 0, set = 4) uniform  sampler2D tex1; //Default Sampler descriptor
 
-layout(binding = 1, set = 5) buffer VertexPositionBuffer 
-{
-    vec3 positions[];
-} vertexPositionBuffer;
+// layout(binding = 1, set = 5) buffer VertexPositionBuffer 
+// {
+//     vec3 positions[];
+// } vertexPositionBuffer;
 
-layout(binding = 1, set = 6) buffer VertexTexCordBuffer 
+layout(binding = 1, set = 4) buffer VertexTexCordBuffer 
 {
     vec2 textureCoords[];
 } vertexTexCoords;
 
-layout(binding = 1, set = 7) buffer IndexBuffer 
+layout(binding = 1, set = 5) buffer IndexBuffer 
 {
     int indices[];
 } indicesBuffer;
+
+layout(binding  = 2, set = 6) uniform  texture2D textureMap[]; //Default Sampler descriptor
+layout(binding  = 2, set = 7) uniform sampler mySampler; //Default Sampler descriptor
+
+
+// layout(binding = 1, set = 9) buffer MatlayerBuffer 
+// {
+//     GLTFMaterialLayer matLayerList[];
+// } matlayerBuffer;
 
 hitAttributeEXT vec2 hitBarycentrics;
 void main() 
@@ -53,8 +64,12 @@ void main()
                                 w * texCoord2;
 
     // Sample the texture
-    vec3 textureColor = texture(tex1, interpolatedTexCoord).xyz;
-
+    //vec3 textureColor = texture(tex1, interpolatedTexCoord).xyz;
+    vec3 textureColor;
+    textureColor = texture(sampler2D(textureMap[4], mySampler), interpolatedTexCoord).xyz;
+    if(gl_PrimitiveID < 75)
+        textureColor = texture(sampler2D(textureMap[gl_PrimitiveID], mySampler), interpolatedTexCoord).xyz;
+    
     // Set the ray payload to the sampled texture color
     payload.hitValue = textureColor;
 }
