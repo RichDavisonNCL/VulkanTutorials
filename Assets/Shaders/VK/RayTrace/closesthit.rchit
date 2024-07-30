@@ -19,23 +19,30 @@ License: MIT (see LICENSE file at the top of the source tree)
 layout(location = 0) rayPayloadInEXT BasicPayload payload;
 //layout(binding  = 0, set = 4) uniform  sampler2D tex1; //Default Sampler descriptor
 
-// layout(binding = 1, set = 5) buffer VertexPositionBuffer 
-// {
-//     vec3 positions[];
-// } vertexPositionBuffer;
-
-layout(binding = 1, set = 4) buffer VertexTexCordBuffer 
+layout(binding = 0, set = 4) buffer VertexPositionBuffer 
 {
-    vec2 textureCoords[];
-} vertexTexCoords;
+    vec3 positions[];
+} vertexPositionBuffer;
 
-layout(binding = 1, set = 5) buffer IndexBuffer 
+layout(binding = 1, set = 4) buffer IndexBuffer 
 {
     int indices[];
 } indicesBuffer;
 
-layout(binding  = 2, set = 6) uniform  texture2D textureMap[]; //Default Sampler descriptor
-layout(binding  = 2, set = 7) uniform sampler mySampler; //Default Sampler descriptor
+layout(binding = 2, set = 4) buffer VertexTexCordBuffer 
+{
+    vec2 textureCoords[];
+} vertexTexCoords;
+
+layout(binding = 3, set = 4) buffer VertexNormalBuffer 
+{
+    vec3 normals[];
+} vertexNormals;
+
+
+
+//layout(binding  = 0, set = 6) uniform  texture2D textureMap[]; //Default Sampler descriptor
+// layout(binding  = 2, set = 7) uniform sampler mySampler; //Default Sampler descriptor
 
 
 // layout(binding = 1, set = 9) buffer MatlayerBuffer 
@@ -55,6 +62,10 @@ void main()
     vec2 texCoord1 = vertexTexCoords.textureCoords[index1];
     vec2 texCoord2 = vertexTexCoords.textureCoords[index2];
 
+    vec3 nomralCoord0 = vertexNormals.normals[index0];
+    vec3 nomralCoord1 = vertexNormals.normals[index1];
+    vec3 nomralCoord2 = vertexNormals.normals[index2];
+
 	// Calculate the third barycentric coordinate
     float w = 1.0 - hitBarycentrics.x - hitBarycentrics.y;
 
@@ -65,11 +76,11 @@ void main()
 
     // Sample the texture
     //vec3 textureColor = texture(tex1, interpolatedTexCoord).xyz;
-    vec3 textureColor;
-    textureColor = texture(sampler2D(textureMap[4], mySampler), interpolatedTexCoord).xyz;
-    if(gl_PrimitiveID < 75)
-        textureColor = texture(sampler2D(textureMap[gl_PrimitiveID], mySampler), interpolatedTexCoord).xyz;
+    // vec3 textureColor;
+    // textureColor = texture(sampler2D(textureMap[4], mySampler), interpolatedTexCoord).xyz;
+    // if(gl_PrimitiveID < 75)
+    //     textureColor = texture(sampler2D(textureMap[gl_PrimitiveID], mySampler), interpolatedTexCoord).xyz;
     
     // Set the ray payload to the sampled texture color
-    payload.hitValue = textureColor;
+    payload.hitValue = nomralCoord0;
 }

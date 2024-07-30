@@ -86,23 +86,15 @@ namespace NCL::Rendering::Vulkan {
 
 		UniqueVulkanRTShader	hitShader2;
 
-		vk::UniqueDescriptorSetLayout	texCordBufferLayout;
-		vk::UniqueDescriptorSet			texCordBufferDescriptor;
+		vk::UniqueDescriptorSetLayout rtSceneBufferLayout;
+		vk::UniqueDescriptorSet			rtSceneBufferDescriptor;
 		VulkanBuffer	texCordBuffer;
-
-		vk::UniqueDescriptorSetLayout	vertexPositionBufferLayout;
-		vk::UniqueDescriptorSet			vertexPositionBufferDescriptor;
 		VulkanBuffer	vertexPositionBuffer;
-		template <typename T>
-		void BuildVertexBuffer(vk::UniqueDescriptorSetLayout& outDesSetLayout, vk::UniqueDescriptorSet& outDesSet,
-			VulkanBuffer&	outBuffer,   vk::Device& device, vk::DescriptorPool& pool, VertexAttribute::Type inAttribute,
-			const std::string& inDescriptorSetLayoutDebugName, const std::string& inBufferDebugName);
-		void BuildVertexIndexBuffer(vk::UniqueDescriptorSetLayout& outDesSetLayout, vk::UniqueDescriptorSet& outDesSet,
-			VulkanBuffer& outBuffer, vk::Device& device, vk::DescriptorPool& pool,const std::string& inDescriptorSetLayoutDebugName, const std::string& inBufferDebugName);
-
-		vk::UniqueDescriptorSetLayout	indicesBufferLayout;
-		vk::UniqueDescriptorSet			indicesBufferDescriptor;
+		VulkanBuffer	vertexNormalBuffer;
 		VulkanBuffer	indicesBuffer;
+
+		void BuildVertexBuffer(vk::UniqueDescriptorSetLayout& inDesSetLayout, vk::UniqueDescriptorSet& outDesSet, vk::Device& device, vk::DescriptorPool& pool);
+
 
 		vk::UniqueDescriptorSetLayout	sceneDesBufferLayout;
 		vk::UniqueDescriptorSet			sceneDesBufferDescriptor;
