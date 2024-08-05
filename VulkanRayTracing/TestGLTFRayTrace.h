@@ -33,6 +33,24 @@ namespace NCL::Rendering::Vulkan {
 		}
 	};
 
+	struct MaterialLayer 
+	{
+		int albedoId{ -1 };
+		int bumpId{ -1 };
+		int occlusionId{ -1 };
+		int emissionId{ -1 };
+		int metallicId{ -1 };
+
+		MaterialLayer(const GLTFMaterialLayer& inMatLayer)
+		{
+			albedoId = inMatLayer.albedoId;
+			bumpId = inMatLayer.bumpId;
+			occlusionId = inMatLayer.occlusionId;
+			emissionId = inMatLayer.emissionId;
+			metallicId = inMatLayer.metallicId;
+		}
+	};
+
 	class TestGLTFRayTrace : public VulkanTutorial	{
 	public:
 		TestGLTFRayTrace(Window& window);
@@ -92,31 +110,18 @@ namespace NCL::Rendering::Vulkan {
 		VulkanBuffer	vertexPositionBuffer;
 		VulkanBuffer	vertexNormalBuffer;
 		VulkanBuffer	indicesBuffer;
-
-		void BuildVertexBuffer(vk::UniqueDescriptorSetLayout& inDesSetLayout, vk::UniqueDescriptorSet& outDesSet, vk::Device& device, vk::DescriptorPool& pool);
-
-
-		vk::UniqueDescriptorSetLayout	sceneDesBufferLayout;
-		vk::UniqueDescriptorSet			sceneDesBufferDescriptor;
-		VulkanBuffer	sceneDesBuffer;
-
-		void SceneDesBufferBuild(vk::Device& device, vk::DescriptorPool& pool);
-
 		/// <summary>
 		/// Buffer to store texturemap and material layer map in a big array
 		/// </summary>
-		vk::UniqueDescriptorSetLayout	textureBufferLayout;
-		vk::UniqueDescriptorSet			textureDescriptor;
 		VulkanBuffer	textureMapBuffer;
 
-		//vk::UniqueDescriptorSetLayout	matLayerBufferLayout;
-		//vk::UniqueDescriptorSet			matLayerDescriptor;
-		//VulkanBuffer	matLayerBuffer;
+		VulkanBuffer	matLayerBuffer;
+		void BuildVertexBuffer(vk::UniqueDescriptorSetLayout& inDesSetLayout, vk::UniqueDescriptorSet& outDesSet, vk::Device& device, vk::DescriptorPool& pool);
 
-		template <typename T>
-		void TextureMatlayerBufferBuild( vk::UniqueDescriptorSetLayout& outDesSetLayout, vk::UniqueDescriptorSet& outDesSet,
-			VulkanBuffer& outBuffer, vk::Device& device, vk::DescriptorPool& pool, std::vector<T>& inData, const bool& inIsImage);
 
+		VulkanBuffer	sceneDesBuffer;
+
+		void SceneDesBufferBuild(vk::Device& device, vk::DescriptorPool& pool);
 		//--------------------------------------------------------------------------------------------------
 	};
 }

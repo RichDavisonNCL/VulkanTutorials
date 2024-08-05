@@ -39,7 +39,7 @@ VulkanBVHBuilder& VulkanBVHBuilder::WithObject(VulkanMesh* m, const Matrix4& tra
 	entry.meshID	= meshID;
 	entry.hitID		= hitID;
 	entry.mask		= mask;
-
+	entry.sbtRecordOffset = hitID;
 	entries.push_back(entry);
 
 	return *this;
@@ -237,7 +237,7 @@ void VulkanBVHBuilder::BuildTLAS(vk::Device device, VmaAllocator allocator, vk::
 
 		tlasEntries[i].flags = (VkGeometryInstanceFlagBitsKHR)vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable;
 		tlasEntries[i].mask = entries[i].mask;
-		tlasEntries[i].instanceShaderBindingTableRecordOffset = entries[i].hitID;
+		tlasEntries[i].instanceShaderBindingTableRecordOffset = entries[i].sbtRecordOffset;
 	}
 
 	size_t dataSize = instanceCount * sizeof(vk::AccelerationStructureInstanceKHR);

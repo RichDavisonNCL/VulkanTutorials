@@ -16,6 +16,7 @@ namespace NCL::Rendering::Vulkan {
 		uint32_t	meshID;
 		uint32_t	hitID;
 		uint32_t	mask;
+		uint32_t sbtRecordOffset;
 	};
 					
 	struct BLASEntry {
@@ -28,7 +29,6 @@ namespace NCL::Rendering::Vulkan {
 		std::vector<vk::AccelerationStructureGeometryKHR>		geometries;
 		std::vector<uint32_t> maxPrims;
 	};
-
 	class VulkanBVHBuilder	{
 	public:
 		VulkanBVHBuilder();

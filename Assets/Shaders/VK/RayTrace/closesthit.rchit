@@ -39,48 +39,72 @@ layout(binding = 3, set = 4) buffer VertexNormalBuffer
     vec3 normals[];
 } vertexNormals;
 
+layout(binding  = 4, set = 4) uniform  texture2D textureMap[]; //Default Sampler descriptor
+layout(binding = 5, set = 4) buffer MatlayerBuffer 
+{
+    GLTFMaterialLayer matLayerList[];
+} matlayerBuffer;
 
+layout(binding = 6, set = 4) buffer PrimInfoBuffer 
+{
+    GLTFPrimInfo primeInfoList[];
+} primeInfoBuffer;
 
-//layout(binding  = 0, set = 6) uniform  texture2D textureMap[]; //Default Sampler descriptor
-// layout(binding  = 2, set = 7) uniform sampler mySampler; //Default Sampler descriptor
-
-
-// layout(binding = 1, set = 9) buffer MatlayerBuffer 
-// {
-//     GLTFMaterialLayer matLayerList[];
-// } matlayerBuffer;
+layout(binding  = 0, set = 5) uniform sampler mySampler; //Default Sampler descriptor
 
 hitAttributeEXT vec2 hitBarycentrics;
 void main() 
 {
-	uint index0 = indicesBuffer.indices[gl_PrimitiveID * 3 + 0];
-    uint index1 = indicesBuffer.indices[gl_PrimitiveID * 3 + 1];
-    uint index2 = indicesBuffer.indices[gl_PrimitiveID * 3 + 2];
 
-	// Fetch the texture coordinates of the hit triangle's vertices
-    vec2 texCoord0 = vertexTexCoords.textureCoords[index0];
-    vec2 texCoord1 = vertexTexCoords.textureCoords[index1];
-    vec2 texCoord2 = vertexTexCoords.textureCoords[index2];
+    // Retrieve the Primitive mesh buffer information
+    // gl_InstanceCustomIndexEXT we are setting it as mesh ID check sample
+    GLTFPrimInfo pinfo = primeInfoBuffer.primeInfoList[gl_InstanceCustomIndexEXT + gl_GeometryIndexEXT];
 
-    vec3 nomralCoord0 = vertexNormals.normals[index0];
-    vec3 nomralCoord1 = vertexNormals.normals[index1];
-    vec3 nomralCoord2 = vertexNormals.normals[index2];
+    // Getting the 'first index' for this mesh (offset of the mesh + offset of the triangle)
+    uint indexOffset  = pinfo.indexOffset + (3 * gl_PrimitiveID);
+    uint vertexOffset = pinfo.vertexOffset; 
+    uint matIndex     = max(0, pinfo.materialLayerID);  // material of primitive mesh
+    GLTFMaterialLayer material = matlayerBuffer.matLayerList[matIndex];
+  
+    ivec3 index = ivec3(
+        indicesBuffer.indices[0 + indexOffset],
+        indicesBuffer.indices[1 + indexOffset],
+        indicesBuffer.indices[2 + indexOffset]);
+    index += ivec3(vertexOffset);
 
-	// Calculate the third barycentric coordinate
-    float w = 1.0 - hitBarycentrics.x - hitBarycentrics.y;
+    const vec3 barycentrics = vec3(
+        1 - hitBarycentrics.x - hitBarycentrics.y,
+        hitBarycentrics.x,
+        hitBarycentrics.y);// (w,u,v)
 
-    // Interpolate the texture coordinates using barycentric coordinates
-    vec2 interpolatedTexCoord = hitBarycentrics.x * texCoord0 +
-                                hitBarycentrics.y * texCoord1 +
-                                w * texCoord2;
+    const vec2 uv0 = vertexTexCoords.textureCoords[index.x];
+    const vec2 uv1 = vertexTexCoords.textureCoords[index.y];
+    const vec2 uv2 = vertexTexCoords.textureCoords[index.z];
 
-    // Sample the texture
-    //vec3 textureColor = texture(tex1, interpolatedTexCoord).xyz;
-    // vec3 textureColor;
-    // textureColor = texture(sampler2D(textureMap[4], mySampler), interpolatedTexCoord).xyz;
-    // if(gl_PrimitiveID < 75)
-    //     textureColor = texture(sampler2D(textureMap[gl_PrimitiveID], mySampler), interpolatedTexCoord).xyz;
-    
-    // Set the ray payload to the sampled texture color
-    payload.hitValue = nomralCoord0;
+    // Vertex of the triangle
+    const vec3 pos0 = vertexPositionBuffer.positions[index.x];
+    const vec3 pos1 = vertexPositionBuffer.positions[index.y];
+    const vec3 pos2 = vertexPositionBuffer.positions[index.z];
+
+    // Normal
+    const vec3 nrm0 = vertexNormals.normals[index.x];
+    const vec3 nrm1 = vertexNormals.normals[index.y];
+    const vec3 nrm2 = vertexNormals.normals[index.z];
+
+    //https://computergraphics.stackexchange.com/questions/7738/how-to-assign-calculate-triangle-texture-coordinates
+    const vec2 texCoord = (uv0 * barycentrics.x) +
+                          (uv1 * barycentrics.y) +
+                          (uv2 * barycentrics.z);
+
+
+    const vec3 position = pos0 * barycentrics.x + pos1 * barycentrics.y + pos2 * barycentrics.z;
+    const vec3 world_position = vec3(gl_ObjectToWorldEXT * vec4(position, 1.0));
+
+    const vec3 normal = normalize(nrm0 * barycentrics.x + nrm1 * barycentrics.y + nrm2 * barycentrics.z);
+    const vec3 world_normal = normalize(vec3(normal * gl_WorldToObjectEXT));
+    const vec3 geom_normal  = normalize(cross(pos1 - pos0, pos2 - pos0));
+
+    vec3 textureColor = texture(sampler2D(textureMap[material.albedoId], mySampler), texCoord).xyz;
+    vec3 normalTexture = texture(sampler2D(textureMap[material.bumpId], mySampler), texCoord).xyz;
+    payload.hitValue = textureColor;
 }

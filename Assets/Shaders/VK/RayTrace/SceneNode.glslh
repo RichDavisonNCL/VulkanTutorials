@@ -1,7 +1,8 @@
-struct SceneNodeDes
+struct GLTFPrimInfo
 {
-  uint nodeID;
-  uint matLayerId[12];
+  uint vertexOffset;
+  uint indexOffset;
+  int materialLayerID;
 };
 
 struct Texture 

@@ -65,8 +65,8 @@ TestGLTFRayTrace::TestGLTFRayTrace(Window& window) : VulkanTutorial(window) {
 	vk::DescriptorPool pool = renderer->GetDescriptorPool();
 
 	GLTFLoader::Load("Sponza/Sponza.gltf", scene);
-	GLTFLoader::Load("CesiumMan/CesiumMan.gltf",scene);
-	GLTFLoader::Load("DamagedHelmet/DamagedHelmet.gltf", scene);
+	//GLTFLoader::Load("CesiumMan/CesiumMan.gltf",scene);
+	//GLTFLoader::Load("DamagedHelmet/DamagedHelmet.gltf", scene);
 
 	for (const auto& m : scene.meshes) {
 		VulkanMesh* loadedMesh = (VulkanMesh*)m.get();
@@ -104,7 +104,7 @@ TestGLTFRayTrace::TestGLTFRayTrace(Window& window) : VulkanTutorial(window) {
 		.Build("Default Sampler");
 
 	dSamplerLayout = DescriptorSetLayoutBuilder(device)
-		.WithSamplers(2, 1)
+		.WithSamplers(0, 1)
 		.Build("D Sampler!");
 
 	BuildTlas(device);
@@ -127,11 +127,13 @@ TestGLTFRayTrace::TestGLTFRayTrace(Window& window) : VulkanTutorial(window) {
 		.WithStorageBuffers(1, 1, vk::ShaderStageFlagBits::eClosestHitKHR) //Index
 		.WithStorageBuffers(2, 1, vk::ShaderStageFlagBits::eClosestHitKHR) //Tex Corrd
 		.WithStorageBuffers(3, 1, vk::ShaderStageFlagBits::eClosestHitKHR) //Normal Corrd
+		.WithSampledImages(4, scene.textures.size(), vk::ShaderStageFlagBits::eClosestHitKHR) //Textre Array
+		.WithStorageBuffers(5, 1, vk::ShaderStageFlagBits::eClosestHitKHR) //Material Layer Buffer
+		.WithStorageBuffers(6, 1, vk::ShaderStageFlagBits::eClosestHitKHR) //SceneNode Buffer
 		.Build("Vertex Buffer Descriptor Set Layout  Build.");
+
 	BuildVertexBuffer(rtSceneBufferLayout, rtSceneBufferDescriptor, device, pool);
-	//SceneDesBufferBuild(device, pool);
-	TextureMatlayerBufferBuild<SharedTexture>(textureBufferLayout, textureDescriptor, textureMapBuffer, device, pool, scene.textures,true);
-	//TextureMatlayerBufferBuild<GLTFMaterialLayer>(matLayerBufferLayout, matLayerDescriptor, matLayerBuffer, device, pool, scene.materialLayers,false);
+	SceneDesBufferBuild(device, pool);
 
 	Vector2i windowSize = hostWindow.GetScreenSize();
 
@@ -170,10 +172,8 @@ TestGLTFRayTrace::TestGLTFRayTrace(Window& window) : VulkanTutorial(window) {
 		.WithDescriptorSetLayout(1, *cameraLayout)
 		.WithDescriptorSetLayout(2, *inverseCamLayout)
 		.WithDescriptorSetLayout(3, *imageLayout)
-		.WithDescriptorSetLayout(4, *rtSceneBufferLayout);
-		//.WithDescriptorSetLayout(6, *textureBufferLayout)
-		//.WithDescriptorSetLayout(7, *dSamplerLayout);
-		//.WithDescriptorSetLayout(9, *matLayerBufferLayout);
+		.WithDescriptorSetLayout(4, *rtSceneBufferLayout)
+		.WithDescriptorSetLayout(5, *dSamplerLayout);
 
 	rtPipeline = rtPipeBuilder.Build("RT Pipeline");
 
@@ -210,7 +210,7 @@ TestGLTFRayTrace::TestGLTFRayTrace(Window& window) : VulkanTutorial(window) {
 }
 
 void NCL::Rendering::Vulkan::TestGLTFRayTrace::BuildTlas(const vk::Device& device)
-{
+{   
 	for (const auto& mesh : scene.meshes) {
 		VulkanMesh* vkMesh = (VulkanMesh*)mesh.get();
 		bvhBuilder.WithObject(vkMesh, Matrix::Translation(Vector3{ 0,0,0 }) * Matrix::Scale(Vector3{ 1,1,1 }));
@@ -229,6 +229,7 @@ TestGLTFRayTrace::~TestGLTFRayTrace() {
 
 void TestGLTFRayTrace::RenderFrame(float dt) {
 	hostWindow.SetTitle(std::to_string(1.0f / dt));
+
 	Matrix4* inverseMatrixData = (Matrix4*)inverseMatrices.Data();
 
 	inverseMatrixData[0] = Matrix::Inverse(camera.BuildViewMatrix());
@@ -244,7 +245,8 @@ void TestGLTFRayTrace::RenderFrame(float dt) {
 		*cameraDescriptor,			//Set 1
 		*inverseCamDescriptor,		//Set 2
 		*imageDescriptor,			//Set 3
-		*rtSceneBufferDescriptor    //Set 4
+		*rtSceneBufferDescriptor,   //Set 4
+		*dSamplerDescriptor			//Set 5
 	};
 
 	cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eRayTracingKHR, *rtPipeline.layout, 0, sets.size(), sets.data(), 0, nullptr);
@@ -284,31 +286,15 @@ void TestGLTFRayTrace::RenderFrame(float dt) {
 
 void NCL::Rendering::Vulkan::TestGLTFRayTrace::SceneDesBufferBuild(vk::Device& device, vk::DescriptorPool& pool)
 {
-	std::vector<SceneNodeDes> sceneDataList;
-
-	for (const auto& node : scene.sceneNodes) 
-	{
-		if (node.mesh == nullptr || node.material == nullptr) continue;
-		if (node.allLayerIndex.size() == 0) continue;
-
-		sceneDataList.emplace_back(SceneNodeDes(node.nodeID, node.allLayerIndex));
-	}
-
-	sceneDesBufferLayout = DescriptorSetLayoutBuilder(device)
-		.WithStorageBuffers(1, 1, vk::ShaderStageFlagBits::eClosestHitKHR)
-		.Build("Scene Description Buffer Layout Creation");
-
-	sceneDesBufferDescriptor = CreateDescriptorSet(device, pool, *sceneDesBufferLayout);
-
 	sceneDesBuffer = BufferBuilder(device, renderer->GetMemoryAllocator())
 		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddressKHR)
 		.WithHostVisibility()
 		.WithPersistentMapping()
-		.Build(sizeof(SceneNodeDes) * sceneDataList.size(), "Scene Description Buffer Creation");
+		.Build(sizeof(GLTFPrimInfo) * scene.primeInfoList.size(), "Scene Primitive Description Buffer Creation");
 
-	sceneDesBuffer.CopyData(sceneDataList.data(), sizeof(SceneNodeDes) * sceneDataList.size());
+	sceneDesBuffer.CopyData(scene.primeInfoList.data(), sizeof(GLTFPrimInfo) * scene.primeInfoList.size());
 
-	WriteBufferDescriptor(device, *sceneDesBufferDescriptor, 1, vk::DescriptorType::eStorageBuffer, sceneDesBuffer);
+	WriteBufferDescriptor(device, *rtSceneBufferDescriptor, 6, vk::DescriptorType::eStorageBuffer, sceneDesBuffer);
 }
 
 void NCL::Rendering::Vulkan::TestGLTFRayTrace::BuildVertexBuffer(vk::UniqueDescriptorSetLayout& inDesSetLayout, vk::UniqueDescriptorSet& outDesSet, vk::Device& device, vk::DescriptorPool& pool)
@@ -317,6 +303,8 @@ void NCL::Rendering::Vulkan::TestGLTFRayTrace::BuildVertexBuffer(vk::UniqueDescr
 	std::vector<unsigned int> indexList;
 	std::vector<Vector2> texCoordDataList;
 	std::vector<Vector3> normalDataList;
+	std::vector<vk::DescriptorImageInfo> tempImageInfoList(scene.textures.size());
+	std::vector<MaterialLayer> matLayerList;
 
 	for (const auto& mesh : scene.meshes) 
 	{
@@ -361,54 +349,34 @@ void NCL::Rendering::Vulkan::TestGLTFRayTrace::BuildVertexBuffer(vk::UniqueDescr
 	WriteBufferDescriptor(device, *outDesSet, 1, vk::DescriptorType::eStorageBuffer, indicesBuffer);
 	WriteBufferDescriptor(device, *outDesSet, 2, vk::DescriptorType::eStorageBuffer, texCordBuffer);
 	WriteBufferDescriptor(device, *outDesSet, 3, vk::DescriptorType::eStorageBuffer, vertexNormalBuffer);
-}
 
-template<typename T>
-void NCL::Rendering::Vulkan::TestGLTFRayTrace::TextureMatlayerBufferBuild(vk::UniqueDescriptorSetLayout& outDesSetLayout, vk::UniqueDescriptorSet& outDesSet, VulkanBuffer& outBuffer, vk::Device& device, vk::DescriptorPool& pool, std::vector<T>& inData, const bool& inIsImage)
-{
-	if (inIsImage)
+
+	for (size_t i = 0; i < scene.textures.size(); i++)
 	{
-		outDesSetLayout = DescriptorSetLayoutBuilder(device)
-			.WithSampledImages(0, scene.textures.size(), vk::ShaderStageFlagBits::eClosestHitKHR)
-			.Build("Texture Sampled Images");
-
-		outDesSet = CreateDescriptorSet(device, pool, *outDesSetLayout);
-		std::vector<vk::DescriptorImageInfo> tempImageInfoList(scene.textures.size());
-
-		for (size_t i = 0; i < scene.textures.size(); i++)
-		{
-			tempImageInfoList[i].sampler = defaultSampler.get();
-			tempImageInfoList[i].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-			std::shared_ptr<VulkanTexture> tempVkTex = std::dynamic_pointer_cast<VulkanTexture>(scene.textures[i]);
-			tempImageInfoList[i].imageView = tempVkTex.get()->GetDefaultView();
-		}
-		
-		vk::WriteDescriptorSet tempDesSet{
-			.dstSet = outDesSet.get(),
-			.dstBinding = 0,
-			.dstArrayElement = 0,
-			.descriptorCount = static_cast<uint32_t>(scene.textures.size()),
-			.descriptorType = vk::DescriptorType::eSampledImage
-		};
-
-		WriteDescriptor(device, tempDesSet, tempImageInfoList);
-	
-		return;
+		tempImageInfoList[i].sampler = defaultSampler.get();
+		tempImageInfoList[i].imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+		std::shared_ptr<VulkanTexture> tempVkTex = std::dynamic_pointer_cast<VulkanTexture>(scene.textures[i]);
+		tempImageInfoList[i].imageView = tempVkTex.get()->GetDefaultView();
 	}
 
-	outDesSetLayout = DescriptorSetLayoutBuilder(device)
-			.WithStorageBuffers(1, 1, vk::ShaderStageFlagBits::eClosestHitKHR)
-			.Build("Texture Buffer Layout Creation");
+	vk::WriteDescriptorSet tempDesSet{
+		.dstSet = outDesSet.get(),
+		.dstBinding = 4,
+		.dstArrayElement = 0,
+		.descriptorCount = static_cast<uint32_t>(scene.textures.size()),
+		.descriptorType = vk::DescriptorType::eSampledImage
+	};
 
-	outDesSet = CreateDescriptorSet(device, pool, *outDesSetLayout);
+	WriteDescriptor(device, tempDesSet, tempImageInfoList);
 
-	outBuffer = BufferBuilder(device, renderer->GetMemoryAllocator())
-			.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddressKHR)
-			.WithHostVisibility()
-			.WithPersistentMapping()
-			.Build(sizeof(T) * inData.size(), "Texture Buffer Buffer Creation");
+	for (const auto& i : scene.materialLayers)
+		matLayerList.emplace_back(MaterialLayer(i));
 
-	outBuffer.CopyData(inData.data(), sizeof(T) * inData.size());
-	WriteBufferDescriptor(device, *outDesSet, 1, vk::DescriptorType::eStorageBuffer, outBuffer);
-
+	matLayerBuffer = BufferBuilder(device, renderer->GetMemoryAllocator())
+		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddressKHR)
+		.WithHostVisibility()
+		.WithPersistentMapping()
+		.Build(sizeof(MaterialLayer) * matLayerList.size(), "Material Buffer");
+	matLayerBuffer.CopyData(matLayerList.data(), sizeof(MaterialLayer) * matLayerList.size());
+	WriteBufferDescriptor(device, *outDesSet, 5, vk::DescriptorType::eStorageBuffer, matLayerBuffer);
 }
