@@ -1,12 +1,9 @@
 [submodule "VulkanRendering"]
 	path = VulkanRendering
-	url = https://github.com/RichDavisonNCL/VulkanRendering
+	url = https://github.com/TheBossBaby47/VulkanRendering
 [submodule "NCLCoreClasses"]
 	path = NCLCoreClasses
-	url = https://github.com/RichDavisonNCL/NCLCoreClasses
+	url = https://github.com/TheBossBaby47/NCLCoreClasses
 [submodule "GLTFLoader"]
 	path = GLTFLoader
-	url = https://github.com/RichDavisonNCL/GLTFLoader
-[submodule "VulkanRayTracing"]
-	path = VulkanRayTracing
-	url = https://github.com/RichDavisonNCL/VulkanRayTracing
+	url = https://github.com/TheBossBaby47/GLTFLoader
