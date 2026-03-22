@@ -14,82 +14,83 @@ using namespace Vulkan;
 
 TUTORIAL_ENTRY(ComputeSkinningExample)
 
-ComputeSkinningExample::ComputeSkinningExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window)
+ComputeSkinningExample::ComputeSkinningExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit)
 {
-	vkInit.autoBeginDynamicRendering = false;
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+	m_vkInit.autoBeginDynamicRendering = false;
+	Initialise();
 
-	FrameState const& frameState = renderer->GetFrameState();
-	vk::Device device = renderer->GetDevice();
-	vk::DescriptorPool pool = renderer->GetDescriptorPool();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
 	GLTFLoader::Load("CesiumMan/CesiumMan.gltf",scene);
 
-	camera.SetPitch(0.0f)
+	m_camera.SetPitch(0.0f)
 		.SetYaw(200)
 		.SetPosition({ 0, 0, -2 })
 		.SetFarPlane(5000.0f);
 
 	VulkanMesh* mesh = (VulkanMesh*)scene.meshes[0].get();
-	mesh->UploadToGPU(renderer);
+	UploadMeshWait(*mesh, vk::BufferUsageFlagBits::eStorageBuffer);
 
-	textureLayout = DescriptorSetLayoutBuilder(device)
+	textureLayout = DescriptorSetLayoutBuilder(context.device)
 		.WithImageSamplers(0, 1, vk::ShaderStageFlagBits::eFragment)
 		.Build("Object Textures");
 
-	for (const auto& m : scene.materials) {	//Build descriptors for each mesh and its sublayers
+	for (const auto& m : scene.meshMaterials) {	//Build descriptors for each mesh and its sublayers
 		layerDescriptors.push_back({});
 		std::vector<vk::UniqueDescriptorSet>& matSet = layerDescriptors.back();
-		for (const auto& l : m.allLayers) {
-			matSet.push_back(CreateDescriptorSet(device, pool, *textureLayout));
-			WriteImageDescriptor(device , *matSet.back(), 0,((VulkanTexture*)l.albedo.get())->GetDefaultView(), *defaultSampler);
+		for (const auto& l : m.layers) {
+			GLTFMaterial& layer = scene.materials[l];
+			matSet.push_back(CreateDescriptorSet(context.device, context.descriptorPool, *textureLayout));
+			WriteCombinedImageDescriptor(context.device, *matSet.back(), 0,((VulkanTexture*)layer.albedo.get())->GetDefaultView(), *m_defaultSampler);
 		}
 	}
 
-	drawShader = ShaderBuilder(device)
-		.WithVertexBinary("SimpleVertexTransform.vert.spv")
-		.WithFragmentBinary("SingleTexture.frag.spv")
-	.Build("Texturing Shader");
-
-	drawPipeline = PipelineBuilder(device)
+	drawPipeline = PipelineBuilder(context.device)
 		.WithVertexInputState(mesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShader(drawShader)
-		.WithColourAttachment(frameState.colourFormat)
-		.WithDepthAttachment(frameState.depthFormat, vk::CompareOp::eLessOrEqual, true, true)
-		.WithDescriptorSetLayout(0,*cameraLayout)	//Camera is set 0
+		.WithShaderBinary("SimpleVertexTransform.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("SingleTexture.frag.spv", vk::ShaderStageFlagBits::eFragment)
+		.WithColourAttachment(context.colourFormat)
+		.WithDepthAttachment(context.depthFormat, vk::CompareOp::eLessOrEqual, true, true)
+		.WithDescriptorSetLayout(0,*m_cameraLayout)	//Camera is set 0
 		.WithDescriptorSetLayout(1,*textureLayout)  //Textures are set 1
 	.Build("Main Scene Pipeline");
 
 	int matCount = scene.meshes[0]->GetJointCount();
 
-	jointsBuffer = BufferBuilder(device, renderer->GetMemoryAllocator())
-		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer)
-		.WithHostVisibility()
-		.Build(sizeof(Matrix4) * matCount, "Joint Matrices");
+	jointsBuffer = m_memoryManager->CreateBuffer(
+		{
+			.size	= sizeof(Matrix4) * matCount,
+			.usage	= vk::BufferUsageFlagBits::eStorageBuffer
+		},
+		vk::MemoryPropertyFlagBits::eHostVisible,
+		"Joint Matrices"
+	);
 
-	computeLayout = DescriptorSetLayoutBuilder(device)
+	computeLayout = DescriptorSetLayoutBuilder(context.device)
 		.WithStorageBuffers(0, 1, vk::ShaderStageFlagBits::eCompute) //0: In positions
 		.WithStorageBuffers(1, 1, vk::ShaderStageFlagBits::eCompute) //1: In weights
 		.WithStorageBuffers(2, 1, vk::ShaderStageFlagBits::eCompute) //2: In indices
 		.WithStorageBuffers(3, 1, vk::ShaderStageFlagBits::eCompute) //3: Out positions
 		.WithStorageBuffers(4, 1, vk::ShaderStageFlagBits::eCompute) //4: joint Matrices
-		.Build("Compute Data"); //Get our camera matrices...
+		.Build("Compute Data"); //Get our m_camera matrices...
 
-	computeDescriptor = CreateDescriptorSet(device , pool,  *computeLayout);
+	computeDescriptor = CreateDescriptorSet(context.device, context.descriptorPool,  *computeLayout);
 
-	skinShader = UniqueVulkanCompute(new VulkanCompute(device, "ComputeSkinning.comp.spv"));
-
-	computePipeline = ComputePipelineBuilder(device)
-		.WithShader(skinShader)
+	computePipeline = ComputePipelineBuilder(context.device)
+		.WithShaderBinary("ComputeSkinning.comp.spv")
 		.WithDescriptorSetLayout(0, *computeLayout)
 		.Build("Async Skinning");
 
-	outputVertices = BufferBuilder(device, renderer->GetMemoryAllocator())
-		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer)
-		.WithBufferUsage(vk::BufferUsageFlagBits::eVertexBuffer)
-		.Build(sizeof(Vector3) * mesh->GetVertexCount(), "Transformed Positions");
+	outputVertices = m_memoryManager->CreateBuffer(
+		{
+				.size	= sizeof(Vector3) * mesh->GetVertexCount(),
+				.usage	=	vk::BufferUsageFlagBits::eStorageBuffer |
+							vk::BufferUsageFlagBits::eVertexBuffer
+		},
+		vk::MemoryPropertyFlagBits::eDeviceLocal,
+		"Transformed Positions"
+	);
 
 	const vk::PipelineVertexInputStateCreateInfo& meshInfo = mesh->GetVertexInputState();
 
@@ -101,13 +102,13 @@ ComputeSkinningExample::ComputeSkinningExample(Window& window, VulkanInitialisat
 	vk::Format weightFormat;
 	vk::Format indexFormat;
 
-	uint32_t vertexOffset = 0;
-	uint32_t weightOffset = 0;
-	uint32_t indexOffset = 0;
+	uint32_t vertexOffset	= 0;
+	uint32_t weightOffset	= 0;
+	uint32_t indexOffset	= 0;
 
-	uint32_t vertexRange = 0;
-	uint32_t weightRange = 0;
-	uint32_t indexRange = 0;
+	uint32_t vertexRange	= 0;
+	uint32_t weightRange	= 0;
+	uint32_t indexRange		= 0;
 
 	if (!mesh->GetAttributeInformation(VertexAttribute::Positions, vertexBuffer, vertexOffset, vertexRange, vertexFormat) ||
 		!mesh->GetAttributeInformation(VertexAttribute::JointWeights, weightBuffer, weightOffset, weightRange, weightFormat) ||
@@ -116,31 +117,25 @@ ComputeSkinningExample::ComputeSkinningExample(Window& window, VulkanInitialisat
 		//??
 	}
 
-	WriteBufferDescriptor(device, *cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
+	WriteBufferDescriptor(context.device, *m_cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, m_cameraBuffer);
 
-	WriteBufferDescriptor(device, *computeDescriptor, 0, vk::DescriptorType::eStorageBuffer, vertexBuffer, vertexOffset, vertexRange);
-	WriteBufferDescriptor(device, *computeDescriptor, 1, vk::DescriptorType::eStorageBuffer, weightBuffer, weightOffset, weightRange);
-	WriteBufferDescriptor(device, *computeDescriptor, 2, vk::DescriptorType::eStorageBuffer, indexBuffer, indexOffset, indexRange);
-	WriteBufferDescriptor(device, *computeDescriptor, 3, vk::DescriptorType::eStorageBuffer, outputVertices);
-	WriteBufferDescriptor(device, *computeDescriptor, 4, vk::DescriptorType::eStorageBuffer, jointsBuffer);
+	WriteBufferDescriptor(context.device, *computeDescriptor, 0, vk::DescriptorType::eStorageBuffer, vertexBuffer, vertexOffset, vertexRange);
+	WriteBufferDescriptor(context.device, *computeDescriptor, 1, vk::DescriptorType::eStorageBuffer, weightBuffer, weightOffset, weightRange);
+	WriteBufferDescriptor(context.device, *computeDescriptor, 2, vk::DescriptorType::eStorageBuffer, indexBuffer, indexOffset, indexRange);
+	WriteBufferDescriptor(context.device, *computeDescriptor, 3, vk::DescriptorType::eStorageBuffer, outputVertices);
+	WriteBufferDescriptor(context.device, *computeDescriptor, 4, vk::DescriptorType::eStorageBuffer, jointsBuffer);
 
-	computeSemaphore = device.createSemaphoreUnique({});
-	vk::CommandPool asyncPool	= renderer->GetCommandPool(CommandType::AsyncCompute);
-	vk::CommandPool gfxPool		= renderer->GetCommandPool(CommandType::Graphics);
-	asyncCmds  = CmdBufferCreate(device, asyncPool, "Async cmds");
-	renderCmds = CmdBufferCreate(device, gfxPool, "Gfx cmds");
-
-}
-
-ComputeSkinningExample::~ComputeSkinningExample() {
-	renderer->GetDevice().waitIdle();
+	computeSemaphore = context.device.createSemaphoreUnique({});
+	asyncCmds  = CmdBufferCreate(context.device, context.commandPools[CommandType::AsyncCompute], "Async cmds");
+	renderCmds = CmdBufferCreate(context.device, context.commandPools[CommandType::Graphics], "Gfx cmds");
 }
 
 void ComputeSkinningExample::RenderFrame(float dt) {
-	VulkanMesh* mesh = (VulkanMesh*)scene.meshes[0].get();
+	FrameContext const& context = m_renderer->GetFrameContext();
+	vk::Queue	asyncQueue	= context.queues[CommandType::AsyncCompute];
+	vk::Queue	gfxQueue	= context.queues[CommandType::Graphics];
 
-	vk::Queue		asyncQueue	= renderer->GetQueue(CommandType::AsyncCompute);
-	vk::Queue		gfxQueue	= renderer->GetQueue(CommandType::Graphics);
+	VulkanMesh* mesh = (VulkanMesh*)scene.meshes[0].get();
 
 	frameTime -= dt;
 
@@ -172,7 +167,7 @@ void ComputeSkinningExample::RenderFrame(float dt) {
 	////Now to render the mesh!
 	CmdBufferResetBegin(renderCmds);
 	renderCmds->bindPipeline(vk::PipelineBindPoint::eGraphics, drawPipeline);
-	renderCmds->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *drawPipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
+	renderCmds->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *drawPipeline.layout, 0, 1, &*m_cameraDescriptor, 0, nullptr);
 
 	Matrix4 modelMatrix;
 	renderCmds->pushConstants(*drawPipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(Matrix4), (void*)&modelMatrix);
@@ -184,7 +179,7 @@ void ComputeSkinningExample::RenderFrame(float dt) {
 	vk::DeviceSize offset = 0;
 	renderCmds->bindVertexBuffers(0, 1, &outputVertices.buffer, &offset);
 
-	renderer->BeginDefaultRendering(*renderCmds);
+	m_renderer->BeginRenderToScreen(*renderCmds);
 
 	for (unsigned int j = 0; j < mesh->GetSubMeshCount(); ++j) {
 		renderCmds->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *drawPipeline.layout, 1, 1, &*set[j], 0, nullptr);

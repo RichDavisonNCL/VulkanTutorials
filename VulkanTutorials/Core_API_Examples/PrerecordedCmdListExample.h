@@ -12,7 +12,7 @@ namespace NCL::Rendering::Vulkan {
 	class PrerecordedCmdListExample : public VulkanTutorial	{
 	public:
 		PrerecordedCmdListExample(Window& window, VulkanInitialisation& vkInit);
-		~PrerecordedCmdListExample();
+		~PrerecordedCmdListExample() = default;
 
 //		void SetupTutorial() override;
 
@@ -22,7 +22,6 @@ namespace NCL::Rendering::Vulkan {
 		void BuildPipeline();
 		VulkanPipeline		pipeline;
 
-		UniqueVulkanMesh		triMesh;
 		UniqueVulkanShader		shader;
 
 		vk::CommandBuffer	recordedBuffer;

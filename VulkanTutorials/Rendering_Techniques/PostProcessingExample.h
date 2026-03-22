@@ -13,21 +13,12 @@ namespace NCL::Rendering::Vulkan {
 	public:
 		PostProcessingExample(Window& window, VulkanInitialisation& vkInit);
 		~PostProcessingExample() {}
-
-//		void SetupTutorial() override;
-
-		//void RenderFrame()		override;	
+	
 	protected:
-		void	BuildMainPipeline();
-		void	BuildProcessPipeline();
 
-		UniqueVulkanMesh gridMesh;
-		UniqueVulkanMesh quadMesh;
+		void RenderFrame(float dt) override;
 
 		UniqueVulkanTexture postTexture;
-
-		UniqueVulkanShader gridShader;
-		UniqueVulkanShader invertShader;
 
 		vk::UniqueSampler	sceneSampler;
 		vk::UniqueSampler	processSampler;

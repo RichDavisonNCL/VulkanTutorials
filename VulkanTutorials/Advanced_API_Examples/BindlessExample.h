@@ -15,21 +15,15 @@ namespace NCL::Rendering::Vulkan {
         ~BindlessExample() {}
 
     protected:
-        void CreateBindlessDescriptorPool();
-
         void RenderFrame(float dt) override;
-
-        vk::UniqueDescriptorPool		bindlessDescriptorPool;	//descriptor sets come from here! Specific placement for destructors
 
         VulkanPipeline	    pipeline;
 
         UniqueVulkanMesh 	cubeMesh;
-        UniqueVulkanShader	shader;
 
         VulkanBuffer	matrices;
 
         vk::UniqueDescriptorSet			descriptorSet;
-
 
         vk::UniqueDescriptorSet			bindlessSet;
         vk::UniqueDescriptorSetLayout	bindlessLayout;

@@ -19,9 +19,6 @@ namespace NCL::Rendering::Vulkan {
 
 		VulkanPipeline pipeline;
 
-		UniqueVulkanShader	lightingShader;
-		UniqueVulkanMesh	cubeMesh;
-
 		vk::UniqueDescriptorSet			lightDescriptor;
 		vk::UniqueDescriptorSet			cameraPosDescriptor;
 

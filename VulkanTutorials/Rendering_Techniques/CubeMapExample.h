@@ -16,17 +16,12 @@ namespace NCL::Rendering::Vulkan {
 		~CubeMapExample() {}
 	protected:
 		void RenderFrame(float dt) override;
-		UniqueVulkanMesh		quadMesh;
-		UniqueVulkanMesh		sphereMesh;
 
-		UniqueVulkanShader		skyboxShader;
 		VulkanPipeline			skyboxPipeline;
-
-		UniqueVulkanShader		objectShader;
 		VulkanPipeline			objectPipeline;
 
 		UniqueVulkanTexture		cubeTex;
-		VulkanBuffer			camPosUniform; 
+		VulkanBuffer			camPosUniform;
 
 		vk::UniqueDescriptorSet	cubemapDescriptor;
 		vk::UniqueDescriptorSet	cameraPosDescriptor;

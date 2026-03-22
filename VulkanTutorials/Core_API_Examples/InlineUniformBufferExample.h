@@ -12,22 +12,18 @@ namespace NCL::Rendering::Vulkan {
 	class InlineUniformBufferExample : public VulkanTutorial {
 	public:
 		InlineUniformBufferExample(Window& window, VulkanInitialisation& vkInit);
-		~InlineUniformBufferExample();
+		~InlineUniformBufferExample() = default;
 
 	protected:
 		void RenderFrame(float dt) override;
 		void	UpdateCameraUniform(vk::CommandBuffer buffer);
 
-		UniqueVulkanMesh 	triMesh;
-		UniqueVulkanShader	shader;
 		VulkanPipeline		pipeline;
 
 		vk::UniqueDescriptorSet			descriptorSet;
 
-		//VulkanBuffer		cameraData;
 		PerspectiveCamera	camera;
 
 		vk::UniqueDescriptorSetLayout inlineLayout;
-		//Matrix4*			cameraMemory;
 	};
 }

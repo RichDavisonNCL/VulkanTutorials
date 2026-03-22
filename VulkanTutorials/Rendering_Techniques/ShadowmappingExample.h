@@ -21,11 +21,6 @@ namespace NCL::Rendering::Vulkan {
 
 		void DrawObjects(vk::CommandBuffer buffer, VulkanPipeline& pipeline);
 
-		UniqueVulkanMesh	cubeMesh;
-
-		UniqueVulkanShader	shadowFillShader;
-		UniqueVulkanShader	shadowUseShader;
-
 		VulkanPipeline	shadowPipeline;
 		VulkanPipeline	scenePipeline;
 

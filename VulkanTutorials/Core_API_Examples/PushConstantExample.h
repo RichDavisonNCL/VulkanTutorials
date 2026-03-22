@@ -12,13 +12,10 @@ namespace NCL::Rendering::Vulkan {
 	class PushConstantExample : public VulkanTutorial {
 	public:
 		PushConstantExample(Window& window, VulkanInitialisation& vkInit);
-		~PushConstantExample() {}
+		~PushConstantExample() = default;
 
 	protected:
 		void RenderFrame(float dt) override;
-
-		UniqueVulkanMesh	triMesh;
-		UniqueVulkanShader	shader;
 
 		VulkanPipeline	pipeline;
 

@@ -12,15 +12,12 @@ namespace NCL::Rendering::Vulkan {
 	class DescriptorExample : public VulkanTutorial	{
 	public:
 		DescriptorExample(Window& window, VulkanInitialisation& vkInit);
-		~DescriptorExample() {}
+		~DescriptorExample() = default;
 
 	protected:
 		void RenderFrame(float dt) override;
 
 		VulkanPipeline	pipeline;
-
-		UniqueVulkanMesh 		triMesh;
-		UniqueVulkanShader	shader;
 
 		VulkanBuffer	uniformData[2];
 

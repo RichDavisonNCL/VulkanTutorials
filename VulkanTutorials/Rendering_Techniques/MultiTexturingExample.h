@@ -17,7 +17,6 @@ namespace NCL::Rendering::Vulkan {
 
 		VulkanPipeline	pipeline;
 
-		UniqueVulkanShader	shader;
 		UniqueVulkanMesh 		mesh;
 		UniqueVulkanTexture	textures[4];
 

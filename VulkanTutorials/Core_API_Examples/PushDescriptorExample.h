@@ -13,18 +13,14 @@ namespace NCL::Rendering::Vulkan {
 	{
 	public:
 		PushDescriptorExample(Window& window, VulkanInitialisation& vkInit);
+		~PushDescriptorExample() = default;
 
 	protected:
 		void RenderFrame(float dt) override;
 
 		VulkanPipeline		pipeline;
 
-		UniqueVulkanMesh 	triMesh;
-		UniqueVulkanShader	shader;
-
-		VulkanBuffer		uniformData[2];
-
-		vk::UniqueDescriptorSetLayout	descriptorLayout;
+		VulkanBuffer	uniformData[2];
 
 		Vector4	colourUniform;
 		Vector4 positionUniform;

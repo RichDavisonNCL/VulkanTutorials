@@ -16,8 +16,6 @@ namespace NCL::Rendering::Vulkan {
 	protected:
 		void RenderFrame(float dt) override;
 
-		UniqueVulkanMesh 	triMesh;
-		UniqueVulkanShader	shader;
-		VulkanPipeline		basicPipeline;
+		VulkanPipeline		pipeline;
 	};
 }

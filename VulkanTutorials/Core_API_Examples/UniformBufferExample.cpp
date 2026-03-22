@@ -13,38 +13,35 @@ using namespace Vulkan;
 
 TUTORIAL_ENTRY(UniformBufferExample)
 
-UniformBufferExample::UniformBufferExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window)	{
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+UniformBufferExample::UniformBufferExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit)	{
+	Initialise();
 
-	triMesh = GenerateTriangle();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	shader = ShaderBuilder(renderer->GetDevice())
-		.WithVertexBinary("BasicUniformBuffer.vert.spv")
-		.WithFragmentBinary("BasicUniformBuffer.frag.spv")
-		.Build("Basic Uniform Buffer Usage!");
-
-	cameraData = BufferBuilder(renderer->GetDevice(), renderer->GetMemoryAllocator())
-		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
-		.WithHostVisibility()
-		.Build(sizeof(Matrix4) * 2, "Camera Data");
+	cameraData = m_memoryManager->CreateBuffer(
+		{
+			.size	= sizeof(Matrix4) * 2,
+			.usage	= vk::BufferUsageFlagBits::eUniformBuffer
+		},
+		vk::MemoryPropertyFlagBits::eHostVisible,
+		"Camera Data"
+	);
 
 	cameraMemory = (Matrix4*)cameraData.Map();
 	camera.SetPosition({ 0,0,10 });
 
-	FrameState const& frameState = renderer->GetFrameState();
-
-	pipeline = PipelineBuilder(renderer->GetDevice())
-		.WithVertexInputState(triMesh->GetVertexInputState())
+	pipeline = PipelineBuilder(context.device)
+		.WithVertexInputState(m_triangleMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShader(shader)
-		.WithColourAttachment(frameState.colourFormat)
-		.WithDepthAttachment(frameState.depthFormat)
+		.WithShaderBinary("BasicUniformBuffer.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("BasicUniformBuffer.frag.spv", vk::ShaderStageFlagBits::eFragment)
+		.WithColourAttachment(context.colourFormat)
+		.WithDepthAttachment(context.depthFormat)
 		.Build("UBO Pipeline");
 
-	descriptorSet = CreateDescriptorSet(renderer->GetDevice(), renderer->GetDescriptorPool(), shader->GetLayout(0));
+	descriptorSet = CreateDescriptorSet(context.device, context.descriptorPool, pipeline.GetSetLayout(0));
 
-	WriteBufferDescriptor(renderer->GetDevice() , *descriptorSet, 0, vk::DescriptorType::eUniformBuffer, cameraData);
+	WriteBufferDescriptor(context.device , *descriptorSet, 0, vk::DescriptorType::eUniformBuffer, cameraData);
 }
 
 UniformBufferExample::~UniformBufferExample() {
@@ -52,22 +49,22 @@ UniformBufferExample::~UniformBufferExample() {
 }
 
 void UniformBufferExample::RenderFrame(float dt) {
-	FrameState const& state = renderer->GetFrameState();
+	FrameContext const& context = m_renderer->GetFrameContext();
 	camera.UpdateCamera(dt);
 
-	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
 	UpdateCameraUniform();
 
-	state.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*descriptorSet, 0, nullptr);
+	context.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*descriptorSet, 0, nullptr);
 
-	triMesh->Draw(state.cmdBuffer);
+	m_triangleMesh->Draw(context.cmdBuffer);
 }
 
 void UniformBufferExample::UpdateCameraUniform() {
 	Matrix4 camMatrices[2];
 	camMatrices[0] = camera.BuildViewMatrix();
-	camMatrices[1] = camera.BuildProjectionMatrix(hostWindow.GetScreenAspect());
+	camMatrices[1] = camera.BuildProjectionMatrix(m_hostWindow.GetScreenAspect());
 	//'Traditional' method...
 	//UpdateUniform(cameraData, (void*)&camMatrices, sizeof(Matrix4) * 2);
 

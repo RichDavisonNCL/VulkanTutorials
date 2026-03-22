@@ -12,12 +12,12 @@ namespace NCL::Rendering::Vulkan {
 	class SimpleTexturingExample : public VulkanTutorial	{
 	public:
 		SimpleTexturingExample(Window& window, VulkanInitialisation& vkInit);
+		~SimpleTexturingExample() = default;
 	protected:
 		void RenderFrame(float dt) override;
 
-		VulkanPipeline	pipeline;
+		VulkanPipeline		pipeline;
 
-		UniqueVulkanShader	shader;
 		UniqueVulkanMesh 	mesh;
 		UniqueVulkanTexture	texture;
 

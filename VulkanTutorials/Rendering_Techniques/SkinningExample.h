@@ -19,8 +19,6 @@ namespace NCL::Rendering::Vulkan {
     protected:
         void RenderFrame(float dt);
 
-        UniqueVulkanShader shader;
-
         GLTFScene  scene;
 
         VulkanBuffer		            jointsBuffer;

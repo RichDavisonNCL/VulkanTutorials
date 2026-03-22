@@ -41,7 +41,7 @@ using namespace Vulkan;
 ////}
 //
 //void TestRayTrace::SetupTutorial() {
-//	vk::Device device = renderer->GetDevice();
+//	vk::Device device = m_renderer->GetDevice();
 //
 //	
 //	
@@ -51,7 +51,7 @@ using namespace Vulkan;
 //	vk::PhysicalDeviceProperties2 props;
 //	props.pNext = &rayPipelineProperties;
 //
-//	renderer->GetPhysicalDevice().getProperties2(&props);
+//	m_renderer->GetPhysicalDevice().getProperties2(&props);
 //
 //	triangle = GenerateTriangle();
 //
@@ -73,25 +73,25 @@ using namespace Vulkan;
 //
 //	tlas = bvhBuilder
 //		.WithObject(&*triangle, Matrix::Translation(Vector3{ 0,0,-100.0f }) * Matrix::Scale(Vector3{2,4,2}))
-//		.WithCommandQueue(renderer->GetQueue(CommandBuffer::AsyncCompute))
-//		.WithCommandPool(renderer->GetCommandPool(CommandBuffer::AsyncCompute))
+//		.WithCommandQueue(m_renderer->GetQueue(CommandBuffer::AsyncCompute))
+//		.WithCommandPool(m_renderer->GetCommandPool(CommandBuffer::AsyncCompute))
 //		.WithDevice(device)
-//		.WithAllocator(renderer->GetMemoryAllocator())
+//		.WithAllocator(m_renderer->GetMemoryAllocator())
 //		.Build(vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace, "Test TLAS");
 //
 //	rayTraceDescriptor		= CreateDescriptorSet(device, *rayTraceLayout);
 //	imageDescriptor			= CreateDescriptorSet(device, *imageLayout);
 //	inverseCamDescriptor	= CreateDescriptorSet(device, *inverseCamLayout);
 //
-//	inverseMatrices = BufferBuilder(device, renderer->GetMemoryAllocator())
+//	inverseMatrices = BufferBuilder(device, m_renderer->GetMemoryAllocator())
 //		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
 //		.WithHostVisibility()
 //		.WithPersistentMapping()
 //		.Build(sizeof(Matrix4) * 2, "InverseMatrices");
 //
-//	rayTexture = TextureBuilder(device, renderer->GetMemoryAllocator())
-//		.UsingPool(renderer->GetCommandPool(CommandBuffer::Graphics))
-//		.UsingQueue(renderer->GetQueue(CommandBuffer::Graphics))
+//	rayTexture = TextureBuilder(device, m_renderer->GetMemoryAllocator())
+//		.UsingPool(m_renderer->GetCommandPool(CommandBuffer::Graphics))
+//		.UsingQueue(m_renderer->GetQueue(CommandBuffer::Graphics))
 //		.WithDimension(windowSize.x, windowSize.y, 1)
 //		.WithUsages(vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage)
 //		.WithPipeFlags(vk::PipelineStageFlagBits2::eColorAttachmentOutput)
@@ -99,7 +99,7 @@ using namespace Vulkan;
 //		.WithFormat(vk::Format::eB8G8R8A8Unorm)
 //		.Build("RaytraceResult");
 //
-//	WriteStorageImageDescriptor(device , *imageDescriptor, 0, 0, *rayTexture, *defaultSampler, vk::ImageLayout::eGeneral);
+//	WriteStorageImageDescriptor(device , *imageDescriptor, 0, 0, *rayTexture, *m_defaultSampler, vk::ImageLayout::eGeneral);
 //
 //	WriteBufferDescriptor(device , *inverseCamDescriptor, 0, vk::DescriptorType::eUniformBuffer, inverseMatrices);
 //
@@ -116,7 +116,7 @@ using namespace Vulkan;
 //		.WithTriangleHitGroup(2)								//Uses shader 2
 //
 //		.WithDescriptorSetLayout(0, *rayTraceLayout)
-//		.WithDescriptorSetLayout(1, *cameraLayout)
+//		.WithDescriptorSetLayout(1, *m_cameraLayout)
 //		.WithDescriptorSetLayout(2, *inverseCamLayout)
 //		.WithDescriptorSetLayout(3, *imageLayout);
 //
@@ -125,7 +125,7 @@ using namespace Vulkan;
 //	bindingTable = VulkanShaderBindingTableBuilder("SBT")
 //		.WithProperties(rayPipelineProperties)
 //		.WithPipeline(rtPipeline, rtPipeBuilder.GetCreateInfo())
-//		.Build(device, renderer->GetMemoryAllocator());
+//		.Build(device, m_renderer->GetMemoryAllocator());
 //
 //	//We also need some Vulkan things for displaying the result!
 //	displayImageLayout = DescriptorSetLayoutBuilder(device)
@@ -133,7 +133,7 @@ using namespace Vulkan;
 //		.Build("Raster Image Layout");
 //
 //	displayImageDescriptor = CreateDescriptorSet(*displayImageLayout);
-//	WriteImageDescriptor(*displayImageDescriptor, 0, 0, *rayTexture, *defaultSampler, vk::ImageLayout::eShaderReadOnlyOptimal);
+//	WriteCombinedImageDescriptor(*displayImageDescriptor, 0, 0, *rayTexture, *m_defaultSampler, vk::ImageLayout::eShaderReadOnlyOptimal);
 //
 //	quadMesh = GenerateQuad();
 //
@@ -147,8 +147,8 @@ using namespace Vulkan;
 //		.WithTopology(vk::PrimitiveTopology::eTriangleStrip)
 //		.WithShader(displayShader)
 //		.WithDescriptorSetLayout(0, *displayImageLayout)
-//		.WithColourAttachment(renderer->GetSurfaceFormat())
-//		.WithDepthAttachment(renderer->GetDepthBuffer()->GetFormat())
+//		.WithColourAttachment(m_renderer->GetSurfaceFormat())
+//		.WithDepthAttachment(m_renderer->GetDepthBuffer()->GetFormat())
 //		.Build("Result display pipeline");
 //}
 //
@@ -157,7 +157,7 @@ using namespace Vulkan;
 //
 //	vk::DescriptorSet sets[4] = {
 //		*rayTraceDescriptor,		//Set 0
-//		*cameraDescriptor,			//Set 1
+//		*m_cameraDescriptor,			//Set 1
 //		*inverseCamDescriptor,		//Set 2
 //		*imageDescriptor			//Set 3
 //	};
@@ -202,6 +202,6 @@ using namespace Vulkan;
 //
 //	Matrix4* inverseMatrixData = (Matrix4*)inverseMatrices.Data();
 //
-//	inverseMatrixData[0] = Matrix::Inverse(camera.BuildViewMatrix());
-//	inverseMatrixData[1] = Matrix::Inverse(camera.BuildProjectionMatrix(hostWindow.GetScreenAspect()));
+//	inverseMatrixData[0] = Matrix::Inverse(m_camera.BuildViewMatrix());
+//	inverseMatrixData[1] = Matrix::Inverse(m_camera.BuildProjectionMatrix(m_hostWindow.GetScreenAspect()));
 //}

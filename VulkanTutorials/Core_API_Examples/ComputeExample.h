@@ -12,19 +12,16 @@ namespace NCL::Rendering::Vulkan {
 	class ComputeExample : public VulkanTutorial {
 	public:
 		ComputeExample(Window& window, VulkanInitialisation& vkInit);
-		~ComputeExample() {}
+		~ComputeExample() = default;
 	protected:
 		void RenderFrame(float dt) override;
-
-		UniqueVulkanShader	rasterShader;
-		UniqueVulkanCompute	computeShader;
 
 		VulkanPipeline	basicPipeline;
 		VulkanPipeline	computePipeline;
 
-		VulkanBuffer			particlePositions;
+		VulkanBuffer		particlePositions;
 		vk::UniqueDescriptorSet	bufferDescriptor;
 
-		vk::UniqueDescriptorSetLayout	dataLayout;
+		vk::UniqueDescriptorSetLayout	sharedLayout;
 	};
 }

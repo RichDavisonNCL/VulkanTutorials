@@ -7,15 +7,11 @@ License: MIT (see LICENSE file at the top of the source tree)
 *//////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "VulkanBVHBuilder.h"
-#include "VulkanRTShader.h"
 #include "../VulkanTutorials/VulkanTutorial.h"
 #include "VulkanShaderBindingTableBuilder.h"
 #include "../GLTFLoader/GLTFLoader.h"
 
 namespace NCL::Rendering::Vulkan {
-	using UniqueVulkanRTShader = std::unique_ptr<VulkanRTShader>;
-	using SharedVulkanRTShader = std::shared_ptr<VulkanRTShader>;
-
 	class TestRayTracedSkinning : public VulkanTutorial	{
 	public:
 		TestRayTracedSkinning(Window& window, VulkanInitialisation& vkInit);
@@ -35,7 +31,6 @@ namespace NCL::Rendering::Vulkan {
 		UniqueVulkanShader	displayShader;
 
 		VulkanPipeline		rtPipeline;
-		UniqueVulkanMesh	quadMesh;
 
 		vk::UniqueDescriptorSetLayout	rayTraceLayout;
 		vk::UniqueDescriptorSet			rayTraceDescriptor;
@@ -57,9 +52,9 @@ namespace NCL::Rendering::Vulkan {
 		VulkanBVHBuilder				bvhBuilder;		
 		vk::UniqueAccelerationStructureKHR	tlas;
 
-		UniqueVulkanRTShader	raygenShader;
-		UniqueVulkanRTShader	hitShader;
-		UniqueVulkanRTShader	missShader;
+		//UniqueVulkanRTShader	raygenShader;
+		//UniqueVulkanRTShader	hitShader;
+		//UniqueVulkanRTShader	missShader;
 		vk::PhysicalDeviceRayTracingPipelinePropertiesKHR	rayPipelineProperties;
 		vk::PhysicalDeviceAccelerationStructureFeaturesKHR	rayAccelFeatures;
 	};

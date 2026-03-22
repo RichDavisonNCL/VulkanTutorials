@@ -13,13 +13,11 @@ namespace NCL::Rendering::Vulkan {
     {
     public:
         MultiViewportExample(Window& window, VulkanInitialisation& vkInit);
-        ~MultiViewportExample() {}
+        ~MultiViewportExample() = default;
 
     protected:
         void RenderFrame(float dt) override;
 
-        UniqueVulkanMesh    triMesh;
-        UniqueVulkanShader  shader;
         VulkanPipeline	    pipeline;
     };
 }

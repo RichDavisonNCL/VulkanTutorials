@@ -18,7 +18,7 @@ License: MIT (see LICENSE file at the top of the source tree)
 ///*
 //BasicMultiPassRenderer::BasicMultiPassRenderer(Window& window, VulkanInitialisation& vkInit) : VulkanRenderer(window)
 //{
-//	camera = Camera::BuildPerspectiveCamera(Vector3(0, 0, 1), 0, 0, 45.0f, 0.1f, 100.0f);
+//	m_camera = Camera::BuildPerspectiveCamera(Vector3(0, 0, 1), 0, 0, 45.0f, 0.1f, 100.0f);
 //
 //	BuildBasicDescriptorPool();
 //
@@ -37,16 +37,13 @@ License: MIT (see LICENSE file at the top of the source tree)
 //}
 //
 //
-//BasicMultiPassRenderer::~BasicMultiPassRenderer()
-//{
-//}
 //
 //void BasicMultiPassRenderer::Update(float msec) {
-//	camera.UpdateCamera(msec);
+//	m_camera.UpdateCamera(msec);
 //}
 //
 //void BasicMultiPassRenderer::Initialise() {
-//	InitPipeline(basicPipeline);	//Only needs doing once
+//	InitPipeline(pipeline);	//Only needs doing once
 //}
 //
 ////We must intercept resize calls so we can recreate the off screen buffers...
@@ -81,13 +78,13 @@ License: MIT (see LICENSE file at the top of the source tree)
 //
 //void BasicMultiPassRenderer::FinishPipeline(vk::GraphicsPipelineCreateInfo& pipelineCreate, VulkanPipeline& pipeline) {
 //	//triangleMesh			= VulkanMesh::GenerateTriangle(this);
-//	//basicPipeline.shader	= VulkanShader::CreateShaderFromGLSL("BasicUniformBuffer.vert", "BasicUniformBuffer.frag", device);
+//	//pipeline.shader	= VulkanShader::CreateShaderFromGLSL("BasicUniformBuffer.vert", "BasicUniformBuffer.frag", device);
 //
-//	//pipelineCreate.setStageCount(basicPipeline.shader->GetNumSubStages());
+//	//pipelineCreate.setStageCount(pipeline.shader->GetNumSubStages());
 //	//pipelineCreate.setPVertexInputState(&triangleMesh->GetVertexBuffer()->vertexInfo);
 //
 //	//vk::PipelineShaderStageCreateInfo* shaderCreate = new vk::PipelineShaderStageCreateInfo[pipelineCreate.stageCount];
-//	//basicPipeline.shader->FillShaderStageCreateInfo(shaderCreate, pipelineCreate.stageCount);
+//	//pipeline.shader->FillShaderStageCreateInfo(shaderCreate, pipelineCreate.stageCount);
 //	//pipelineCreate.setPStages(shaderCreate);
 //
 //
@@ -100,17 +97,17 @@ License: MIT (see LICENSE file at the top of the source tree)
 //	pipeLayoutCreate.setSetLayoutCount(pipeline.layouts.size());
 //	pipeLayoutCreate.setPSetLayouts(&pipeline.layouts[0]);
 //
-//	basicPipeline.pipelineLayout = device.createPipelineLayout(pipeLayoutCreate);
+//	pipeline.pipelineLayout = device.createPipelineLayout(pipeLayoutCreate);
 //
 //
 //}
 //
 //void BasicMultiPassRenderer::RenderFrame() {
-//	frameCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline);
+//	frameCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 //
 //	UpdateCameraUniform();
 //
-//	frameCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, basicPipeline.pipelineLayout, 0, 1, &defaultDescriptorSet, 0, nullptr);
+//	frameCmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipelineLayout, 0, 1, &defaultDescriptorSet, 0, nullptr);
 //
 //	triangleMesh->SubmitDraw(frameCmdBuffer);
 //}
@@ -170,16 +167,16 @@ License: MIT (see LICENSE file at the top of the source tree)
 //
 //	float currentAspect = (float)currentWidth / (float)currentHeight;
 //
-//	camMatrices[0] = camera.BuildViewMatrix();
-//	camMatrices[1] = camera.BuildProjectionMatrix(currentAspect);
+//	camMatrices[0] = m_camera.BuildViewMatrix();
+//	camMatrices[1] = m_camera.BuildProjectionMatrix(currentAspect);
 //
 //	//'Traditional' method...
 //	//UpdateUniform(cameraData, (void*)&camMatrices, sizeof(Matrix4) * 2);
 //
 //	//'Modern' method - just permamap the buffer and transfer the new data directly to GPU
 //	//Only works with the host visible bit set...
-//	cameraMemory[0] = camera.BuildViewMatrix();
-//	cameraMemory[1] = camera.BuildProjectionMatrix(currentAspect);
+//	cameraMemory[0] = m_camera.BuildViewMatrix();
+//	cameraMemory[1] = m_camera.BuildProjectionMatrix(currentAspect);
 //}
 //
 //*/

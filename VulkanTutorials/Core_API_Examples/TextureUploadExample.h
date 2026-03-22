@@ -12,6 +12,7 @@ namespace NCL::Rendering::Vulkan {
 	class TextureUploadExample : public VulkanTutorial	{
 	public:
 		TextureUploadExample(Window& window, VulkanInitialisation& vkInit);
+		~TextureUploadExample() = default;
 	protected:
 		void RenderFrame(float dt) override;
 
@@ -19,7 +20,6 @@ namespace NCL::Rendering::Vulkan {
 
 		VulkanPipeline	pipeline;
 
-		UniqueVulkanShader	shader;
 		UniqueVulkanMesh 	mesh;
 		UniqueVulkanTexture	texture;
 

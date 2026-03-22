@@ -17,15 +17,12 @@ namespace NCL::Rendering::Vulkan {
 	protected:
 		void RenderFrame(float dt) override;
 
-		UniqueVulkanShader	rasterShader;
-		UniqueVulkanCompute	computeShader;
-
 		VulkanPipeline	rasterPipeline;
 		VulkanPipeline	computePipeline;
 
-		VulkanBuffer			frameIDBuffer;
+		VulkanBuffer		frameIDBuffer;
 
-		VulkanBuffer			particlePositions;
+		VulkanBuffer		particlePositions;
 		vk::UniqueDescriptorSet	bufferDescriptor;
 
 		vk::UniqueDescriptorSetLayout dataLayout;

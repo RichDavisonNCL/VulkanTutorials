@@ -14,41 +14,36 @@ using namespace Vulkan;
 
 TUTORIAL_ENTRY(TessellationExample)
 
-TessellationExample::TessellationExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window) {
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+TessellationExample::TessellationExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit) {
+	Initialise();
 //	deviceFeatures.features.setTessellationShader(true);
 //	deviceFeatures.features.setFillModeNonSolid(true);
 
 	mesh = GenerateTriangle();
 
-	FrameState const& frameState = renderer->GetFrameState();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	shader = ShaderBuilder(renderer->GetDevice())
-		.WithVertexBinary("BasicGeometry.vert.spv")
-		.WithTessControlBinary("BasicTCS.tesc.spv")
-		.WithTessEvalBinary("BasicTES.tese.spv")
-		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.Build("Tessellation Shader!");
-
-	pipeline = PipelineBuilder(renderer->GetDevice())
-		.WithColourAttachment(frameState.colourFormat)
-		.WithDepthAttachment(frameState.depthFormat)
+	pipeline = PipelineBuilder(context.device)
+		.WithColourAttachment(context.colourFormat)
+		.WithDepthAttachment(context.depthFormat)
 		.WithVertexInputState(mesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::ePatchList)
 		.WithRasterState({}, vk::PolygonMode::eLine)
-		.WithShader(shader)
+		.WithShaderBinary("BasicGeometry.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("BasicTCS.tesc.spv", vk::ShaderStageFlagBits::eTessellationControl)
+		.WithShaderBinary("BasicTES.tese.spv", vk::ShaderStageFlagBits::eTessellationEvaluation)
+		.WithShaderBinary("BasicGeometry.frag.spv", vk::ShaderStageFlagBits::eFragment)
 		.WithTessellationPatchVertexCount(3)
 	.Build("Tessellation Shader Example Pipeline");
 }
 
 void TessellationExample::RenderFrame(float dt) {
-	FrameState const& state = renderer->GetFrameState();
-	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	FrameContext const& context = m_renderer->GetFrameContext();
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
 	Vector4 tessValues{ 8,8,8,8 };
 
-	state.cmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eTessellationControl, 0, sizeof(Vector4), &tessValues);
+	context.cmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eTessellationControl, 0, sizeof(Vector4), &tessValues);
 
-	mesh->Draw(state.cmdBuffer);
+	mesh->Draw(context.cmdBuffer);
 }

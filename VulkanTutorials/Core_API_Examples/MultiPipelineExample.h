@@ -12,14 +12,13 @@ namespace NCL::Rendering::Vulkan {
 	class MultiPipelineExample : public VulkanTutorial {
 	public:
 		MultiPipelineExample(Window& window, VulkanInitialisation& vkInit);
-		~MultiPipelineExample() {}
+		~MultiPipelineExample() = default;
 
 	protected:
 		void RenderFrame(float dt) override;
 
 		VulkanPipeline	solidColourPipeline;
 		VulkanPipeline	texturedPipeline;
-		UniqueVulkanMesh	triangleMesh;
 
 		UniqueVulkanTexture	textures[2];
 

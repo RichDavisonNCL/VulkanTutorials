@@ -16,23 +16,20 @@ using namespace Vulkan;
 //PrerecordedCmdListExample::PrerecordedCmdListExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window)	{
 //}
 //
-//PrerecordedCmdListExample::~PrerecordedCmdListExample()	{
-//}
-//
 //void PrerecordedCmdListExample::SetupTutorial() {
 //	VulkanTutorial::SetupTutorial();
 //	triMesh = GenerateTriangle();
 //
-//	shader = ShaderBuilder(renderer->GetDevice())
+//	shader = ShaderBuilder(m_renderer->GetDevice())
 //		.WithVertexBinary("BasicGeometry.vert.spv")
 //		.WithFragmentBinary("BasicGeometry.frag.spv")
 //	.Build("Basic Shader!");
 //	 
 //	BuildPipeline();
 //
-//	auto buffers = renderer->GetDevice().allocateCommandBuffers(
+//	auto buffers = m_renderer->GetDevice().allocateCommandBuffers(
 //		{
-//			.commandPool = renderer->GetCommandPool(CommandBuffer::Graphics),
+//			.commandPool = m_renderer->GetCommandPool(CommandBuffer::Graphics),
 //			.level = vk::CommandBufferLevel::eSecondary,
 //			.commandBufferCount = 1
 //		}
@@ -55,11 +52,11 @@ using namespace Vulkan;
 //}
 //
 //void PrerecordedCmdListExample::BuildPipeline() {
-//	pipeline = PipelineBuilder(renderer->GetDevice())
+//	pipeline = PipelineBuilder(m_renderer->GetDevice())
 //		.WithVertexInputState(triMesh->GetVertexInputState())
 //		.WithTopology(vk::PrimitiveTopology::eTriangleList)
 //		//.WithDepthFormat(depthBuffer->GetFormat())
-//		.WithDepthAttachment(renderer->GetDepthBuffer()->GetFormat())
+//		.WithDepthAttachment(m_renderer->GetDepthBuffer()->GetFormat())
 //		.WithShader(shader)
 //	.Build("Prerecorded cmd list pipeline");
 //}

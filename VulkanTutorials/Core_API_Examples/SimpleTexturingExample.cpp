@@ -1,10 +1,10 @@
-/******************************************************************************
-This file is part of the Newcastle Vulkan Tutorial Series
-
-Author:Rich Davison
-Contact:richgdavison@gmail.com
-License: MIT (see LICENSE file at the top of the source tree)
-*//////////////////////////////////////////////////////////////////////////////
+///******************************************************************************
+//This file is part of the Newcastle Vulkan Tutorial Series
+//
+//Author:Rich Davison
+//Contact:richgdavison@gmail.com
+//License: MIT (see LICENSE file at the top of the source tree)
+//*//////////////////////////////////////////////////////////////////////////////
 #include "SimpleTexturingExample.h"
 #include "../VulkanRendering/VulkanUtils.h"
 
@@ -14,49 +14,54 @@ using namespace Vulkan;
 
 TUTORIAL_ENTRY(SimpleTexturingExample)
 
-SimpleTexturingExample::SimpleTexturingExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window)	{
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+SimpleTexturingExample::SimpleTexturingExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit)	{
+	Initialise();
 
-	vk::Device device		= renderer->GetDevice();
-	vk::DescriptorPool pool = renderer->GetDescriptorPool();
+	FrameContext const& context = m_renderer->GetFrameContext();
 	
 	texture = LoadTexture("Vulkan.png");
 	
 	mesh = GenerateQuad();
 	
-	shader = ShaderBuilder(device)
-		.WithVertexBinary("BasicTexturing.vert.spv")
-		.WithFragmentBinary("BasicTexturing.frag.spv")
-	.Build("Texturing Shader!");
-
-	FrameState const& frameState = renderer->GetFrameState();
-	
-	pipeline = PipelineBuilder(device)
+	pipeline = PipelineBuilder(context.device)
 		.WithVertexInputState(mesh->GetVertexInputState())
 		.WithTopology(mesh->GetVulkanTopology())
-		.WithShader(shader)
-		.WithColourAttachment(frameState.colourFormat)
-		.WithDepthAttachment(frameState.depthFormat)
+		.WithShaderBinary("BasicTexturing.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("BasicTexturing.frag.spv", vk::ShaderStageFlagBits::eFragment)
+		.WithColourAttachment(context.colourFormat)
+		.WithDepthAttachment(context.depthFormat)
 	.Build("Texturing Pipeline");
 
-	descriptorSet = CreateDescriptorSet(device, pool, shader->GetLayout(0));
-	WriteImageDescriptor(device , *descriptorSet, 0, texture->GetDefaultView(), *defaultSampler);
+	descriptorSet = CreateDescriptorSet(context.device, context.descriptorPool, pipeline.GetSetLayout(0));
+//WriteCombinedImageDescriptor(context.device, *descriptorSet, 0, texture->GetDefaultView(), *m_defaultSampler);
+	WriteDescriptor(context.device,
+	{
+		.dstSet				= *descriptorSet,
+		.dstBinding			= 0,
+		.descriptorCount	= 1,
+		.descriptorType		= vk::DescriptorType::eCombinedImageSampler
+	}
+	,
+	{
+		.sampler		= *m_defaultSampler,
+		.imageView		= texture->GetDefaultView(),
+		.imageLayout	= vk::ImageLayout::eShaderReadOnlyOptimal
+	});
 }
 
 void SimpleTexturingExample::RenderFrame(float dt) {
-	FrameState const& state = renderer->GetFrameState();
-	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	FrameContext const& context = m_renderer->GetFrameContext();
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
-	state.cmdBuffer.bindDescriptorSets(
-		vk::PipelineBindPoint::eGraphics, //Which type of pipeline to fill
-		*pipeline.layout,				//Which layout describes our pipeline
-		0,								//First set to fill
-		1,								//How many sets to fill
-		&*descriptorSet,							//Pointer to our sets
-		0,								//Dynamic offset count
-		nullptr							//Pointer to dynamic offsets
+	context.cmdBuffer.bindDescriptorSets(
+		vk::PipelineBindPoint::eGraphics,	//Which type of pipeline to fill
+		*pipeline.layout,					//Which layout describes our pipeline
+		0,									//First set to fill
+		1,									//How many sets to fill
+		&*descriptorSet,					//Pointer to our sets
+		0,									//Dynamic offset count
+		nullptr								//Pointer to dynamic offsets
 	);
 
-	mesh->Draw(state.cmdBuffer);
+	mesh->Draw(context.cmdBuffer);
 }

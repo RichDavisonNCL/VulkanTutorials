@@ -13,37 +13,39 @@ using namespace Vulkan;
 
 TUTORIAL_ENTRY(LightingExample)
 
-LightingExample::LightingExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window) {
-	vkInit.autoBeginDynamicRendering = true;
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+LightingExample::LightingExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit) {
+	m_vkInit.autoBeginDynamicRendering = true;
+	Initialise();
 
-	camera.SetPitch(-20.0f).SetPosition({ 0, 100.0f, 200 });
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	cubeMesh = LoadMesh("Cube.msh");
+	m_camera.SetPitch(-20.0f).SetPosition({ 0, 100.0f, 200 });
 
-	boxObject.mesh		= &*cubeMesh;
+	boxObject.mesh		= &*m_cubeMesh;
 	boxObject.transform = Matrix::Translation(Vector3{ -20, 10, -20 }) * Matrix::Scale(Vector3{ 10.0f, 10.0f, 10.0f });
 
-	floorObject.mesh		= &*cubeMesh;
+	floorObject.mesh		= &*m_cubeMesh;
 	floorObject.transform = Matrix::Scale(Vector3{ 100.0f, 1.0f, 100.0f });
-
-	lightingShader = ShaderBuilder(renderer->GetDevice())
-		.WithVertexBinary("Lighting.vert.spv")
-		.WithFragmentBinary("Lighting.frag.spv")
-	.Build("Lighting Shader");
 
 	Light testLight(Vector3(0, 20, -30), 150.0f, Vector4(1, 0.8f, 0.5f, 1));
 
-	lightUniform = BufferBuilder(renderer->GetDevice(), renderer->GetMemoryAllocator())
-		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
-		.WithHostVisibility()
-		.Build(sizeof(Light), "Light Uniform");
+	lightUniform = m_memoryManager->CreateBuffer(
+		{
+			.size	= sizeof(Light),
+			.usage	= vk::BufferUsageFlagBits::eUniformBuffer
+		},
+		vk::MemoryPropertyFlagBits::eHostVisible,
+		"Light Uniform"
+	);
 
-	camPosUniform = BufferBuilder(renderer->GetDevice(), renderer->GetMemoryAllocator())
-		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
-		.WithHostVisibility()
-		.Build(sizeof(Vector3), "Camera Position Uniform");
+	camPosUniform = m_memoryManager->CreateBuffer(
+		{
+			.size = sizeof(Vector3),
+			.usage = vk::BufferUsageFlagBits::eUniformBuffer
+		},
+		vk::MemoryPropertyFlagBits::eHostVisible,
+		"Camera Position Uniform"
+	);
 
 	lightUniform.CopyData((void*)&testLight, sizeof(testLight));
 
@@ -52,55 +54,42 @@ LightingExample::LightingExample(Window& window, VulkanInitialisation& vkInit) :
 	allTextures[2] = LoadTexture("concrete_diffuse.png");
 	allTextures[3] = LoadTexture("concrete_bump.png");
 
-	vk::Device device = renderer->GetDevice();
-	vk::DescriptorPool pool = renderer->GetDescriptorPool();
-
-	pipeline = PipelineBuilder(device)
-		.WithVertexInputState(cubeMesh->GetVertexInputState())
+	pipeline = PipelineBuilder(context.device)
+		.WithVertexInputState(m_cubeMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShader(lightingShader)
-		.WithDepthAttachment(renderer->GetDepthBuffer()->GetFormat(), vk::CompareOp::eLessOrEqual, true, true)
+		.WithShaderBinary("Lighting.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("Lighting.frag.spv", vk::ShaderStageFlagBits::eFragment)
+		.WithDepthAttachment(context.depthFormat, vk::CompareOp::eLessOrEqual, true, true)
 		.Build("Lighting Pipeline");
 
-	lightDescriptor = CreateDescriptorSet(device, pool, lightingShader->GetLayout(1));
-	boxObject.descriptorSet = CreateDescriptorSet(device, pool, lightingShader->GetLayout(2));
-	floorObject.descriptorSet = CreateDescriptorSet(device, pool, lightingShader->GetLayout(2));
-	cameraPosDescriptor = CreateDescriptorSet(device, pool, lightingShader->GetLayout(3));
+	lightDescriptor				= CreateDescriptorSet(context.device, context.descriptorPool, pipeline.GetSetLayout(1));
+	boxObject.descriptorSet		= CreateDescriptorSet(context.device, context.descriptorPool, pipeline.GetSetLayout(2));
+	floorObject.descriptorSet	= CreateDescriptorSet(context.device, context.descriptorPool, pipeline.GetSetLayout(2));
+	cameraPosDescriptor			= CreateDescriptorSet(context.device, context.descriptorPool, pipeline.GetSetLayout(3));
 
-	WriteImageDescriptor(device, *boxObject.descriptorSet, 0, allTextures[0]->GetDefaultView(), *defaultSampler);
-	WriteImageDescriptor(device, *boxObject.descriptorSet, 1, allTextures[1]->GetDefaultView(), *defaultSampler);
+	WriteCombinedImageDescriptor(context.device, *boxObject.descriptorSet, 0, allTextures[0]->GetDefaultView(), *m_defaultSampler);
+	WriteCombinedImageDescriptor(context.device, *boxObject.descriptorSet, 1, allTextures[1]->GetDefaultView(), *m_defaultSampler);
 
-	WriteImageDescriptor(device, *floorObject.descriptorSet, 0, allTextures[2]->GetDefaultView(), *defaultSampler);
-	WriteImageDescriptor(device, *floorObject.descriptorSet, 1, allTextures[3]->GetDefaultView(), *defaultSampler);
+	WriteCombinedImageDescriptor(context.device, *floorObject.descriptorSet, 0, allTextures[2]->GetDefaultView(), *m_defaultSampler);
+	WriteCombinedImageDescriptor(context.device, *floorObject.descriptorSet, 1, allTextures[3]->GetDefaultView(), *m_defaultSampler);
 
-	WriteBufferDescriptor(device, *cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
-	WriteBufferDescriptor(device, *lightDescriptor, 0, vk::DescriptorType::eUniformBuffer, lightUniform);
-	WriteBufferDescriptor(device, *cameraPosDescriptor, 0, vk::DescriptorType::eUniformBuffer, camPosUniform);
+	WriteBufferDescriptor(context.device, *m_cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, m_cameraBuffer);
+	WriteBufferDescriptor(context.device, *lightDescriptor, 0, vk::DescriptorType::eUniformBuffer, lightUniform);
+	WriteBufferDescriptor(context.device, *cameraPosDescriptor, 0, vk::DescriptorType::eUniformBuffer, camPosUniform);
 }
 
 void LightingExample::RenderFrame(float dt) {
-	FrameState const& state = renderer->GetFrameState();
-	vk::CommandBuffer cmdBuffer = state.cmdBuffer;
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	Vector3 newCamPos = camera.GetPosition();
+	Vector3 newCamPos = m_camera.GetPosition();
 	camPosUniform.CopyData((void*)&newCamPos, sizeof(Vector3));
 
-	vk::Device device = renderer->GetDevice();
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
+	context.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*m_cameraDescriptor, 0, nullptr);
+	context.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 1, 1, &*lightDescriptor, 0, nullptr);
+	context.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 3, 1, &*cameraPosDescriptor, 0, nullptr);
 
-
-
-
-	cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
-
-	WriteBufferDescriptor(device, *cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
-	WriteBufferDescriptor(device, *lightDescriptor, 0, vk::DescriptorType::eUniformBuffer, lightUniform);
-	WriteBufferDescriptor(device, *cameraPosDescriptor, 0, vk::DescriptorType::eUniformBuffer, camPosUniform);
-
-	cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
-	cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 1, 1, &*lightDescriptor, 0, nullptr);
-	cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 3, 1, &*cameraPosDescriptor, 0, nullptr);
-
-	RenderSingleObject(boxObject	, cmdBuffer, pipeline, 2);
-	RenderSingleObject(floorObject	, cmdBuffer, pipeline, 2);
+	RenderSingleObject(boxObject	, context.cmdBuffer, pipeline, 2);
+	RenderSingleObject(floorObject	, context.cmdBuffer, pipeline, 2);
 }

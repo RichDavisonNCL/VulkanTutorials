@@ -14,31 +14,24 @@ using namespace Vulkan;
 
 TUTORIAL_ENTRY(GeometryShaderExample)
 
-GeometryShaderExample::GeometryShaderExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window) {
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+GeometryShaderExample::GeometryShaderExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit) {
+	Initialise();
 
-	mesh = GenerateTriangle();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	FrameState const& frameState = renderer->GetFrameState();
-
-	shader = ShaderBuilder(renderer->GetDevice())
-		.WithVertexBinary("BasicGeometry.vert.spv")
-		.WithGeometryBinary("BasicGeom.geom.spv")
-		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.Build("Geometry Shader!");
-
-	pipeline = PipelineBuilder(renderer->GetDevice())
-		.WithColourAttachment(frameState.colourFormat)
-		.WithDepthAttachment(frameState.depthFormat)
-		.WithVertexInputState(mesh->GetVertexInputState())
+	pipeline = PipelineBuilder(context.device)
+		.WithColourAttachment(context.colourFormat)
+		.WithDepthAttachment(context.depthFormat)
+		.WithVertexInputState(m_triangleMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::ePointList)
-		.WithShader(shader)
+		.WithShaderBinary("BasicGeometry.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("BasicGeom.geom.spv", vk::ShaderStageFlagBits::eGeometry)
+		.WithShaderBinary("BasicGeometry.frag.spv", vk::ShaderStageFlagBits::eFragment)
 	.Build("Geometry Shader Example Pipeline");
 }
 
 void GeometryShaderExample::RenderFrame(float dt) {
-	FrameState const& state = renderer->GetFrameState();
-	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
-	mesh->Draw(state.cmdBuffer);
+	FrameContext const& context = m_renderer->GetFrameContext();
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	m_triangleMesh->Draw(context.cmdBuffer);
 }

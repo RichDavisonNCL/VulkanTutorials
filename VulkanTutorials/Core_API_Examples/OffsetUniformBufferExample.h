@@ -12,16 +12,10 @@ namespace NCL::Rendering::Vulkan {
 	class OffsetUniformBufferExample : public VulkanTutorial {
 	public:
 		OffsetUniformBufferExample(Window& window, VulkanInitialisation& vkInit);
-		~OffsetUniformBufferExample();
-
-//		void SetupTutorial() override;
-
-		//void RenderFrame()		override;
-		//void Update(float dt)	override;
+		~OffsetUniformBufferExample() = default;
 
 	protected:
-		UniqueVulkanMesh 	triMesh;
-		UniqueVulkanShader	shader;
+		void RenderFrame(float dt) override;
 		VulkanPipeline		pipeline;
 
 		vk::UniqueDescriptorSet			objectMatrixSet;

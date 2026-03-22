@@ -48,10 +48,18 @@ set(ALL_FILES
 	${ALL_SHADERS}
 )
 
+if(COMPILE_WITH_IMGUI)
+    include_directories(${IMGUI_DIR})
+    include_directories(${IMGUI_DIR}/backends)
+    file(GLOB IMGUI_CPPS "${IMGUI_DIR}/*.cpp" "${IMGUI_DIR}/backends/imgui_impl_win32.cpp" "${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp")
+    SOURCE_GROUP("imgui" FILES ${IMGUI_CPPS})
+    list(APPEND CPPS ${IMGUI_CPPS})
+endif()
+
 ################################################################################
 # Target
 ################################################################################
-add_executable(${PROJECT_NAME} ${ALL_FILES})
+add_executable(${PROJECT_NAME} ${ALL_FILES} ${CPPS})
 
 target_precompile_headers(${PROJECT_NAME} PRIVATE
     <vulkan/vulkan.hpp>
@@ -78,8 +86,6 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
 
     <SmartTypes.h>
     <VulkanRenderer.h>
-    <VulkanShader.h>
-    <VulkanShaderBuilder.h>
     <VulkanTexture.h>
     <VulkanMesh.h>
     <VulkanPipelineBuilder.h>
@@ -89,10 +95,8 @@ target_precompile_headers(${PROJECT_NAME} PRIVATE
 
     <VulkanDescriptorSetLayoutBuilder.h>
     <VulkanRenderPassBuilder.h>
-    <VulkanCompute.h>
     <VulkanComputePipelineBuilder.h>
-	<VulkanBufferBuilder.h>
-
+	
     <VulkanDescriptorSetWriter.h>
     <VulkanDescriptorSetBinder.h>   
     <VulkanDescriptorBufferWriter.h>
@@ -120,7 +124,7 @@ target_include_directories (${PROJECT_NAME}
     PUBLIC ${CMAKE_SOURCE_DIR}/VulkanRendering
     PUBLIC ${CMAKE_SOURCE_DIR}/GLTFLoader
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-)	
+)
 
 foreach (file ${ALL_SHADERS})
     get_filename_component(file_name ${file} NAME)
@@ -128,7 +132,7 @@ foreach (file ${ALL_SHADERS})
 	
 	message("Adding custom command to ${file}")
 	get_filename_component(file_dir ${file} ABSOLUTE)
-	set(SPIRV_OUTPUT ${file_name}.spv)
+	set(SPIRV_OUTPUT ${file}.spv)
 	set(SPIRV_ABS_INPUT ${file_dir})
 	set(SPIRV_ABS_OUTPUT ${file_dir}.spv)
 
@@ -169,7 +173,7 @@ endforeach()
 
 add_custom_target(
     Shaders
-    DEPENDS ON ${SPIRV_BINARY_FILES}
+    DEPENDS ${SPIRV_BINARY_FILES}
 )
 
 set(PROJECT_DEPENDENCIES
@@ -183,8 +187,12 @@ add_dependencies(${PROJECT_NAME}
     Shaders
 )
 
-add_compile_definitions(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC)
-add_compile_definitions(VK_NO_PROTOTYPES)
+add_compile_definitions(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1)
+add_compile_definitions(VULKAN_HPP_ENABLE_DYNAMIC_LOADER_TOOL=1)
+
+if(NOT COMPILE_WITH_IMGUI)
+    add_compile_definitions(VK_NO_PROTOTYPES)
+endif()
 add_compile_definitions(VULKAN_HPP_NO_STRUCT_CONSTRUCTORS)
 
 target_link_libraries(${PROJECT_NAME} 

@@ -19,12 +19,8 @@ namespace NCL::Rendering::Vulkan {
 
 		VulkanPipeline	pipeline;
 
-		UniqueVulkanMesh 	triMesh;
-		UniqueVulkanShader	shader;
-
-		VulkanBuffer	uniformData[2];
+		VulkanBuffer					uniformData[2];
 		vk::UniqueDescriptorSet			descriptorSet;
-		vk::UniqueDescriptorSetLayout	descriptorLayout;
 
 		VulkanBuffer		descriptorBuffer;
 		vk::DeviceSize		descriptorBufferSize;

@@ -14,13 +14,10 @@ using namespace Vulkan;
 
 TUTORIAL_ENTRY(MultiTexturingExample)
 
-MultiTexturingExample::MultiTexturingExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window)	{
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+MultiTexturingExample::MultiTexturingExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit)	{
+	Initialise();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	vk::Device device		= renderer->GetDevice();
-	vk::DescriptorPool pool = renderer->GetDescriptorPool();
-	
 	textures[0] = LoadTexture("Vulkan.png");
 	textures[1] = LoadTexture("Doge.png");
 
@@ -29,40 +26,34 @@ MultiTexturingExample::MultiTexturingExample(Window& window, VulkanInitialisatio
 	
 	mesh = GenerateTriangle();
 	
-	shader = ShaderBuilder(device)
-		.WithVertexBinary("BasicTexturing.vert.spv")
-		.WithFragmentBinary("MultiTexturing.frag.spv")
-	.Build("Texturing Shader!");
-
-	FrameState const& frameState = renderer->GetFrameState();
-	
-	pipeline = PipelineBuilder(device)
+	pipeline = PipelineBuilder(context.device)
 		.WithVertexInputState(mesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShader(shader)
-		.WithColourAttachment(frameState.colourFormat)
-		.WithDepthAttachment(frameState.depthFormat)
+		.WithShaderBinary("BasicTexturing.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("MultiTexturing.frag.spv", vk::ShaderStageFlagBits::eFragment)
+		.WithColourAttachment(context.colourFormat)
+		.WithDepthAttachment(context.depthFormat)
 	.Build("Texturing Pipeline");
 
-	descriptorSets[0] = CreateDescriptorSet(device, pool, shader->GetLayout(0));
-	WriteImageDescriptor(device, *descriptorSets[0], 0, textures[0]->GetDefaultView(), *defaultSampler);
-	WriteImageDescriptor(device, *descriptorSets[0], 1, textures[1]->GetDefaultView(), *defaultSampler);
+	descriptorSets[0] = CreateDescriptorSet(context.device, context.descriptorPool, pipeline.GetSetLayout(0));
+	WriteCombinedImageDescriptor(context.device, *descriptorSets[0], 0, textures[0]->GetDefaultView(), *m_defaultSampler);
+	WriteCombinedImageDescriptor(context.device, *descriptorSets[0], 1, textures[1]->GetDefaultView(), *m_defaultSampler);
 
-	descriptorSets[1] = CreateDescriptorSet(device, pool, shader->GetLayout(1));
-	WriteImageDescriptor(device, *descriptorSets[1], 0, 0, textures[0]->GetDefaultView(), *defaultSampler);
-	WriteImageDescriptor(device, *descriptorSets[1], 0, 1, textures[1]->GetDefaultView(), *defaultSampler);
+	descriptorSets[1] = CreateDescriptorSet(context.device, context.descriptorPool, pipeline.GetSetLayout(1));
+	WriteCombinedImageDescriptor(context.device, *descriptorSets[1], 0, 0, textures[0]->GetDefaultView(), *m_defaultSampler);
+	WriteCombinedImageDescriptor(context.device, *descriptorSets[1], 0, 1, textures[1]->GetDefaultView(), *m_defaultSampler);
 }
 
 void MultiTexturingExample::RenderFrame(float dt) {
-	FrameState const& state = renderer->GetFrameState();
-	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	FrameContext const& context = m_renderer->GetFrameContext();
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
 	vk::DescriptorSet	sets[2] = {
 		*descriptorSets[0],
 		*descriptorSets[1]
 	};
 
-	state.cmdBuffer.bindDescriptorSets(
+	context.cmdBuffer.bindDescriptorSets(
 		vk::PipelineBindPoint::eGraphics, //Which type of pipeline to fill
 		*pipeline.layout,				//Which layout describes our pipeline
 		0,								//First set to fill
@@ -72,5 +63,5 @@ void MultiTexturingExample::RenderFrame(float dt) {
 		nullptr							//Pointer to dynamic offsets
 	);
 
-	mesh->Draw(state.cmdBuffer);
+	mesh->Draw(context.cmdBuffer);
 }

@@ -13,37 +13,30 @@ using namespace Vulkan;
 
 TUTORIAL_ENTRY(PushConstantExample)
 
-PushConstantExample::PushConstantExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window)	{
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+PushConstantExample::PushConstantExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit)	{
+	Initialise();
 
-	triMesh = GenerateTriangle();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	shader = ShaderBuilder(renderer->GetDevice())
-		.WithVertexBinary("BasicPushConstant.vert.spv")
-		.WithFragmentBinary("BasicPushConstant.frag.spv")
-		.Build("Testing push constants!");
-
-	FrameState const& frameState = renderer->GetFrameState();
-
-	pipeline = PipelineBuilder(renderer->GetDevice())
-		.WithVertexInputState(triMesh->GetVertexInputState())
+	pipeline = PipelineBuilder(context.device)
+		.WithVertexInputState(m_triangleMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShader(shader)
-		.WithColourAttachment(frameState.colourFormat)
-		.WithDepthAttachment(frameState.depthFormat)
+		.WithShaderBinary("BasicPushConstant.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("BasicPushConstant.frag.spv", vk::ShaderStageFlagBits::eFragment)
+		.WithColourAttachment(context.colourFormat)
+		.WithDepthAttachment(context.depthFormat)
 		.Build("Basic Push Constant Pipeline");
 }
 
 void PushConstantExample::RenderFrame(float dt) {
-	FrameState const& state = renderer->GetFrameState();
-	positionUniform = {sin(runTime), 0.0f, 0.0f };
+	FrameContext const& context = m_renderer->GetFrameContext();
+	positionUniform = {sin(m_runTime), 0.0f, 0.0f };
 	colourUniform	= Vector4(1.0f, 1.0f, 0.0f, 1.0f);
 
-	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
-	state.cmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(positionUniform), (void*)&positionUniform);
-	state.cmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eFragment, sizeof(Vector4), sizeof(colourUniform), (void*)&colourUniform);
+	context.cmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(positionUniform), (void*)&positionUniform);
+	context.cmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eFragment, sizeof(Vector4), sizeof(colourUniform), (void*)&colourUniform);
 
-	triMesh->Draw(state.cmdBuffer);
+	m_triangleMesh->Draw(context.cmdBuffer);
 }

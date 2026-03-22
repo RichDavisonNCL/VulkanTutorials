@@ -14,18 +14,15 @@ namespace NCL::Rendering::Vulkan {
     {
     public:
         ComputeSkinningExample(Window& window, VulkanInitialisation& vkInit);
-        ~ComputeSkinningExample();
+        ~ComputeSkinningExample() = default;
 
     protected:
         void RenderFrame(float dt) override;
 
-        UniqueVulkanShader  drawShader;
-        UniqueVulkanCompute skinShader;
-
         GLTFScene scene;
 
-        VulkanBuffer		            jointsBuffer;
-        VulkanBuffer		            outputVertices;
+        VulkanBuffer		jointsBuffer;
+        VulkanBuffer		outputVertices;
 
         vk::UniqueDescriptorSetLayout	textureLayout;
         std::vector<std::vector<vk::UniqueDescriptorSet>>	 layerDescriptors;

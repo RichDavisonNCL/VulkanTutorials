@@ -1,10 +1,10 @@
-/******************************************************************************
-This file is part of the Newcastle Vulkan Tutorial Series
-
-Author:Rich Davison
-Contact:richgdavison@gmail.com
-License: MIT (see LICENSE file at the top of the source tree)
-*//////////////////////////////////////////////////////////////////////////////
+///******************************************************************************
+//This file is part of the Newcastle Vulkan Tutorial Series
+//
+//Author:Rich Davison
+//Contact:richgdavison@gmail.com
+//License: MIT (see LICENSE file at the top of the source tree)
+//*//////////////////////////////////////////////////////////////////////////////
 #include "TextureUploadExample.h"
 #include "../VulkanRendering/VulkanUtils.h"
 
@@ -17,60 +17,47 @@ TUTORIAL_ENTRY(TextureUploadExample)
 const uint32_t dataWidth  = 128;
 const uint32_t dataHeight = 128;
 
-TextureUploadExample::TextureUploadExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window)	{
-	vkInit.autoBeginDynamicRendering = false;
+TextureUploadExample::TextureUploadExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit)	{
+	m_vkInit.autoBeginDynamicRendering = false;
 
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+	Initialise();
 
-	vk::Device device			 = renderer->GetDevice();
-	
-	texture = TextureBuilder(device, renderer->GetMemoryAllocator())
-		.UsingPool(renderer->GetCommandPool(CommandType::Graphics))
-		.UsingQueue(renderer->GetQueue(CommandType::Graphics))
+	FrameContext const& context = m_renderer->GetFrameContext();
+
+	texture = TextureBuilder(context.device, *m_memoryManager)
+		.WithCommandBuffer(context.cmdBuffer)
 		.WithFormat(vk::Format::eR32G32B32A32Sfloat) //4 channels, 32bit float each
 		.WithDimension(dataWidth, dataHeight)
 		.Build("Custom Data");
 
-	stagingBuffer = BufferBuilder(device, renderer->GetMemoryAllocator())
-		.WithBufferUsage(vk::BufferUsageFlagBits::eTransferSrc)
-		.WithHostVisibility()
-		.Build(dataWidth * dataHeight * 4 * sizeof(float), "Staging Buffer");
-	
+	stagingBuffer = m_memoryManager->CreateStagingBuffer(dataWidth * dataHeight * 4 * sizeof(float), "Staging Buffer");
 	mesh = GenerateQuad();
 	
-	shader = ShaderBuilder(device)
-		.WithVertexBinary("BasicTexturing.vert.spv")
-		.WithFragmentBinary("BasicTexturing.frag.spv")
-	.Build("Texturing Shader!");
-
-	FrameState const& frameState = renderer->GetFrameState();
-	vk::DescriptorPool pool = renderer->GetDescriptorPool();
-
-	pipeline = PipelineBuilder(device)
+	pipeline = PipelineBuilder(context.device)
 		.WithVertexInputState(mesh->GetVertexInputState())
 		.WithTopology(mesh->GetVulkanTopology())
-		.WithShader(shader)
-		.WithColourAttachment(frameState.colourFormat)
-		.WithDepthAttachment(frameState.depthFormat)
+		.WithShaderBinary("BasicTexturing.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("BasicTexturing.frag.spv", vk::ShaderStageFlagBits::eFragment)
+		.WithColourAttachment(context.colourFormat)
+		.WithDepthAttachment(context.depthFormat)
 	.Build("Texturing Pipeline");
 
-	descriptorSet = CreateDescriptorSet(device, pool, shader->GetLayout(0));
-	WriteImageDescriptor(device, *descriptorSet, 0, texture->GetDefaultView(), *defaultSampler);
+	descriptorSet = CreateDescriptorSet(context.device, context.descriptorPool, pipeline.GetSetLayout(0));
+	WriteCombinedImageDescriptor(context.device, *descriptorSet, 0, texture->GetDefaultView(), *m_defaultSampler);
 }
 
 void TextureUploadExample::RenderFrame(float dt) {
-	FrameState const& state = renderer->GetFrameState();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
 	if (Window::GetKeyboard()->KeyDown(KeyCodes::T)) {
-		UploadTexture(state.cmdBuffer);
+		UploadTexture(context.cmdBuffer);
 	}
 
-	renderer->BeginDefaultRendering(state.cmdBuffer);
+	m_renderer->BeginRenderToScreen(context.cmdBuffer);
 
-	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
-	state.cmdBuffer.bindDescriptorSets(
+	context.cmdBuffer.bindDescriptorSets(
 		vk::PipelineBindPoint::eGraphics, //Which type of pipeline to fill
 		*pipeline.layout,				//Which layout describes our pipeline
 		0,								//First set to fill
@@ -80,27 +67,27 @@ void TextureUploadExample::RenderFrame(float dt) {
 		nullptr							//Pointer to dynamic offsets
 	);
 
-	mesh->Draw(state.cmdBuffer);
+	mesh->Draw(context.cmdBuffer);
 
-	state.cmdBuffer.endRendering();
+	context.cmdBuffer.endRendering();
 }
 
-void TextureUploadExample::UploadTexture(vk::CommandBuffer cmdBuffer) {
+void TextureUploadExample::UploadTexture(vk::CommandBuffer m_cmdBuffer) {
 	Vector4* texData = (Vector4*)stagingBuffer.Map();
 
 	for (int y = 0; y < dataHeight; ++y) {
 		for (int x = 0; x < dataWidth; ++x) {
 			Vector4* texel = &texData[(y * dataWidth) + x];
 			*texel = Vector4(
-				std::sin(runTime + (x / ((float)dataWidth - 1))),
-				std::cos(runTime + (y / ((float)dataHeight - 1))), 
+				std::sin(m_runTime + (x / ((float)dataWidth - 1))),
+				std::cos(m_runTime + (y / ((float)dataHeight - 1))), 
 				0.0f, 
 				1.0f);
 		}
 	}
 	stagingBuffer.Unmap();
 
-	Vulkan::UploadTextureData(cmdBuffer, stagingBuffer.buffer, texture->GetImage(), vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal,
+	Vulkan::UploadTextureData(m_cmdBuffer, stagingBuffer.buffer, texture->GetImage(), vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal,
 		vk::BufferImageCopy{
 			.imageSubresource = {
 				.aspectMask = vk::ImageAspectFlagBits::eColor,

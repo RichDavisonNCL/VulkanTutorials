@@ -12,8 +12,8 @@ License: MIT (see LICENSE file at the top of the source tree)
 
 namespace NCL::Rendering::Vulkan {
 	struct RenderObject {
-		VulkanMesh* mesh;
-		Matrix4		transform;
+		VulkanMesh*				mesh;
+		Matrix4					transform;
 		vk::UniqueDescriptorSet descriptorSet;
 	};
 
@@ -35,31 +35,33 @@ namespace NCL::Rendering::Vulkan {
 
 	class VulkanTutorial	{
 	public:
-		VulkanTutorial(Window& window);
-		~VulkanTutorial();
+		VulkanTutorial(Window& window, VulkanInitialisation& vkInit);
+		virtual ~VulkanTutorial();
 
 		virtual void Update(float dt) {
-			runTime += dt;
+			m_runTime += dt;
 			UpdateCamera(dt);
 			UploadCameraUniform();
 
-			renderer->Update(dt);
+			m_renderer->Update(dt);
 		}
 
 		virtual void RunFrame(float dt);
 
+		void Finish() const;
+
 		void WindowEventHandler(WindowEvent e, uint32_t w, uint32_t h);
 
-		static VulkanTutorial* CreateTutorial(const std::string& name, VulkanInitialisation& vkInit);
-		static VulkanInitialisation DefaultInitialisation();
+		static VulkanTutorial*		CreateTutorial(int& chainID, VulkanInitialisation& vkInit);
+		static VulkanTutorial*		CreateTutorial(const std::string& name, VulkanInitialisation& vkInit);
+		static VulkanInitialisation	DefaultInitialisation();
 
 	protected:
 		virtual void RenderFrame(float dt) = 0;
 		virtual void OnWindowResize(uint32_t width, uint32_t height) {
 
 		}
-
-		void InitTutorialObjects();
+		void Initialise();
 
 		void BuildCamera();
 		void UpdateCamera(float dt);
@@ -68,6 +70,8 @@ namespace NCL::Rendering::Vulkan {
 		void RenderSingleObject(RenderObject& o, vk::CommandBuffer  toBuffer, VulkanPipeline& toPipeline, int descriptorSet = 0);
 
 		UniqueVulkanMesh	LoadMesh(const string& filename, vk::BufferUsageFlags bufferUsage = {});
+
+		void UploadMeshWait(VulkanMesh& m, vk::BufferUsageFlags bufferUsage = {});
 		UniqueVulkanTexture LoadTexture(const string& filename);
 
 		UniqueVulkanTexture LoadCubemap(
@@ -80,21 +84,28 @@ namespace NCL::Rendering::Vulkan {
 		UniqueVulkanMesh GenerateQuad();
 		UniqueVulkanMesh GenerateGrid();
 
-		VulkanInitialisation vkInit;
-		VulkanRenderer*		renderer;
-		NCL::Window&		hostWindow;
+		VulkanInitialisation	m_vkInit;
+		VulkanRenderer*			m_renderer;
+		VulkanMemoryManager*	m_memoryManager;
+		NCL::Window&			m_hostWindow;
 
-		vk::UniqueDescriptorSet			cameraDescriptor;
-		vk::UniqueDescriptorSetLayout	cameraLayout;
+		KeyboardMouseController m_controller;
+		PerspectiveCamera		m_camera;
+		VulkanBuffer			m_cameraBuffer;
 
-		vk::UniqueDescriptorSetLayout	nullLayout;
-		vk::UniqueSampler				defaultSampler;
+		vk::UniqueDescriptorSet			m_cameraDescriptor;
+		vk::UniqueDescriptorSetLayout	m_cameraLayout;
 
-		KeyboardMouseController controller;
-		PerspectiveCamera		camera;
-		VulkanBuffer			cameraBuffer;
+		vk::UniqueDescriptorSetLayout	m_nullLayout;
+		vk::UniqueSampler				m_defaultSampler;
 
-		float runTime;
+		UniqueVulkanMesh	m_triangleMesh;
+		UniqueVulkanMesh	m_quadMesh;
+		UniqueVulkanMesh	m_gridMesh;
+		UniqueVulkanMesh	m_cubeMesh;
+		UniqueVulkanMesh	m_sphereMesh;
+
+		float m_runTime;
 	};
 
 #define TUTORIAL_ENTRY(object) static VulkanTutorialEntry entry = VulkanTutorialEntry(#object, [](Window& w, VulkanInitialisation& vk) {return new object(w, vk); });
@@ -103,21 +114,20 @@ namespace NCL::Rendering::Vulkan {
 	class VulkanTutorialEntry {
 	public:
 		VulkanTutorialEntry(const std::string& s, TutorialEntryFunc f) {
-			if (listStartPtr) {
-				nodeChain		= listStartPtr;
-				listStartPtr	= this;
+			if (s_listStartPtr) {
+				m_nodeChain		= s_listStartPtr;
+				s_listStartPtr	= this;
 			}
 			else {
-				listStartPtr	= this;
+				s_listStartPtr	= this;
 			}
-			name		= s;
-			creatorFunc = f;
+			m_name			= s;
+			m_creatorFunc	= f;
 		}
-		std::string				name;
-		TutorialEntryFunc		creatorFunc;
-		VulkanTutorialEntry*	nodeChain = nullptr;
+		std::string				m_name;
+		TutorialEntryFunc		m_creatorFunc;
+		VulkanTutorialEntry*	m_nodeChain = nullptr;
 
-		static VulkanTutorialEntry* listStartPtr;
-
+		static VulkanTutorialEntry* s_listStartPtr;
 	};
 }

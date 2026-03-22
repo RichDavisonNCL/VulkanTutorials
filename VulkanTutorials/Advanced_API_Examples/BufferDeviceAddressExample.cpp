@@ -13,49 +13,41 @@ using namespace Vulkan;
 
 TUTORIAL_ENTRY(BufferDeviceAddressExample)
 
-BufferDeviceAddressExample::BufferDeviceAddressExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window){
-	vkInit.deviceExtensions.emplace_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-	vkInit.vmaFlags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+BufferDeviceAddressExample::BufferDeviceAddressExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit){
+	m_vkInit.deviceExtensions.emplace_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+	m_vkInit.vmaFlags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
 	static vk::PhysicalDeviceBufferDeviceAddressFeaturesKHR deviceAddressfeature = {
 		.bufferDeviceAddress = true
 	};
 
-	//static vk::PhysicalDeviceDescriptorIndexingFeatures indexingFeatures = {
-	//	.runtimeDescriptorArray = true
-	//};
+	m_vkInit.features.push_back((void*)&deviceAddressfeature);
 
-	vkInit.features.push_back((void*)&deviceAddressfeature);
-//	vkInit.features.push_back((void*)&indexingFeatures);
+	Initialise();
 
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	FrameState const& frameState = renderer->GetFrameState();
-	vk::Device device = renderer->GetDevice();
-	vk::DescriptorPool pool = renderer->GetDescriptorPool();
-
-	triMesh = GenerateTriangle();
-
-	shader = ShaderBuilder(device)
-		.WithVertexBinary("BasicGeometry.vert.spv")
-		.WithFragmentBinary("BufferDeviceAddress.frag.spv")
-		.Build("Buffer Device Address Shader!");
-
-	pointerBuffer = BufferBuilder(device, renderer->GetMemoryAllocator())
-		.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer)
-		.WithDeviceAddress()
-		.WithHostVisibility()
-		.Build(sizeof(vk::DeviceAddress) * 3, "Pointer Buffer");
+	pointerBuffer = m_memoryManager->CreateBuffer(
+		{
+				.size = sizeof(vk::DeviceAddress) * 3,
+				.usage = vk::BufferUsageFlagBits::eStorageBuffer |
+							vk::BufferUsageFlagBits::eShaderDeviceAddress
+		},
+		vk::MemoryPropertyFlagBits::eHostVisible,
+		"Pointer Buffer"
+	);
 
 	vk::DeviceAddress* addresses = pointerBuffer.Map<vk::DeviceAddress>();
 
 	for (int i = 0; i < 3; ++i) {
-		dataBuffers[i] = BufferBuilder(device, renderer->GetMemoryAllocator())
-			.WithBufferUsage(vk::BufferUsageFlagBits::eStorageBuffer)
-			.WithDeviceAddress()
-			.WithHostVisibility()
-			.Build(sizeof(Vector4), "Data Buffer " + std::to_string(i));
+		dataBuffers[i] = m_memoryManager->CreateBuffer(
+			{
+				.size	= sizeof(Vector4),
+				.usage	= vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress
+			},
+			vk::MemoryPropertyFlagBits::eHostVisible,
+			"Data Buffer " + std::to_string(i)
+		);
 
 		Vector4* colour = dataBuffers[i].Map<Vector4>();
 		*colour = Vector4(0, 0, 0, 1);
@@ -67,19 +59,18 @@ BufferDeviceAddressExample::BufferDeviceAddressExample(Window& window, VulkanIni
 
 	pointerBuffer.Unmap();
 
-	pipeline = PipelineBuilder(device)
-		.WithVertexInputState(triMesh->GetVertexInputState())
+	pipeline = PipelineBuilder(context.device)
+		.WithVertexInputState(m_triangleMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithColourAttachment(frameState.colourFormat)
-		.WithDepthAttachment(frameState.depthFormat)
-		.WithShader(shader)
+		.WithColourAttachment(context.colourFormat)
+		.WithDepthAttachment(context.depthFormat)
+		.WithShaderBinary("BasicGeometry.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("BufferDeviceAddress.frag.spv", vk::ShaderStageFlagBits::eFragment)
 		.Build("Buffer Device Address Pipeline");
 }
 
 void BufferDeviceAddressExample::RenderFrame(float dt) {
-	FrameState const& state = renderer->GetFrameState();
-
-	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	FrameContext const& context = m_renderer->GetFrameContext();
 
 	static int bufferSelection = 0;
 	if (Window::GetKeyboard()->KeyPressed(KeyCodes::NUM1)) {
@@ -92,8 +83,11 @@ void BufferDeviceAddressExample::RenderFrame(float dt) {
 		bufferSelection = 2;
 	}
 
-	state.cmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(vk::DeviceAddress), (void*)&pointerBuffer.deviceAddress);
-	state.cmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eFragment, sizeof(vk::DeviceAddress), sizeof(uint32_t), (void*)&bufferSelection);
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	context.cmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eFragment, 
+		0, sizeof(vk::DeviceAddress), (void*)&pointerBuffer.deviceAddress);
+	context.cmdBuffer.pushConstants(*pipeline.layout, vk::ShaderStageFlagBits::eFragment, 
+		sizeof(vk::DeviceAddress), sizeof(uint32_t), (void*)&bufferSelection);
 
-	triMesh->Draw(state.cmdBuffer);
+	m_triangleMesh->Draw(context.cmdBuffer);
 }

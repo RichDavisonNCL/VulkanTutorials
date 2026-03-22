@@ -18,8 +18,6 @@ namespace NCL::Rendering::Vulkan {
 		void RenderFrame(float dt) override;
 		void	UpdateCameraUniform();
 
-		UniqueVulkanMesh 	triMesh;
-		UniqueVulkanShader	shader;
 		VulkanPipeline		pipeline;
 
 		vk::UniqueDescriptorSet			descriptorSet;

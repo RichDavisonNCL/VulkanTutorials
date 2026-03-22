@@ -23,25 +23,18 @@ struct LightStageUBOData {
 	Vector2 screenResolution;
 };
 
-DeferredExample::DeferredExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window) {	
-	vkInit.autoBeginDynamicRendering = false;
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+DeferredExample::DeferredExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit) {
+	m_vkInit.autoBeginDynamicRendering = false;
+	Initialise();
 
-	vk::Device device = renderer->GetDevice();
-	vk::DescriptorPool pool = renderer->GetDescriptorPool();
-	FrameState const& frameState = renderer->GetFrameState();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	camera.SetPitch(-20.0f).SetPosition({ 0, 75.0f, 200 }).SetFarPlane(1000.0f);
+	m_camera.SetPitch(-20.0f).SetPosition({ 0, 75.0f, 200 }).SetFarPlane(1000.0f);
 
-	cubeMesh	= LoadMesh("Cube.msh");
-	sphereMesh	= LoadMesh("Sphere.msh");
-	quadMesh	= GenerateQuad();
-
-	boxObject.mesh		= &*cubeMesh;
+	boxObject.mesh		= &*m_cubeMesh;
 	boxObject.transform = Matrix::Translation(Vector3{ -50, 10, -50 }) * Matrix::Scale(Vector3{ 10.2f, 10.2f, 10.2f });
 
-	floorObject.mesh		= &*cubeMesh;
+	floorObject.mesh		= &*m_cubeMesh;
 	floorObject.transform = Matrix::Scale(Vector3{ 500.0f, 1.0f, 500.0f });
 
 	objectTextures[0] = LoadTexture("rust_diffuse.png");
@@ -49,8 +42,7 @@ DeferredExample::DeferredExample(Window& window, VulkanInitialisation& vkInit) :
 	objectTextures[2] = LoadTexture("concrete_diffuse.png");
 	objectTextures[3] = LoadTexture("concrete_bump.png");
 
-	LoadShaders();
-	CreateFrameBuffers(hostWindow.GetScreenSize().x, hostWindow.GetScreenSize().y);
+	CreateFrameBuffers(m_hostWindow.GetScreenSize().x, m_hostWindow.GetScreenSize().y);
 	BuildPipelines();
 
 	Light allLights[LIGHTCOUNT];
@@ -66,19 +58,27 @@ DeferredExample::DeferredExample(Window& window, VulkanInitialisation& vkInit) :
 		allLights[i].radius = Maths::RandomValue(25.0f, 50.0f);
 	}
 
-	lightUniform = BufferBuilder(device, renderer->GetMemoryAllocator())
-		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
-		.WithHostVisibility()
-		.Build(sizeof(allLights), "Lights");
+	lightUniform = m_memoryManager->CreateBuffer(
+		{
+			.size = sizeof(allLights),
+			.usage = vk::BufferUsageFlagBits::eUniformBuffer
+		},
+		vk::MemoryPropertyFlagBits::eHostVisible,
+		"Lights"
+	);
 	lightUniform.CopyData(&allLights, sizeof(allLights));
 
-	lightStageUniform = BufferBuilder(device, renderer->GetMemoryAllocator())
-		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
-		.WithHostVisibility()
-		.Build(sizeof(LightStageUBOData), "Light Stage");
+	lightStageUniform = m_memoryManager->CreateBuffer(
+		{
+			.size = sizeof(LightStageUBOData),
+			.usage = vk::BufferUsageFlagBits::eUniformBuffer
+		},
+		vk::MemoryPropertyFlagBits::eHostVisible,
+		"Light Stage"
+	);
 
-	WriteBufferDescriptor(device, *descriptors[Descriptors::LightState], 0, vk::DescriptorType::eUniformBuffer, lightStageUniform);
-	WriteBufferDescriptor(device, *descriptors[Descriptors::Lighting], 0, vk::DescriptorType::eUniformBuffer, lightUniform);
+	WriteBufferDescriptor(context.device, *descriptorSets[Descriptors::LightState], 0, vk::DescriptorType::eUniformBuffer, lightStageUniform);
+	WriteBufferDescriptor(context.device, *descriptorSets[Descriptors::Lighting], 0, vk::DescriptorType::eUniformBuffer, lightUniform);
 
 	UpdateDescriptors();
 }
@@ -87,28 +87,14 @@ void DeferredExample::OnWindowResize(uint32_t width, uint32_t height) {
 	CreateFrameBuffers(width, height);
 }
 
-void	DeferredExample::LoadShaders() {
-	gBufferShader = ShaderBuilder(renderer->GetDevice())
-		.WithVertexBinary("DeferredScene.vert.spv")
-		.WithFragmentBinary("DeferredScene.frag.spv")
-	.Build("Deferred GBuffer Fill Shader");
-
-	lightingShader = ShaderBuilder(renderer->GetDevice())
-		.WithVertexBinary("DeferredLight.vert.spv")
-		.WithFragmentBinary("DeferredLight.frag.spv")
-	.Build("Deferred Lighting Shader");
-
-	combineShader = ShaderBuilder(renderer->GetDevice())
-		.WithVertexBinary("DeferredCombine.vert.spv")
-		.WithFragmentBinary("DeferredCombine.frag.spv")
-	.Build("Deferred Combine Shader");
-}
-
 void	DeferredExample::CreateFrameBuffers(uint32_t width, uint32_t height) {
-	TextureBuilder builder(renderer->GetDevice(), renderer->GetMemoryAllocator());
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	builder.UsingPool(renderer->GetCommandPool(CommandType::Graphics))
-			.UsingQueue(renderer->GetQueue(CommandType::Graphics))
+	vk::UniqueCommandBuffer cmdBuffer = Vulkan::CmdBufferCreateBegin(context.device, context.commandPools[CommandType::Graphics]);
+
+	TextureBuilder builder(context.device, *m_memoryManager);
+
+	builder.WithCommandBuffer(*cmdBuffer)
 			.WithDimension(width, height, 1)
 			.WithMips(false)
 			.WithUsages(vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled)
@@ -128,54 +114,57 @@ void	DeferredExample::CreateFrameBuffers(uint32_t width, uint32_t height) {
 		.WithAspects(vk::ImageAspectFlagBits::eDepth)
 	.Build("GBuffer Depth");
 
+	Vulkan::CmdBufferEndSubmitWait(*cmdBuffer, context.device, context.queues[CommandType::Graphics]);
+
 	UpdateDescriptors();
 }
 
 void	DeferredExample::UpdateDescriptors() {
-	if (!descriptors[Descriptors::LightTexture]) {
+	if (!descriptorSets[Descriptors::LightTexture]) {
 		return;
 	}
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	DescriptorSetWriter(renderer->GetDevice(), *descriptors[Descriptors::LightTexture])
-		.WriteImage(0, *bufferTextures[1], *defaultSampler)
-		.WriteImage(1, *bufferTextures[2], *defaultSampler, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+	DescriptorSetWriter(context.device, *descriptorSets[Descriptors::LightTexture])
+		.WriteImage(0, *bufferTextures[1], *m_defaultSampler)
+		.WriteImage(1, *bufferTextures[2], *m_defaultSampler, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
 
-	DescriptorSetWriter(renderer->GetDevice(), *descriptors[Descriptors::Combine])
-		.WriteImage(0, *bufferTextures[0], *defaultSampler)
-		.WriteImage(1, *bufferTextures[3], *defaultSampler)
-		.WriteImage(2, *bufferTextures[4], *defaultSampler);
+	DescriptorSetWriter(context.device, *descriptorSets[Descriptors::Combine])
+		.WriteImage(0, *bufferTextures[0], *m_defaultSampler)
+		.WriteImage(1, *bufferTextures[3], *m_defaultSampler)
+		.WriteImage(2, *bufferTextures[4], *m_defaultSampler);
 }
 
 void	DeferredExample::BuildPipelines() {
-	vk::Device device = renderer->GetDevice();
-	vk::DescriptorPool pool = renderer->GetDescriptorPool();
-	FrameState const& frameState = renderer->GetFrameState();
+	FrameContext const& context = m_renderer->GetFrameContext();
 	{
-		gBufferPipeline = PipelineBuilder(device)
-			.WithVertexInputState(cubeMesh->GetVertexInputState())
+		gBufferPipeline = PipelineBuilder(context.device)
+			.WithVertexInputState(m_cubeMesh->GetVertexInputState())
 			.WithTopology(vk::PrimitiveTopology::eTriangleList)
-			.WithShader(gBufferShader)
+			.WithShaderBinary("DeferredScene.vert.spv", vk::ShaderStageFlagBits::eVertex)
+			.WithShaderBinary("DeferredScene.frag.spv", vk::ShaderStageFlagBits::eFragment)
 			.WithColourAttachment(bufferTextures[ScreenTextures::Albedo]->GetFormat())
 			.WithColourAttachment(bufferTextures[ScreenTextures::Normals]->GetFormat())
 			.WithDepthAttachment(bufferTextures[ScreenTextures::Depth]->GetFormat(), vk::CompareOp::eLessOrEqual, true, true)
 			.Build("Main Scene Pipeline");
 
-		boxObject.descriptorSet		= CreateDescriptorSet(device, pool, gBufferShader->GetLayout(1));
-		floorObject.descriptorSet	= CreateDescriptorSet(device, pool, gBufferShader->GetLayout(1));
+		boxObject.descriptorSet		= CreateDescriptorSet(context.device, context.descriptorPool, gBufferPipeline.GetSetLayout(1));
+		floorObject.descriptorSet	= CreateDescriptorSet(context.device, context.descriptorPool, gBufferPipeline.GetSetLayout(1));
 
-		DescriptorSetWriter(device, *boxObject.descriptorSet)
-			.WriteImage(0, *objectTextures[0], *defaultSampler)
-			.WriteImage(1, *objectTextures[1], *defaultSampler);
+		DescriptorSetWriter(context.device, *boxObject.descriptorSet)
+			.WriteImage(0, *objectTextures[0], *m_defaultSampler)
+			.WriteImage(1, *objectTextures[1], *m_defaultSampler);
 
-		DescriptorSetWriter(device, *floorObject.descriptorSet)
-			.WriteImage(0, *objectTextures[2], *defaultSampler)
-			.WriteImage(1, *objectTextures[3], *defaultSampler);
+		DescriptorSetWriter(context.device, *floorObject.descriptorSet)
+			.WriteImage(0, *objectTextures[2], *m_defaultSampler)
+			.WriteImage(1, *objectTextures[3], *m_defaultSampler);
 	}
 	{
-		lightPipeline = PipelineBuilder(device)
-			.WithVertexInputState(sphereMesh->GetVertexInputState())
+		lightPipeline = PipelineBuilder(context.device)
+			.WithVertexInputState(m_sphereMesh->GetVertexInputState())
 			.WithTopology(vk::PrimitiveTopology::eTriangleList)
-			.WithShader(lightingShader)
+			.WithShaderBinary("DeferredLight.vert.spv", vk::ShaderStageFlagBits::eVertex)
+			.WithShaderBinary("DeferredLight.frag.spv", vk::ShaderStageFlagBits::eFragment)
 			.WithRasterState(vk::CullModeFlagBits::eFront, vk::PolygonMode::eFill)
 
 			.WithColourAttachment(bufferTextures[ScreenTextures::Diffuse]->GetFormat(), vk::BlendFactor::eOne, vk::BlendFactor::eOne)
@@ -183,32 +172,33 @@ void	DeferredExample::BuildPipelines() {
 
 		.Build("Deferred Lighting Pipeline");
 
-		descriptors[Descriptors::Lighting]		= CreateDescriptorSet(device, pool, lightingShader->GetLayout(1));
-		descriptors[Descriptors::LightState]	= CreateDescriptorSet(device, pool, lightingShader->GetLayout(2));
-		descriptors[Descriptors::LightTexture]	= CreateDescriptorSet(device, pool, lightingShader->GetLayout(3));
+		descriptorSets[Descriptors::Lighting]		= CreateDescriptorSet(context.device, context.descriptorPool, lightPipeline.GetSetLayout(1));
+		descriptorSets[Descriptors::LightState]	= CreateDescriptorSet(context.device, context.descriptorPool, lightPipeline.GetSetLayout(2));
+		descriptorSets[Descriptors::LightTexture]	= CreateDescriptorSet(context.device, context.descriptorPool, lightPipeline.GetSetLayout(3));
 	}
 	{
-		combinePipeline = PipelineBuilder(device)
-			.WithVertexInputState(quadMesh->GetVertexInputState())
+		combinePipeline = PipelineBuilder(context.device)
+			.WithVertexInputState(m_quadMesh->GetVertexInputState())
 			.WithTopology(vk::PrimitiveTopology::eTriangleStrip)
-			.WithShader(combineShader)		
-			.WithColourAttachment(frameState.colourFormat)
-			.WithDepthAttachment(frameState.depthFormat)
+			.WithShaderBinary("DeferredCombine.vert.spv", vk::ShaderStageFlagBits::eVertex)
+			.WithShaderBinary("DeferredCombine.frag.spv", vk::ShaderStageFlagBits::eFragment)
+			.WithColourAttachment(context.colourFormat)
+			.WithDepthAttachment(context.depthFormat)
 		.Build("Post process pipeline");
 
-		descriptors[Descriptors::Combine] = CreateDescriptorSet(device, pool, combineShader->GetLayout(0));
+		descriptorSets[Descriptors::Combine] = CreateDescriptorSet(context.device, context.descriptorPool, combinePipeline.GetSetLayout(0));
 	}
 }
 
 void DeferredExample::RenderFrame(float dt) {
 	LightStageUBOData newData;
-	newData.camPosition = camera.GetPosition();
+	newData.camPosition = m_camera.GetPosition();
 
-	Vector2i screenSize = hostWindow.GetScreenSize();
+	Vector2i screenSize = m_hostWindow.GetScreenSize();
 
 	newData.screenResolution.x = 1.0f / (float)(screenSize.x);
 	newData.screenResolution.y = 1.0f / (float)(screenSize.y);
-	newData.inverseViewProj = Matrix::Inverse(camera.BuildProjectionMatrix(hostWindow.GetScreenAspect()) * camera.BuildViewMatrix());
+	newData.inverseViewProj = Matrix::Inverse(m_camera.BuildProjectionMatrix(m_hostWindow.GetScreenAspect()) * m_camera.BuildViewMatrix());
 
 	lightStageUniform.CopyData(&newData, sizeof(LightStageUBOData));
 
@@ -218,10 +208,10 @@ void DeferredExample::RenderFrame(float dt) {
 }
 
 void	DeferredExample::FillGBuffer() {
-	FrameState const& frameState = renderer->GetFrameState();
-	frameState.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, gBufferPipeline);
+	FrameContext const& context = m_renderer->GetFrameContext();
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, gBufferPipeline);
 
-	frameState.cmdBuffer.beginRendering(
+	context.cmdBuffer.beginRendering(
 		DynamicRenderBuilder()
 			.WithColourAttachment({
 				.imageView		= *bufferTextures[ScreenTextures::Albedo],
@@ -241,79 +231,81 @@ void	DeferredExample::FillGBuffer() {
 				.loadOp			= vk::AttachmentLoadOp::eClear,
 				.clearValue		= vk::ClearValue({1.0f})
 			})
-			.WithRenderArea(frameState.defaultScreenRect)
+			.WithRenderArea(context.screenRect)
 			.Build()
 	);
 
-	WriteBufferDescriptor(renderer->GetDevice(), *cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, cameraBuffer);
-	frameState.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *gBufferPipeline.layout, 0, 1, &*cameraDescriptor, 0, nullptr);
+	WriteBufferDescriptor(context.device, *m_cameraDescriptor, 0, vk::DescriptorType::eUniformBuffer, m_cameraBuffer);
+	context.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *gBufferPipeline.layout, 0, 1, &*m_cameraDescriptor, 0, nullptr);
 
-	RenderSingleObject(boxObject	, frameState.cmdBuffer, gBufferPipeline	, 1);
-	RenderSingleObject(floorObject	, frameState.cmdBuffer, gBufferPipeline	, 1);
+	RenderSingleObject(boxObject	, context.cmdBuffer, gBufferPipeline	, 1);
+	RenderSingleObject(floorObject	, context.cmdBuffer, gBufferPipeline	, 1);
 
-	frameState.cmdBuffer.endRendering();
+	context.cmdBuffer.endRendering();
 }
 
 void	DeferredExample::RenderLights() {	//Second step: Take in the GBuffer and render lights
-	FrameState const& frameState = renderer->GetFrameState();
-	frameState.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, lightPipeline);
-	TransitionColourToSampler(frameState.cmdBuffer, *bufferTextures[ScreenTextures::Normals]);
-	TransitionDepthToSampler(frameState.cmdBuffer, *bufferTextures[ScreenTextures::Depth]);
+	FrameContext const& context = m_renderer->GetFrameContext();
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, lightPipeline);
+	TransitionColourToSampler(context.cmdBuffer, *bufferTextures[ScreenTextures::Normals]);
+	TransitionDepthToSampler(context.cmdBuffer, *bufferTextures[ScreenTextures::Depth]);
 
-	frameState.cmdBuffer.beginRendering(
+	context.cmdBuffer.beginRendering(
 		DynamicRenderBuilder()
 		.WithColourAttachment({
-			.imageView = *bufferTextures[ScreenTextures::Diffuse],
-			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-			.loadOp = vk::AttachmentLoadOp::eClear,
-			.clearValue = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f)
+			.imageView		= *bufferTextures[ScreenTextures::Diffuse],
+			.imageLayout	= vk::ImageLayout::eColorAttachmentOptimal,
+			.loadOp			= vk::AttachmentLoadOp::eClear,
+			.clearValue		= vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f)
 			})
 		.WithColourAttachment({
-			.imageView = *bufferTextures[ScreenTextures::Specular],
-			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-			.loadOp = vk::AttachmentLoadOp::eClear,
-			.clearValue = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f)
+			.imageView		= *bufferTextures[ScreenTextures::Specular],
+			.imageLayout	= vk::ImageLayout::eColorAttachmentOptimal,
+			.loadOp			= vk::AttachmentLoadOp::eClear,
+			.clearValue		= vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f)
 			})
-		.WithRenderArea(frameState.defaultScreenRect)
+		.WithRenderArea(context.screenRect)
 		.Build()
 	);
 
-	DescriptorSetMultiBinder()
-		.Bind(*cameraDescriptor, 0)
-		.Bind(*descriptors[Descriptors::Lighting], 1)
-		.Bind(*descriptors[Descriptors::LightState], 2)
-		.Bind(*descriptors[Descriptors::LightTexture], 3)
-		.Commit(frameState.cmdBuffer, *lightPipeline.layout);
+	vk::DescriptorSet sets[] = {
+		*m_cameraDescriptor,
+		*descriptorSets[Descriptors::Lighting],
+		*descriptorSets[Descriptors::LightState],
+		*descriptorSets[Descriptors::LightTexture],
+	};
 
-	sphereMesh->Draw(frameState.cmdBuffer, LIGHTCOUNT);
+	context.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *lightPipeline.layout, 0, std::size(sets), sets, 0, nullptr);
 
-	frameState.cmdBuffer.endRendering();
+	m_sphereMesh->Draw(context.cmdBuffer, LIGHTCOUNT);
+
+	context.cmdBuffer.endRendering();
 }
 
 void	DeferredExample::CombineBuffers() {
-	FrameState const& frameState = renderer->GetFrameState();
-	vk::CommandBuffer cmdBuffer = frameState.cmdBuffer;
+	FrameContext const& context = m_renderer->GetFrameContext();
+	vk::CommandBuffer m_cmdBuffer = context.cmdBuffer;
 
-	TransitionColourToSampler(cmdBuffer, *bufferTextures[ScreenTextures::Albedo]);
-	TransitionColourToSampler(cmdBuffer, *bufferTextures[ScreenTextures::Diffuse]);
-	TransitionColourToSampler(cmdBuffer, *bufferTextures[ScreenTextures::Specular]);
+	TransitionColourToSampler(m_cmdBuffer, *bufferTextures[ScreenTextures::Albedo]);
+	TransitionColourToSampler(m_cmdBuffer, *bufferTextures[ScreenTextures::Diffuse]);
+	TransitionColourToSampler(m_cmdBuffer, *bufferTextures[ScreenTextures::Specular]);
 
-	cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, combinePipeline);
+	m_cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, combinePipeline);
 
-	renderer->BeginDefaultRendering(cmdBuffer);
+	m_renderer->BeginRenderToScreen(m_cmdBuffer);
 
-	cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *combinePipeline.layout, 0, 1, &*descriptors[Descriptors::Combine], 0, nullptr);
+	m_cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *combinePipeline.layout, 0, 1, &*descriptorSets[Descriptors::Combine], 0, nullptr);
 
-	quadMesh->Draw(cmdBuffer);
+	m_quadMesh->Draw(m_cmdBuffer);
 
-	cmdBuffer.endRendering();
+	m_cmdBuffer.endRendering();
 
-	TransitionSamplerToColour(cmdBuffer, *bufferTextures[ScreenTextures::Albedo]);
-	TransitionSamplerToColour(cmdBuffer, *bufferTextures[ScreenTextures::Normals]);
+	TransitionSamplerToColour(m_cmdBuffer, *bufferTextures[ScreenTextures::Albedo]);
+	TransitionSamplerToColour(m_cmdBuffer, *bufferTextures[ScreenTextures::Normals]);
 
-	TransitionSamplerToDepth(cmdBuffer, *bufferTextures[ScreenTextures::Depth]);
+	TransitionSamplerToDepth(m_cmdBuffer, *bufferTextures[ScreenTextures::Depth]);
 
-	TransitionSamplerToColour(cmdBuffer, *bufferTextures[ScreenTextures::Diffuse]);
-	TransitionSamplerToColour(cmdBuffer, *bufferTextures[ScreenTextures::Specular]);
+	TransitionSamplerToColour(m_cmdBuffer, *bufferTextures[ScreenTextures::Diffuse]);
+	TransitionSamplerToColour(m_cmdBuffer, *bufferTextures[ScreenTextures::Specular]);
 }
 //Old tutorial was 264 LOC...

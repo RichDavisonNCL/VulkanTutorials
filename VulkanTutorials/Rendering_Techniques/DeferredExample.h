@@ -19,7 +19,6 @@ namespace NCL::Rendering::Vulkan {
 
 	protected:
 		void	RenderFrame(float dt) override;
-		void	LoadShaders();
 		void	CreateFrameBuffers(uint32_t width, uint32_t height);
 		void	BuildPipelines();
 
@@ -29,19 +28,11 @@ namespace NCL::Rendering::Vulkan {
 		void	CombineBuffers();
 		void	UpdateDescriptors();
 
-		UniqueVulkanShader gBufferShader;
-		UniqueVulkanShader lightingShader;
-		UniqueVulkanShader combineShader;
-
 		VulkanBuffer lightUniform;
 		VulkanBuffer lightStageUniform;
 
 		RenderObject boxObject;
 		RenderObject floorObject;
-
-		UniqueVulkanMesh sphereMesh;
-		UniqueVulkanMesh cubeMesh;
-		UniqueVulkanMesh quadMesh;
 
 		enum ScreenTextures {
 			Albedo,
@@ -63,7 +54,7 @@ namespace NCL::Rendering::Vulkan {
 		UniqueVulkanTexture bufferTextures[ScreenTextures::MAX_TEXTURES];
 		UniqueVulkanTexture objectTextures[4];
 
-		vk::UniqueDescriptorSet	descriptors[Descriptors::MAX_DESCRIPTORS];
+		vk::UniqueDescriptorSet	descriptorSets[Descriptors::MAX_DESCRIPTORS];
 
 		VulkanPipeline	gBufferPipeline;
 		VulkanPipeline	lightPipeline;

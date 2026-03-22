@@ -19,11 +19,7 @@ namespace NCL::Rendering::Vulkan {
 
         VulkanPipeline	    pipeline;
 
-        UniqueVulkanMesh 	triMesh;
-        UniqueVulkanShader	shader;
-
         VulkanBuffer	    pointerBuffer;
-
         VulkanBuffer	    dataBuffers[3];
     };
 }

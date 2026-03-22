@@ -19,8 +19,6 @@ namespace NCL::Rendering::Vulkan {
 	protected:
 		void RenderFrame(float dt) override;
 
-		UniqueVulkanShader shader;
-
 		GLTFScene  scene;
 
 		std::vector<std::vector<vk::UniqueDescriptorSet>>	 layerDescriptors;

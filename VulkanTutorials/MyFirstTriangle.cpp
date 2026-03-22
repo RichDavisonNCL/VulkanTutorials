@@ -13,30 +13,23 @@ using namespace Vulkan;
 
 TUTORIAL_ENTRY(MyFirstTriangle)
 
-MyFirstTriangle::MyFirstTriangle(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window)	{
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+MyFirstTriangle::MyFirstTriangle(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit)	{
+	Initialise();
 
-	triMesh = GenerateTriangle();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	shader = ShaderBuilder(renderer->GetDevice())
-		.WithVertexBinary("BasicGeometry.vert.spv")
-		.WithFragmentBinary("BasicGeometry.frag.spv")
-	.Build("Basic Shader!");
-
-	FrameState const& frameState = renderer->GetFrameState();
-
-	basicPipeline = PipelineBuilder(renderer->GetDevice())
-		.WithVertexInputState(triMesh->GetVertexInputState())
+	pipeline = PipelineBuilder(context.device)
+		.WithVertexInputState(m_triangleMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithColourAttachment(frameState.colourFormat)
-		.WithDepthAttachment(frameState.depthFormat)
-		.WithShader(shader)
+		.WithColourAttachment(context.colourFormat)
+		.WithDepthAttachment(context.depthFormat)
+		.WithShaderBinary("BasicGeometry.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("BasicGeometry.frag.spv", vk::ShaderStageFlagBits::eFragment)
 	.Build("Basic Pipeline");
 }
 
 void MyFirstTriangle::RenderFrame(float dt) {
-	FrameState const& state = renderer->GetFrameState();
-	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, basicPipeline);
-	triMesh->Draw(state.cmdBuffer);
+	FrameContext const& context = m_renderer->GetFrameContext();
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	m_triangleMesh->Draw(context.cmdBuffer);
 }

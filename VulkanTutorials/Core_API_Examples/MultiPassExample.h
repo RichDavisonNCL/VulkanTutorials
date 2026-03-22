@@ -13,7 +13,7 @@ class BasicMultiPassRenderer : public VulkanRenderer
 {
 public:
 	BasicMultiPassRenderer(Window& window, VulkanInitialisation& vkInit);
-	~BasicMultiPassRenderer();
+	~BasicMultiPassRenderer() = default;
 
 	void Initialise() override;
 protected:
@@ -47,7 +47,7 @@ protected:
 
 
 	UniformData cameraData;
-	Camera		camera;
+	Camera		m_camera;
 
 	Matrix4*	cameraMemory;
 };

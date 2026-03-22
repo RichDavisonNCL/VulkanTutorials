@@ -15,76 +15,69 @@ TUTORIAL_ENTRY(InlineUniformBufferExample)
 
 const size_t byteCount = sizeof(Matrix4) * 2;
 
-InlineUniformBufferExample::InlineUniformBufferExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window)	{
+InlineUniformBufferExample::InlineUniformBufferExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit)	{
 	static vk::PhysicalDeviceInlineUniformBlockFeatures blockFeatures;
 	blockFeatures.inlineUniformBlock = true;
 
-	vkInit.features.push_back(&blockFeatures);
+	m_vkInit.features.push_back(&blockFeatures);
 
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+	Initialise();
 
-	triMesh = GenerateTriangle();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	shader = ShaderBuilder(renderer->GetDevice())
-		.WithVertexBinary("BasicUniformBuffer.vert.spv")
-		.WithFragmentBinary("BasicUniformBuffer.frag.spv")
-		.Build("Basic Uniform Buffer Usage!");
-
-	inlineLayout = DescriptorSetLayoutBuilder(renderer->GetDevice())
+	inlineLayout = DescriptorSetLayoutBuilder(context.device)
 		.WithDescriptor(vk::DescriptorType::eInlineUniformBlock, 0, byteCount, vk::ShaderStageFlagBits::eVertex)
 		.Build("Inline Layout"); //New!
 
 	camera.SetPosition({ 0,0,10 });
 
-	FrameState const& frameState = renderer->GetFrameState();
-
-	pipeline = PipelineBuilder(renderer->GetDevice())
-		.WithVertexInputState(triMesh->GetVertexInputState())
+	pipeline = PipelineBuilder(context.device)
+		.WithVertexInputState(m_triangleMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShader(shader)
-		.WithColourAttachment(frameState.colourFormat)
-		.WithDepthAttachment(frameState.depthFormat)
+		.WithShaderBinary("BasicUniformBuffer.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("BasicUniformBuffer.frag.spv", vk::ShaderStageFlagBits::eFragment)
+		.WithColourAttachment(context.colourFormat)
+		.WithDepthAttachment(context.depthFormat)
 		.WithDescriptorSetLayout(0, inlineLayout) //New!
 		.Build("UBO Pipeline");
 
-	descriptorSet = CreateDescriptorSet(renderer->GetDevice(), renderer->GetDescriptorPool(), *inlineLayout); //Changed!
-}
-
-InlineUniformBufferExample::~InlineUniformBufferExample() {
+	descriptorSet = CreateDescriptorSet(context.device, context.descriptorPool, *inlineLayout); //Changed!
 }
 
 void InlineUniformBufferExample::RenderFrame(float dt) {
-	FrameState const& state = renderer->GetFrameState();
+	FrameContext const& context = m_renderer->GetFrameContext();
 	camera.UpdateCamera(dt);
 
-	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
-	UpdateCameraUniform(state.cmdBuffer);
+	UpdateCameraUniform(context.cmdBuffer);
 
-	state.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*descriptorSet, 0, nullptr);
+	context.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 1, &*descriptorSet, 0, nullptr);
 
-	triMesh->Draw(state.cmdBuffer);
+	m_triangleMesh->Draw(context.cmdBuffer);
 }
 
 void InlineUniformBufferExample::UpdateCameraUniform(vk::CommandBuffer buffer) {
-	Matrix4 camMatrices[2];
-	camMatrices[0] = camera.BuildViewMatrix();
-	camMatrices[1] = camera.BuildProjectionMatrix(hostWindow.GetScreenAspect());
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	vk::WriteDescriptorSetInlineUniformBlock inlineWrite;
-
-	inlineWrite.dataSize = byteCount;
-	inlineWrite.pData = &camMatrices;
-
-	vk::WriteDescriptorSet descriptorWrite = {
-		.pNext  = &inlineWrite,	//New!
-		.dstSet = *descriptorSet,
-		.dstBinding = 0,
-		.dstArrayElement = 0,
-		.descriptorCount = byteCount,
-		.descriptorType = vk::DescriptorType::eInlineUniformBlock, //New!
+	Matrix4 camMatrices[2] = {
+		camera.BuildViewMatrix(),
+		camera.BuildProjectionMatrix(m_hostWindow.GetScreenAspect())
 	};
 
-	renderer->GetDevice().updateDescriptorSets(1, &descriptorWrite, 0, nullptr);
+	vk::WriteDescriptorSetInlineUniformBlock inlineWrite = {
+		.dataSize	= byteCount,
+		.pData		= &camMatrices
+	};
+
+	vk::WriteDescriptorSet descriptorWrite = {
+		.pNext				= &inlineWrite,	//New!
+		.dstSet				= *descriptorSet,
+		.dstBinding			= 0,
+		.dstArrayElement	= 0,
+		.descriptorCount	= byteCount, //Changed!
+		.descriptorType		= vk::DescriptorType::eInlineUniformBlock, //New!
+	};
+
+	context.device.updateDescriptorSets(1, &descriptorWrite, 0, nullptr);
 }

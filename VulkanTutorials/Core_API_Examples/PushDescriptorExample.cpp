@@ -13,81 +13,81 @@ using namespace Vulkan;
 
 TUTORIAL_ENTRY(PushDescriptorExample)
 
-PushDescriptorExample::PushDescriptorExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window) {
-	vkInit.deviceExtensions.emplace_back(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+PushDescriptorExample::PushDescriptorExample(Window& window, VulkanInitialisation& vkInit) : VulkanTutorial(window, vkInit) {
+	m_vkInit.deviceExtensions.emplace_back(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
 
-	renderer = new VulkanRenderer(window, vkInit);
-	InitTutorialObjects();
+	Initialise();
 
 	vk::PhysicalDeviceProperties2 physicalProps;
 	vk::PhysicalDevicePushDescriptorPropertiesKHR pushProps;
 	physicalProps.pNext = &pushProps;
-	renderer->GetPhysicalDevice().getProperties2(&physicalProps);
+	m_renderer->GetPhysicalDevice().getProperties2(&physicalProps);
 	std::cout << __FUNCTION__ << ": Physical device supports " << pushProps.maxPushDescriptors << " push descriptors\n";
 
-	triMesh = GenerateTriangle();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
-	shader = ShaderBuilder(renderer->GetDevice())
-		.WithVertexBinary("BasicDescriptor.vert.spv")
-		.WithFragmentBinary("BasicDescriptor.frag.spv")
-		.Build("Basic Descriptor Shader!");
+	uniformData[0] = m_memoryManager->CreateBuffer(
+		{
+			.size	= sizeof(positionUniform),
+			.usage	= vk::BufferUsageFlagBits::eUniformBuffer
+		},
+		vk::MemoryPropertyFlagBits::eHostVisible,
+		"Position Uniform"
+	);
 
-	descriptorLayout = DescriptorSetLayoutBuilder(renderer->GetDevice())
-		.WithDescriptors(shader->GetLayoutBinding(0))
-		.WithCreationFlags(vk::DescriptorSetLayoutCreateFlagBits::ePushDescriptorKHR)	//New!
-		.Build("Uniform Data");
+	uniformData[1] = m_memoryManager->CreateBuffer(
+		{
+			.size	= sizeof(colourUniform),
+			.usage	= vk::BufferUsageFlagBits::eUniformBuffer
+		},
+		vk::MemoryPropertyFlagBits::eHostVisible,
+		"Colour Uniform"
+	);
 
-	uniformData[0] = BufferBuilder(renderer->GetDevice(), renderer->GetMemoryAllocator())
-		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
-		.WithHostVisibility()
-		.Build(sizeof(positionUniform), "Position Uniform");
-
-	uniformData[1] = BufferBuilder(renderer->GetDevice(), renderer->GetMemoryAllocator())
-		.WithBufferUsage(vk::BufferUsageFlagBits::eUniformBuffer)
-		.WithHostVisibility()
-		.Build(sizeof(colourUniform), "Colour Uniform");
-
-	FrameState const& frameState = renderer->GetFrameState();
-
-	pipeline = PipelineBuilder(renderer->GetDevice())
-		.WithVertexInputState(triMesh->GetVertexInputState())
+	pipeline = PipelineBuilder(context.device)
+		.WithVertexInputState(m_triangleMesh->GetVertexInputState())
 		.WithTopology(vk::PrimitiveTopology::eTriangleList)
-		.WithShader(shader)
-		.WithDescriptorSetLayout(0, *descriptorLayout)
-		.WithColourAttachment(frameState.colourFormat)
-		.WithDepthAttachment(frameState.depthFormat)
+		.WithShaderBinary("BasicDescriptor.vert.spv", vk::ShaderStageFlagBits::eVertex)
+		.WithShaderBinary("BasicDescriptor.frag.spv", vk::ShaderStageFlagBits::eFragment)
+		.WithDescriptorSetLayoutCreationFlags(0, vk::DescriptorSetLayoutCreateFlagBits::ePushDescriptorKHR)
+		.WithColourAttachment(context.colourFormat)
+		.WithDepthAttachment(context.depthFormat)
 	.Build("Descriptor Buffer Pipeline");
 }
 
 void PushDescriptorExample::RenderFrame(float dt) {
-	Vector3 positionUniform = Vector3(sin(runTime), 0.0, 0.0f);
-	Vector4 colourUniform	= Vector4(sin(runTime), 0, 1, 1);
+	Vector3 positionUniform = Vector3(sin(m_runTime), 0.0, 0.0f);
+	Vector4 colourUniform	= Vector4(sin(m_runTime), 0, 1, 1);
 
-	FrameState const& state = renderer->GetFrameState();
+	FrameContext const& context = m_renderer->GetFrameContext();
 
 	uniformData[0].CopyData((void*)&positionUniform, sizeof(positionUniform));
 	uniformData[1].CopyData((void*)&colourUniform, sizeof(colourUniform));
 
-	state.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	context.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
 	vk::DescriptorBufferInfo bufferInfo[2] = {
 		{ uniformData[0].buffer, 0, VK_WHOLE_SIZE },
 		{ uniformData[1].buffer, 0, VK_WHOLE_SIZE }
 	};
 
-	vk::WriteDescriptorSet pushSets[2];
+	vk::WriteDescriptorSet pushSets[2] = {
+		{
+			.dstBinding			= 0,
+			.descriptorCount	= 1,
+			.descriptorType		= vk::DescriptorType::eUniformBuffer,
+			.pBufferInfo		= &bufferInfo[0]
+		}
+		,
+		{
+			.dstBinding			= 1,
+			.descriptorCount	= 1,
+			.descriptorType		= vk::DescriptorType::eUniformBuffer,
+			.pBufferInfo		= &bufferInfo[1]
+		}
+	};
 
-	pushSets[0].setDstBinding(0)
-			   .setDescriptorCount(1)
-			   .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-			   .setBufferInfo(bufferInfo[0]);
+	context.cmdBuffer.pushDescriptorSetKHR(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, std::size(pushSets), pushSets);
 
-	pushSets[1].setDstBinding(1)
-			   .setDescriptorCount(1)
-			   .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-			   .setBufferInfo(bufferInfo[1]);
-
-	state.cmdBuffer.pushDescriptorSetKHR(vk::PipelineBindPoint::eGraphics, *pipeline.layout, 0, 2, pushSets);
-
-	triMesh->Draw(state.cmdBuffer);
+	m_triangleMesh->Draw(context.cmdBuffer);
 }
