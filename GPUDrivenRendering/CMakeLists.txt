@@ -30,7 +30,7 @@ target_compile_definitions(${TARGET_NAME} PRIVATE
 # ImGui support (optional, for interactive debug mode)
 if(COMPILE_WITH_IMGUI)
     target_compile_definitions(${TARGET_NAME} PRIVATE USE_IMGUI=1)
-    target_include_directories(${TARGET_NAME} PRIVATE ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+    target_include_directories(${TARGET_NAME} PRIVATE ${IMGUI_DIR} ${IMGUI_DIR}/backends ${CMAKE_SOURCE_DIR}/imgui)
     file(GLOB IMGUI_SOURCES ${IMGUI_DIR}/imgui*.cpp
         ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
         ${IMGUI_DIR}/backends/imgui_impl_win32.cpp)

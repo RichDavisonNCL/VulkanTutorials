@@ -118,6 +118,11 @@ public:
 	void SetGui(GuiWrapper* gui) { m_gui = gui; }
 #endif
 
+	void GenerateScene(const std::vector<uint32_t>& tileGrid);
+	void CreateBuffers();
+	void CreateDescriptorSets();
+	void CreateQueryPool();
+
 protected:
 	void Initialise();
 	void BuildCamera();
@@ -126,11 +131,7 @@ protected:
 	void UploadMeshWait(VulkanMesh& m);
 
 	void GenerateScene();
-	void GenerateScene(const std::vector<uint32_t>& tileGrid);
-	void CreateBuffers();
 	void CreatePipelines();
-	void CreateDescriptorSets();
-	void CreateQueryPool();
 	void WriteInstanceData();
 	void ComputeChunkAABBs();
 	void ReadbackGPUVisibility();
