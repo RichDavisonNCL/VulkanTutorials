@@ -4,6 +4,7 @@
  * Benchmark mode: headless, runs warmup + recording frames, outputs CSV.
  */
 #include "GPUSceneManagement.h"
+#include "BenchmarkPanel.h"
 
 #ifdef USE_IMGUI
 #include "GuiWrapper.h"
@@ -91,10 +92,12 @@ int main(int argc, char* argv[]) {
 
 #ifdef USE_IMGUI
 	GuiWrapper* gui = nullptr;
+	BenchmarkPanel benchPanel;
 	if (!benchmarkMode) {
 		gui = new GuiWrapper();
 		gui->Init(static_cast<Win32Code::Win32Window*>(w)->GetHandle(), app.GetRenderer());
 		app.SetGui(gui);
+		app.SetBenchPanel(&benchPanel);
 	}
 #endif
 

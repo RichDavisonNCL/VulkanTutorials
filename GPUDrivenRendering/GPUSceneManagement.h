@@ -38,6 +38,8 @@
 #include "VulkanUtils.h"
 #include "VulkanMemoryManager.h"
 
+class BenchmarkPanel;
+
 #ifdef USE_IMGUI
 #include "GuiWrapper.h"
 #endif
@@ -116,6 +118,7 @@ public:
 
 #ifdef USE_IMGUI
 	void SetGui(GuiWrapper* gui) { m_gui = gui; }
+	void SetBenchPanel(BenchmarkPanel* panel) { m_benchPanel = panel; }
 #endif
 
 	void GenerateScene(const std::vector<uint32_t>& tileGrid);
@@ -209,6 +212,7 @@ protected:
 	float m_cellSize = 4.0f;
 #ifdef USE_IMGUI
 	GuiWrapper* m_gui = nullptr;
+	BenchmarkPanel* m_benchPanel = nullptr;
 #endif
 
 	VulkanTexture* m_offscreenColour;

@@ -21,6 +21,8 @@
 #include "ChunkMonitor.h"
 #include "Win32Window.h"
 
+#include "BenchmarkPanel.h"
+
 using namespace NCL;
 using namespace Rendering;
 using namespace Vulkan;
@@ -247,20 +249,15 @@ void GPUSceneManagement::RunFrame(float dt) {
 		}
 		m_gui->StartNewFrame();
 
-		// Main info panel
-		ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-		ImGui::Begin("GPU-Driven Scene Management");
-		ImGui::Text("Scheme: %d  Frame: %u  Instances: %u  Chunks: %zu",
-			(int)m_benchConfig.scheme, m_currentFrame,
-			m_totalInstances, m_chunks.size());
-		ImGui::Separator();
-		ImGui::Text("Camera: %.1f, %.1f, %.1f  Pitch: %.1f  Yaw: %.1f",
-			m_camera.GetPosition().x, m_camera.GetPosition().y, m_camera.GetPosition().z,
-			m_camera.GetPitch(), m_camera.GetYaw());
-		uint32_t visChunks = 0;
-		for (bool v : m_chunkVisible) if (v) ++visChunks;
-		ImGui::Text("Visible chunks: %u / %zu", visChunks, m_chunks.size());
-		ImGui::End();
+		// BenchmarkPanel
+		if (m_benchPanel) m_benchPanel->Render(this);
+		if (m_benchPanel && m_benchPanel->ShouldRenderPartial()) {
+			UpdateSceneFromTileGrid(m_benchPanel->GetPartialTileGrid());
+			SetRenderPartial(true);
+		}
+		if (m_benchPanel && m_benchPanel->GenerationReady() && m_benchPanel->GetState() == PanelState::Ready) {
+			SetRenderPartial(false);
+		}
 
 		// ChunkMonitor panel (lazy-init on first frame)
 		if (!m_monitor && m_gridChunks > 0 && m_gridChunks <= 128) {
