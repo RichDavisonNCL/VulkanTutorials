@@ -7,6 +7,7 @@
 #include <vector>
 #include <cstdint>
 #include <random>
+#include <functional>
 
 namespace NCL::Rendering::Vulkan {
 
@@ -26,11 +27,14 @@ struct WFCInstance {
 	bool isCube;
 };
 
+using WFCProgressCallback = std::function<void(uint32_t collapsed, uint32_t total)>;
+
 struct WFCConfig {
-	uint32_t gridSize  = 128;
-	uint32_t seed      = 42;
-	float emptyWeight  = 5.0f;
-	float otherWeight  = 5.0f;
+	uint32_t gridSize        = 128;
+	uint32_t seed            = 42;
+	float emptyWeight        = 5.0f;
+	float otherWeight        = 5.0f;
+	WFCProgressCallback onProgress;
 };
 
 class WFCGenerator {

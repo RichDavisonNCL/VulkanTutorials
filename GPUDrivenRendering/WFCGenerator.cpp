@@ -74,7 +74,13 @@ std::vector<uint32_t> WFCGenerator::Generate(const WFCConfig& config) {
 		possibilities[bestIdx] = { chosen };
 		grid[bestIdx] = chosen;
 		Propagate(possibilities, N, bestIdx % N, bestIdx / N);
+
+		if (config.onProgress && (iter % 500 == 0)) {
+			config.onProgress(iter + 1, total);
+		}
 	}
+
+	if (config.onProgress) config.onProgress(total, total);
 
 	return grid;
 }
