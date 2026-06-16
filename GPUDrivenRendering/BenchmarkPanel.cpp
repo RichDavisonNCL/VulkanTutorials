@@ -134,6 +134,8 @@ void BenchmarkPanel::GenerationThread(GPUSceneManagement* app, uint32_t gridSize
         case 80: cfg.emptyWeight = 2.0f; cfg.otherWeight = 10.0f; break;
     }
     cfg.onProgress = [&](uint32_t collapsed, uint32_t total) { m_genProgress = collapsed; };
+    cfg.partialGrid = &m_partialTileGrid;
+    cfg.gridMutex = &m_tileGridMutex;
     auto tileGrid = gen.Generate(cfg);
     { std::lock_guard<std::mutex> lock(m_tileGridMutex); m_partialTileGrid = std::move(tileGrid); }
     m_genProgress = gridSize * gridSize;

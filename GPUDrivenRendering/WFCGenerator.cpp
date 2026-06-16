@@ -75,6 +75,11 @@ std::vector<uint32_t> WFCGenerator::Generate(const WFCConfig& config) {
 		grid[bestIdx] = chosen;
 		Propagate(possibilities, N, bestIdx % N, bestIdx / N);
 
+		if (config.partialGrid && config.gridMutex && (iter % 200 == 0 || iter == total - 1)) {
+			std::lock_guard<std::mutex> lock(*config.gridMutex);
+			*config.partialGrid = grid;
+		}
+
 		if (config.onProgress && (iter % 500 == 0)) {
 			config.onProgress(iter + 1, total);
 		}

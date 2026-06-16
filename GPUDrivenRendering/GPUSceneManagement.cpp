@@ -226,6 +226,10 @@ void GPUSceneManagement::RunFrame(float dt) {
 	UploadCameraUniform();
 	m_memoryManager->Update();
 
+	if (m_renderPartial) {
+		UpdateSceneFromTileGrid(m_tileGrid);
+	}
+
 	switch (m_benchConfig.scheme) {
 		case RenderScheme::CPU_Instanced:    RenderScheme1(dt); break;
 		case RenderScheme::CPU_CullIndirect: RenderScheme2(dt); break;
@@ -397,6 +401,21 @@ void GPUSceneManagement::GenerateScene(const std::vector<uint32_t>& tileGrid) {
 	          << m_chunks.size() << " chunks (grid " << m_benchConfig.gridSize
 	          << ", chunk " << m_benchConfig.chunkSize
 	          << "), scheme=" << (int)m_benchConfig.scheme << "\n";
+}
+
+void GPUSceneManagement::UpdateSceneFromTileGrid(const std::vector<uint32_t>& grid) {
+	WFCGenerator gen;
+	auto instances = gen.TileGridToInstances(grid, m_benchConfig.gridSize, m_cellSize);
+	m_cullingData.resize(instances.size());
+	m_renderData.resize(instances.size());
+	for (size_t i = 0; i < instances.size(); ++i) {
+		m_cullingData[i] = { instances[i].posX, instances[i].posY, instances[i].posZ,
+			instances[i].scaleX * 0.5f, instances[i].scaleY * 0.5f, instances[i].scaleZ * 0.5f };
+		m_renderData[i]  = { instances[i].r, instances[i].g, instances[i].b, 1.0f };
+	}
+	m_totalInstances = (uint32_t)instances.size();
+	WriteInstanceData();
+	ComputeChunkAABBs();
 }
 
 void GPUSceneManagement::ComputeChunkAABBs() {

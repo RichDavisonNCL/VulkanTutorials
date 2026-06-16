@@ -119,6 +119,8 @@ public:
 #endif
 
 	void GenerateScene(const std::vector<uint32_t>& tileGrid);
+	void UpdateSceneFromTileGrid(const std::vector<uint32_t>& grid);
+	void SetRenderPartial(bool partial) { m_renderPartial = partial; }
 	void CreateBuffers();
 	void CreateDescriptorSets();
 	void CreateQueryPool();
@@ -203,6 +205,7 @@ protected:
 	class ChunkMonitor* m_monitor = nullptr;
 	bool m_altWasHeld = false;
 	bool m_pendingReadback = false;
+	bool m_renderPartial = false;
 	float m_cellSize = 4.0f;
 #ifdef USE_IMGUI
 	GuiWrapper* m_gui = nullptr;

@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <mutex>
 
 namespace NCL::Rendering::Vulkan {
 
@@ -35,6 +36,8 @@ struct WFCConfig {
 	float emptyWeight        = 5.0f;
 	float otherWeight        = 5.0f;
 	WFCProgressCallback onProgress;
+	std::vector<uint32_t>* partialGrid = nullptr;
+	std::mutex* gridMutex = nullptr;
 };
 
 class WFCGenerator {
