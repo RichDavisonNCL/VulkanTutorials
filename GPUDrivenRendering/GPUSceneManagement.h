@@ -108,6 +108,12 @@ public:
 	VulkanRenderer* GetRenderer() { return m_renderer; }
 	const BenchmarkConfig& GetBenchmarkConfig() const { return m_benchConfig; }
 	void SetScheme(RenderScheme s) { m_benchConfig.scheme = s; }
+
+	const std::vector<FrameStats>& GetFrameStats() const { return m_frameStats; }
+	const std::vector<uint32_t>& GetTileGrid() const { return m_tileGrid; }
+	uint32_t GetGridSize() const { return m_benchConfig.gridSize; }
+	bool IsBenchmarkRecording() const { return m_isRecording; }
+
 #ifdef USE_IMGUI
 	void SetGui(GuiWrapper* gui) { m_gui = gui; }
 #endif
@@ -120,6 +126,7 @@ protected:
 	void UploadMeshWait(VulkanMesh& m);
 
 	void GenerateScene();
+	void GenerateScene(const std::vector<uint32_t>& tileGrid);
 	void CreateBuffers();
 	void CreatePipelines();
 	void CreateDescriptorSets();

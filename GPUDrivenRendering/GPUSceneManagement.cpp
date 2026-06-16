@@ -339,10 +339,15 @@ void GPUSceneManagement::GenerateScene() {
 	}
 
 	m_tileGrid = gen.Generate(wfcCfg);
-	auto instances = gen.TileGridToInstances(m_tileGrid, wfcCfg.gridSize, m_cellSize);
+	GenerateScene(m_tileGrid);
+}
+
+void GPUSceneManagement::GenerateScene(const std::vector<uint32_t>& tileGrid) {
+	WFCGenerator gen;
+	auto instances = gen.TileGridToInstances(tileGrid, m_benchConfig.gridSize, m_cellSize);
 
 	const uint32_t chunkDim = m_benchConfig.chunkSize;
-	m_gridChunks = wfcCfg.gridSize / chunkDim;
+	m_gridChunks = m_benchConfig.gridSize / chunkDim;
 
 	std::vector<std::vector<WFCInstance>> buckets(m_gridChunks * m_gridChunks);
 	for (const auto& inst : instances) {
