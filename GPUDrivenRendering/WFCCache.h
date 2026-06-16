@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <string>
 
+namespace NCL::Rendering::Vulkan {
+
 class WFCCache {
 public:
     static void Save(const std::vector<uint32_t>& tileGrid, uint32_t gridSize,
@@ -17,3 +19,5 @@ public:
 private:
     static void EnsureCacheDir();
 };
+
+} // namespace NCL::Rendering::Vulkan

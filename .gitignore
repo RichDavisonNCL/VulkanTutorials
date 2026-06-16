@@ -390,3 +390,6 @@ MigrationBackup/
 docs/superpowers/
 docs/*.md
 memory/
+
+# Runtime caches
+cache/

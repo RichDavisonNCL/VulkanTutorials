@@ -6,6 +6,8 @@
 #include <fstream>
 #include <iostream>
 
+namespace NCL::Rendering::Vulkan {
+
 void WFCCache::EnsureCacheDir() {
     std::filesystem::create_directories("cache");
 }
@@ -57,3 +59,5 @@ bool WFCCache::Load(std::vector<uint32_t>& outGrid, uint32_t& outGridSize,
     std::cout << "[Cache] Loaded " << outGrid.size() << " cells from " << path << "\n";
     return true;
 }
+
+} // namespace NCL::Rendering::Vulkan
