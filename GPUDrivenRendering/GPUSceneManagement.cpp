@@ -214,11 +214,7 @@ void GPUSceneManagement::RunFrame(float dt) {
 		}
 	}
 
-	if (m_currentFrame < 5 || m_currentFrame % 100 == 0)
-		std::cout << "[RunFrame] frame " << m_currentFrame << " calling BeginFrame..." << std::endl;
 	m_renderer->BeginFrame();
-	if (m_currentFrame < 5 || m_currentFrame % 100 == 0)
-		std::cout << "[RunFrame] frame " << m_currentFrame << " BeginFrame OK" << std::endl;
 
 	ReadbackGPUVisibility();
 
@@ -278,27 +274,19 @@ void GPUSceneManagement::RunFrame(float dt) {
 	}
 #endif
 
-	if (m_currentFrame < 5 || m_currentFrame % 100 == 0)
-		std::cout << "[RunFrame] frame " << m_currentFrame << " calling EndFrame..." << std::endl;
 	m_renderer->EndFrame();
-	if (m_currentFrame < 5 || m_currentFrame % 100 == 0)
-		std::cout << "[RunFrame] frame " << m_currentFrame << " calling SwapBuffers..." << std::endl;
 	m_renderer->SwapBuffers();
 
 	// Deferred query readback: last frame cmd buffer now submitted by EndFrame.
 	if (m_pendingReadback) {
-		std::cout << "[Benchmark] Readback START frame=" << m_currentFrame << std::endl;
 		m_pendingReadback = false;
-		std::cout << "[Benchmark] calling vkDeviceWaitIdle..." << std::endl;
 		Finish();
-		std::cout << "[Benchmark] waitIdle done, reading " << (m_frameStats.size()*2) << " queries..." << std::endl;
 		FrameContext const& rctx = m_renderer->GetFrameContext();
 		uint32_t numQueries = 2 * (uint32_t)m_frameStats.size();
 		std::vector<uint64_t> rawQueries(numQueries);
 		vk::Result r = rctx.device.getQueryPoolResults(*m_queryPool, 0, numQueries,
 			rawQueries.size() * sizeof(uint64_t), rawQueries.data(), sizeof(uint64_t),
 			vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWait);
-		std::cout << "[Benchmark] getQueryPoolResults: " << vk::to_string(r) << std::endl;
 		if (r == vk::Result::eSuccess) {
 			for (uint32_t i = 0; i < m_frameStats.size(); ++i) {
 				m_frameStats[i].gpuTimeUs = (double)(rawQueries[2*i+1] - rawQueries[2*i])
@@ -307,11 +295,7 @@ void GPUSceneManagement::RunFrame(float dt) {
 		}
 		WriteCSVSummary();
 		m_benchmarkComplete = true;
-		std::cout << "[Benchmark] Readback DONE" << std::endl;
 	}
-	if (m_currentFrame < 5 || m_currentFrame % 100 == 0)
-		std::cout << "[RunFrame] frame " << m_currentFrame << " SwapBuffers OK" << std::endl;
-
 	if (m_currentFrame == 0)
 		std::cout << "[GPUDriven] First frame rendered\n";
 
