@@ -43,7 +43,10 @@ void BenchmarkPanel::RenderGenerationSection(GPUSceneManagement* app) {
     if (isGenerating) ImGui::BeginDisabled();
     ImGui::InputInt("Grid Size", (int*)&m_genGridSize);
     ImGui::InputInt("Seed", (int*)&m_genSeed);
-    ImGui::Combo("Density", (int*)&m_genDensity, "20 %%\0 50 %%\0 80 %%\0\0");
+    int densityIdx = (m_genDensity == 20) ? 0 : (m_genDensity == 50) ? 1 : 2;
+	if (ImGui::Combo("Density", &densityIdx, "20 %%\0 50 %%\0 80 %%\0\0")) {
+		m_genDensity = (densityIdx == 0) ? 20u : (densityIdx == 1) ? 50u : 80u;
+	}
     if (isGenerating) ImGui::EndDisabled();
 
     ImGui::Checkbox("Use Cache", &m_useCache);
@@ -68,6 +71,7 @@ void BenchmarkPanel::RenderGenerationSection(GPUSceneManagement* app) {
                     m_partialTileGrid = std::move(loadedGrid);
                     m_totalCells = m_genGridSize * m_genGridSize;
                     m_genProgress = m_totalCells;
+                    app->SetSceneParams(m_genGridSize, m_genSeed, m_genDensity);
                     app->GenerateScene(m_partialTileGrid);
                     app->CreateBuffers();
                     app->CreateDescriptorSets();
@@ -94,6 +98,7 @@ void BenchmarkPanel::RenderGenerationSection(GPUSceneManagement* app) {
 
     if (m_generationReady && m_state == PanelState::Generating) {
         if (m_genThread.joinable()) m_genThread.join();
+		app->SetSceneParams(m_genGridSize, m_genSeed, m_genDensity);
         app->GenerateScene(m_partialTileGrid);
         app->CreateBuffers();
         app->CreateDescriptorSets();
@@ -140,6 +145,7 @@ void BenchmarkPanel::RenderBenchmarkSection(GPUSceneManagement* app) {
         }
         if (recorded >= m_recordFrames) {
             m_state = PanelState::Results;
+			app->SetBenchmarkEnabled(false);
             m_lastResults.assign(stats.begin(), stats.end());
             m_lastScheme = m_scheme;
             auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -159,6 +165,7 @@ void BenchmarkPanel::RenderBenchmarkSection(GPUSceneManagement* app) {
             m_chartFrame = 0;
             m_csvPath.clear();
             m_state = PanelState::Recording;
+		app->SetBenchmarkEnabled(true);
             app->SetBenchmarkConfig(cfg);
         }
     }

@@ -255,9 +255,13 @@ void GPUSceneManagement::RunFrame(float dt) {
 			SetRenderPartial(false);
 		}
 
-		// ChunkMonitor panel (lazy-init on first frame)
-		if (!m_monitor && m_gridChunks > 0 && m_gridChunks <= 128) {
-			m_monitor = new ChunkMonitor(m_gridChunks, m_benchConfig.chunkSize, m_benchConfig.gridSize);
+		// ChunkMonitor — recreate when scene dimensions change
+		if (m_gridChunks > 0 && m_gridChunks <= 128) {
+			if (!m_monitor || m_monitorGridChunks != m_gridChunks) {
+				delete m_monitor;
+				m_monitor = new ChunkMonitor(m_gridChunks, m_benchConfig.chunkSize, m_benchConfig.gridSize);
+				m_monitorGridChunks = m_gridChunks;
+			}
 		}
 		if (m_monitor) {
 			std::vector<ChunkMonitorCell> cells(m_chunks.size());
@@ -328,10 +332,12 @@ void GPUSceneManagement::GenerateScene() {
 }
 
 void GPUSceneManagement::GenerateScene(const std::vector<uint32_t>& tileGrid) {
+	std::cout << "[DEBUG GenScene] gridSize=" << m_benchConfig.gridSize << " chunkSize=" << m_benchConfig.chunkSize << " tileGrid.size=" << tileGrid.size() << std::endl;
 	WFCGenerator gen;
 	auto instances = gen.TileGridToInstances(tileGrid, m_benchConfig.gridSize, m_cellSize);
 
 	const uint32_t chunkDim = m_benchConfig.chunkSize;
+	std::cout << "[DEBUG GenScene] instances=" << instances.size() << " m_gridChunks=" << m_gridChunks << std::endl;
 	m_gridChunks = m_benchConfig.gridSize / chunkDim;
 
 	std::vector<std::vector<WFCInstance>> buckets(m_gridChunks * m_gridChunks);
@@ -684,7 +690,7 @@ void GPUSceneManagement::RenderScheme3(float dt) {
 }
 
 void GPUSceneManagement::BeginMeasurement() {
-	if (!m_isRecording && !m_benchmarkComplete && m_currentFrame >= m_benchConfig.warmupFrames) {
+	if (!m_isRecording && m_benchmarkEnabled && !m_benchmarkComplete && m_currentFrame >= m_benchConfig.warmupFrames) {
 		m_isRecording = true;
 		m_recordFrameIdx = 0;
 	}

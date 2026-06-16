@@ -85,7 +85,7 @@ struct FrameStats {
 };
 
 struct BenchmarkConfig {
-	uint32_t gridSize     = 512;
+	uint32_t gridSize     = 16;
 	uint32_t chunkSize    = 16;
 	uint32_t density      = 50;
 	RenderScheme scheme   = RenderScheme::GPU_CullIndirect;
@@ -110,6 +110,12 @@ public:
 	VulkanRenderer* GetRenderer() { return m_renderer; }
 	const BenchmarkConfig& GetBenchmarkConfig() const { return m_benchConfig; }
 	void SetScheme(RenderScheme s) { m_benchConfig.scheme = s; }
+	void SetBenchmarkEnabled(bool on) { m_benchmarkEnabled = on; }
+	void SetSceneParams(uint32_t gridSize, uint32_t seed, uint32_t density) {
+		m_benchConfig.gridSize = gridSize;
+		m_benchConfig.seed = seed;
+		m_benchConfig.density = density;
+	}
 
 	const std::vector<FrameStats>& GetFrameStats() const { return m_frameStats; }
 	const std::vector<uint32_t>& GetTileGrid() const { return m_tileGrid; }
@@ -206,8 +212,10 @@ protected:
 	LARGE_INTEGER m_frameStartQpc;
 
 	class ChunkMonitor* m_monitor = nullptr;
+		uint32_t m_monitorGridChunks = 0;
 	bool m_altWasHeld = false;
 	bool m_pendingReadback = false;
+	bool m_benchmarkEnabled = false;
 	bool m_renderPartial = false;
 	float m_cellSize = 4.0f;
 #ifdef USE_IMGUI

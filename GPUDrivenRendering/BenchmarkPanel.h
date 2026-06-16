@@ -25,7 +25,7 @@ public:
     void GenerationThread(class GPUSceneManagement* app, uint32_t gridSize,
                           uint32_t seed, uint32_t density);
     PanelState GetState() const { return m_state; }
-    bool ShouldRenderPartial() const { return m_state == PanelState::Generating && m_showGeneration; }
+    bool ShouldRenderPartial() const { return false; }
     const std::vector<uint32_t>& GetPartialTileGrid() const { return m_partialTileGrid; }
     bool GenerationReady() const { return m_generationReady; }
 
