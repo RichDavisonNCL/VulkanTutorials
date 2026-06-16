@@ -32,8 +32,7 @@ GPUSceneManagement::GPUSceneManagement(Window& window, VulkanInitialisation& vkI
 	, m_vkInit(vkInit), m_totalInstances(0), m_gridChunks(0)
 	, m_cubeIndexCount(0), m_sphereIndexCount(0)
 	, m_isRecording(false), m_benchmarkComplete(false), m_currentFrame(0)
-	, m_recordFrameIdx(0), m_drawCallCount(0)
-	, m_monitor(nullptr), m_offscreenColour(nullptr), m_offscreenDepth(nullptr) {
+	, m_recordFrameIdx(0), m_drawCallCount(0) {
 
 	m_vkInit.autoBeginDynamicRendering = false;
 	Initialise();
@@ -57,8 +56,6 @@ GPUSceneManagement::~GPUSceneManagement() {
 	delete m_memoryManager;
 	delete m_renderer;
 	if (m_monitor) delete m_monitor;
-	if (m_offscreenColour) delete m_offscreenColour;
-	if (m_offscreenDepth) delete m_offscreenDepth;
 }
 
 void GPUSceneManagement::Finish() {
@@ -865,5 +862,3 @@ void GPUSceneManagement::RegenerateChunks(uint32_t updateCount) {
  *  Headless benchmark currently uses a tiny window + swapchain.
  *  True headless with VK_KHR_display / offscreen-render-to-image is future work.
  */
-void GPUSceneManagement::CreateOffscreenResources() {}
-void GPUSceneManagement::BeginOffscreenRender(vk::CommandBuffer) {}

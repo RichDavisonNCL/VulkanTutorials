@@ -41,7 +41,24 @@ void BenchmarkPanel::RenderGenerationSection(GPUSceneManagement* app) {
     bool isIdle       = (m_state == PanelState::Idle);
 
     if (isGenerating) ImGui::BeginDisabled();
-    ImGui::InputInt("Grid Size", (int*)&m_genGridSize);
+	static const uint32_t kGridSizes[] = { 16, 64, 128, 256, 512, 1024, 2048, 4096 };
+	static const char* kGridSizeNames[] = { "16", "64", "128", "256", "512", "1024", "2048", "4096" };
+	int sizeIdx = 0;
+	for (int i = 0; i < IM_ARRAYSIZE(kGridSizes); ++i)
+		if (m_genGridSize == kGridSizes[i]) { sizeIdx = i; break; }
+	if (ImGui::Combo("Grid Size", &sizeIdx, kGridSizeNames, IM_ARRAYSIZE(kGridSizeNames)))
+		m_genGridSize = kGridSizes[sizeIdx];
+	if (m_genChunkSize > m_genGridSize) m_genChunkSize = m_genGridSize;
+	static const uint32_t kChunkSizes[] = { 4, 8, 16, 32, 64, 128, 256, 512 };
+	int chunkIdx = 0;
+	for (int i = 0; i < IM_ARRAYSIZE(kChunkSizes); ++i)
+		if (m_genChunkSize == kChunkSizes[i]) { chunkIdx = i; break; }
+	static const char* kChunkSizeNames[] = { "4", "8", "16", "32", "64", "128", "256", "512" };
+	if (ImGui::Combo("Chunk Size", &chunkIdx, kChunkSizeNames, IM_ARRAYSIZE(kChunkSizeNames)))
+		m_genChunkSize = kChunkSizes[chunkIdx];
+		m_genChunkSize = kChunkSizes[chunkIdx];
+	if (m_genChunkSize > m_genGridSize) m_genChunkSize = m_genGridSize;
+
     ImGui::InputInt("Seed", (int*)&m_genSeed);
     int densityIdx = (m_genDensity == 20) ? 0 : (m_genDensity == 50) ? 1 : 2;
 	if (ImGui::Combo("Density", &densityIdx, "20 %%\0 50 %%\0 80 %%\0\0")) {
@@ -62,49 +79,54 @@ void BenchmarkPanel::RenderGenerationSection(GPUSceneManagement* app) {
         ImGui::Text("%u / %u cells (%.1f%%)", progress, total, frac * 100.0f);
     }
 
-    if (isIdle) {
-        if (ImGui::Button("Generate")) {
-            if (m_useCache) {
-                std::vector<uint32_t> loadedGrid;
-                uint32_t loadedSize = 0;
-                if (WFCCache::Load(loadedGrid, loadedSize, m_genGridSize, m_genSeed, m_genDensity)) {
-                    m_partialTileGrid = std::move(loadedGrid);
-                    m_totalCells = m_genGridSize * m_genGridSize;
-                    m_genProgress = m_totalCells;
-                    app->SetSceneParams(m_genGridSize, m_genSeed, m_genDensity);
-                    app->GenerateScene(m_partialTileGrid);
-                    app->CreateBuffers();
-                    app->CreateDescriptorSets();
-                    app->CreateQueryPool();
-                    m_state = PanelState::Ready;
-                } else {
-                    m_totalCells = m_genGridSize * m_genGridSize;
-                    m_genProgress = 0;
-                    m_generationReady = false;
-                    m_state = PanelState::Generating;
-                    m_genThread = std::thread(&BenchmarkPanel::GenerationThread,
-                        this, app, m_genGridSize, m_genSeed, m_genDensity);
-                }
-            } else {
-                m_totalCells = m_genGridSize * m_genGridSize;
-                m_genProgress = 0;
-                m_generationReady = false;
-                m_state = PanelState::Generating;
-                m_genThread = std::thread(&BenchmarkPanel::GenerationThread,
-                    this, app, m_genGridSize, m_genSeed, m_genDensity);
-            }
-        }
+	if (isIdle) {
+		if (ImGui::Button("Generate")) {
+			bool loaded = false;
+			if (m_useCache) {
+				std::vector<uint32_t> loadedGrid;
+				uint32_t loadedSize = 0;
+				if (WFCCache::Load(loadedGrid, loadedSize, m_genGridSize, m_genSeed, m_genDensity)) {
+					m_partialTileGrid = std::move(loadedGrid);
+					app->SetSceneParams(m_genGridSize, m_genChunkSize, m_genSeed, m_genDensity);
+					app->GenerateScene(m_partialTileGrid);
+					app->CreateBuffers();
+					app->CreateDescriptorSets();
+					app->CreateQueryPool();
+					m_totalCells = m_genGridSize * m_genGridSize;
+					m_genProgress = m_totalCells;
+					m_state = PanelState::Ready;
+					loaded = true;
+				}
+			}
+			if (!loaded) {
+				m_totalCells = m_genGridSize * m_genGridSize;
+				m_genProgress = 0;
+				m_generationReady = false;
+				m_state = PanelState::Generating;
+				m_genThread = std::thread(&BenchmarkPanel::GenerationThread,
+					this, app, m_genGridSize, m_genSeed, m_genDensity);
+			}
+		}
     }
 
     if (m_generationReady && m_state == PanelState::Generating) {
         if (m_genThread.joinable()) m_genThread.join();
-		app->SetSceneParams(m_genGridSize, m_genSeed, m_genDensity);
+		app->SetSceneParams(m_genGridSize, m_genChunkSize, m_genSeed, m_genDensity);
         app->GenerateScene(m_partialTileGrid);
         app->CreateBuffers();
         app->CreateDescriptorSets();
         app->CreateQueryPool();
         m_state = PanelState::Ready;
     }
+
+	if (m_state == PanelState::Ready || m_state == PanelState::Results) {
+		ImGui::SameLine();
+		if (ImGui::Button("Reset")) {
+			m_state = PanelState::Idle;
+			m_generationReady = false;
+			m_partialTileGrid.clear();
+		}
+	}
 
     switch (m_state) {
         case PanelState::Idle:       ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Status: Idle"); break;
@@ -135,14 +157,11 @@ void BenchmarkPanel::RenderBenchmarkSection(GPUSceneManagement* app) {
         ImGui::EndDisabled();
     } else if (isRecording) {
         const auto& stats = app->GetFrameStats();
-        int recorded = (int)stats.size();
+		int recorded = (int)stats.size();
         ImGui::ProgressBar((float)recorded / (float)m_recordFrames, ImVec2(200, 0));
         ImGui::SameLine(); ImGui::Text("%d / %d", recorded, m_recordFrames);
-        if (recorded > m_chartFrame) {
-            for (int i = m_chartFrame; i < recorded; ++i)
-                m_frameTimes.push_back((float)stats[i].totalTimeUs);
-            m_chartFrame = recorded;
-        }
+		if (recorded > (int)m_frameTimes.size())
+			m_frameTimes.push_back((float)stats.back().totalTimeUs);
         if (recorded >= m_recordFrames) {
             m_state = PanelState::Results;
 			app->SetBenchmarkEnabled(false);
@@ -159,10 +178,10 @@ void BenchmarkPanel::RenderBenchmarkSection(GPUSceneManagement* app) {
             app->SetScheme((RenderScheme)m_scheme);
             BenchmarkConfig cfg = app->GetBenchmarkConfig();
             cfg.scheme = (RenderScheme)m_scheme;
+		cfg.chunkSize = m_genChunkSize;
             cfg.warmupFrames = m_warmupFrames;
             cfg.recordFrames = m_recordFrames;
             m_frameTimes.clear();
-            m_chartFrame = 0;
             m_csvPath.clear();
             m_state = PanelState::Recording;
 		app->SetBenchmarkEnabled(true);
@@ -224,7 +243,6 @@ void BenchmarkPanel::GenerationThread(GPUSceneManagement* app, uint32_t gridSize
     cfg.otherWeight = 5.0f;
     switch (density) {
         case 20: cfg.emptyWeight = 8.0f; cfg.otherWeight = 2.0f; break;
-        case 50: cfg.emptyWeight = 5.0f; cfg.otherWeight = 5.0f; break;
         case 80: cfg.emptyWeight = 2.0f; cfg.otherWeight = 10.0f; break;
     }
     cfg.onProgress = [&](uint32_t collapsed, uint32_t total) { m_genProgress = collapsed; };

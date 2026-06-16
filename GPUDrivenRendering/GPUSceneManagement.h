@@ -111,10 +111,11 @@ public:
 	const BenchmarkConfig& GetBenchmarkConfig() const { return m_benchConfig; }
 	void SetScheme(RenderScheme s) { m_benchConfig.scheme = s; }
 	void SetBenchmarkEnabled(bool on) { m_benchmarkEnabled = on; }
-	void SetSceneParams(uint32_t gridSize, uint32_t seed, uint32_t density) {
+	void SetSceneParams(uint32_t gridSize, uint32_t chunkSize, uint32_t seed, uint32_t density) {
 		m_benchConfig.gridSize = gridSize;
 		m_benchConfig.seed = seed;
 		m_benchConfig.density = density;
+		m_benchConfig.chunkSize = chunkSize;
 	}
 
 	const std::vector<FrameStats>& GetFrameStats() const { return m_frameStats; }
@@ -223,8 +224,4 @@ protected:
 	BenchmarkPanel* m_benchPanel = nullptr;
 #endif
 
-	VulkanTexture* m_offscreenColour;
-	VulkanTexture* m_offscreenDepth;
-	void CreateOffscreenResources();
-	void BeginOffscreenRender(vk::CommandBuffer cmd);
 };

@@ -117,7 +117,6 @@ int main(int argc, char* argv[]) {
 			app.SetBenchmarkConfig(benchConfig);
 		}
 
-		int loopCount = 0;
 		while (w->UpdateWindow() && !Window::GetKeyboard()->KeyDown(KeyCodes::ESCAPE)) {
 			app.RunFrame(w->GetTimer().GetTimeDeltaSeconds());
 
@@ -128,7 +127,6 @@ int main(int argc, char* argv[]) {
 			if (Window::GetKeyboard()->KeyPressed(KeyCodes::NUM3))
 				app.SetScheme(RenderScheme::GPU_CullIndirect);
 
-			++loopCount;
 		}
 		app.Finish();
 	}

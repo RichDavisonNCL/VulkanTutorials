@@ -96,6 +96,7 @@ void GuiWrapper::SyncInput(HWND hwnd) {
 	if (curShift != prevShift) io.AddKeyEvent(ImGuiMod_Shift, curShift);
 	if (curAlt   != prevAlt)   io.AddKeyEvent(ImGuiMod_Alt,   curAlt);
 	prevCtrl = curCtrl; prevShift = curShift; prevAlt = curAlt;
+
 }
 
 void GuiWrapper::StartNewFrame() {

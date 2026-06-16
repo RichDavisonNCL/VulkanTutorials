@@ -36,6 +36,7 @@ private:
 
     PanelState m_state = PanelState::Idle;
     uint32_t m_genGridSize = 512;
+	uint32_t m_genChunkSize = 16;
     uint32_t m_genSeed = 42;
     uint32_t m_genDensity = 50;
     bool m_useCache = true;
@@ -43,7 +44,6 @@ private:
     int m_scheme = 3;
     int m_warmupFrames = 60;
     int m_recordFrames = 200;
-    bool m_benchmarkRunning = false;
     std::string m_csvPath;
 
     std::thread m_genThread;
@@ -56,5 +56,4 @@ private:
     std::vector<FrameStats> m_lastResults;
     int m_lastScheme = 0;
     std::vector<float> m_frameTimes;
-    int m_chartFrame = 0;
 };
