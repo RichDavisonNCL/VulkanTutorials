@@ -16,9 +16,9 @@
 
 using namespace NCL::Rendering::Vulkan;
 
-BenchmarkPanel::BenchmarkPanel() {}
+BenchmarkPanel::BenchmarkPanel() { ImPlot::CreateContext(); }
 
-BenchmarkPanel::~BenchmarkPanel() { if (m_genThread.joinable()) m_genThread.join(); }
+BenchmarkPanel::~BenchmarkPanel() { if (m_genThread.joinable()) m_genThread.join(); ImPlot::DestroyContext(); }
 
 void BenchmarkPanel::Render(GPUSceneManagement* app) {
     if (!app) return;
