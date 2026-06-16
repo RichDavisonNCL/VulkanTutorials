@@ -175,17 +175,11 @@ void BenchmarkPanel::RenderBenchmarkSection(GPUSceneManagement* app) {
         }
     } else if (canRun) {
         if (ImGui::Button("Run Benchmark", ImVec2(150, 0))) {
-            app->SetScheme((RenderScheme)m_scheme);
-            BenchmarkConfig cfg = app->GetBenchmarkConfig();
-            cfg.scheme = (RenderScheme)m_scheme;
-		cfg.chunkSize = m_genChunkSize;
-            cfg.warmupFrames = m_warmupFrames;
-            cfg.recordFrames = m_recordFrames;
             m_frameTimes.clear();
             m_csvPath.clear();
             m_state = PanelState::Recording;
 		app->SetBenchmarkEnabled(true);
-            app->SetBenchmarkConfig(cfg);
+            app->ResetBenchmarkState((RenderScheme)m_scheme, m_warmupFrames, m_recordFrames, "");
         }
     }
 }

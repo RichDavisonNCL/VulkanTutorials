@@ -111,6 +111,16 @@ public:
 	const BenchmarkConfig& GetBenchmarkConfig() const { return m_benchConfig; }
 	void SetScheme(RenderScheme s) { m_benchConfig.scheme = s; }
 	void SetBenchmarkEnabled(bool on) { m_benchmarkEnabled = on; }
+	void ResetBenchmarkState(RenderScheme scheme, uint32_t warmup, uint32_t record, const std::string& outputPath) {
+		m_benchConfig.scheme = scheme;
+		m_benchConfig.warmupFrames = warmup;
+		m_benchConfig.recordFrames = record;
+		m_benchConfig.outputPath = outputPath;
+		m_frameStats.clear();
+		m_recordFrameIdx = 0;
+		m_isRecording = false;
+		m_benchmarkComplete = false;
+	}
 	void SetSceneParams(uint32_t gridSize, uint32_t chunkSize, uint32_t seed, uint32_t density) {
 		m_benchConfig.gridSize = gridSize;
 		m_benchConfig.seed = seed;
