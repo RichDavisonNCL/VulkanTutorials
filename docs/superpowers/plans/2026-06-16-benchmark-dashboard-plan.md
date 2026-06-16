@@ -200,34 +200,36 @@ uint32_t GetGridSize() const { return m_benchConfig.gridSize; }
 bool IsBenchmarkRecording() const { return m_isRecording; }
 ```
 
-- [ ] **Step 2: Add public RunBenchmarkInPanel method**
+- [ ] **Step 2: Add GenerateScene(tileGrid) overload + GetBenchmarkConfig**
+
+In `GPUSceneManagement.h` public section, add after `SetScheme()`:
 
 ```cpp
-// Run a benchmark with panel-specified parameters. After completion,
-// results are available via GetFrameStats() and CSV is written.
-void RunBenchmarkInPanel(const std::string& outputPath);
+const std::vector<FrameStats>& GetFrameStats() const { return m_frameStats; }
+const std::vector<uint32_t>& GetTileGrid() const { return m_tileGrid; }
+uint32_t GetGridSize() const { return m_benchConfig.gridSize; }
+bool IsBenchmarkRecording() const { return m_isRecording; }
+const BenchmarkConfig& GetBenchmarkConfig() const { return m_benchConfig; }
 ```
 
-Implementation in `.cpp`:
+Also declare the overload:
 
 ```cpp
-void GPUSceneManagement::RunBenchmarkInPanel(const std::string& outputPath) {
-    m_benchConfig.outputPath = outputPath;
-    m_frameStats.clear();
-    m_recordFrameIdx = 0;
-    m_isRecording = false;
-    m_benchmarkComplete = false;
-    // Benchmark begins on next frame when BeginMeasurement detects warmup threshold
+void GenerateScene(const std::vector<uint32_t>& tileGrid);
+```
+
+Implementation: extract the instance-building loop from existing `GenerateScene()` into this overload. The existing `GenerateScene()` calls it after WFC:
+
+```cpp
+void GPUSceneManagement::GenerateScene() {
+    WFCGenerator gen;
+    // ... config ...
+    m_tileGrid = gen.Generate(wfcCfg);
+    GenerateScene(m_tileGrid);  // shared instance-packing path
 }
 ```
 
-- [ ] **Step 3: Remove diagnostic couts from production path**
-
-Remove or guard all `std::cout << "[Main] loop..."`, `"[RunFrame] frame..."`, `"[Benchmark] Readback..."` with `#ifndef NDEBUG` or replace with a flag.
-
-- [ ] **Step 4: Verify compilation**
-
-```bash
+- [ ] **Step 3: Verify compilation**
 cmake --build . --target GPUDrivenRendering --config Debug
 ```
 
@@ -451,24 +453,22 @@ void BenchmarkPanel::RenderGenerationSection(GPUSceneManagement* app) {
         ImGui::Text("%.0f%%", progress * 100.0f);
     } else if (isIdle || isReady) {
         if (isIdle) {
-            if (ImGui::Button("Generate", ImVec2(120, 0))) {
-                // Try cache first
                 if (m_useCache) {
                     uint32_t cachedSize;
-                    if (WFCCache::Load(m_partialTileGrid, cachedSize,
+                    std::vector<uint32_t> loadedGrid;
+                    if (WFCCache::Load(loadedGrid, cachedSize,
                                        m_genGridSize, m_genSeed, m_genDensity)) {
                         m_totalCells = m_genGridSize * m_genGridSize;
                         m_genProgress = m_totalCells;
                         m_generationReady = true;
                         m_state = PanelState::Ready;
-                        BenchmarkConfig cfg;
-                        cfg.gridSize = m_genGridSize;
-                        cfg.seed = m_genSeed;
-                        cfg.density = m_genDensity;
-                        cfg.scheme = (RenderScheme)m_scheme;
-                        cfg.chunkSize = 16;
-                        app->SetBenchmarkConfig(cfg);
+                        app->GenerateScene(loadedGrid);  // build scene from cached grid
+                        app->CreateBuffers();
+                        app->CreateDescriptorSets();
+                        app->CreateQueryPool();
                         return;
+                    }
+                }
                     }
                 }
                 // Start generation thread
@@ -499,18 +499,16 @@ void BenchmarkPanel::RenderGenerationSection(GPUSceneManagement* app) {
     if (m_generationReady && m_state == PanelState::Generating) {
         m_state = PanelState::Ready;
         if (m_genThread.joinable()) m_genThread.join();
-        // Full generation done — set config on app
-        BenchmarkConfig cfg;
-        cfg.gridSize = m_genGridSize;
-        cfg.seed = m_genSeed;
-        cfg.density = m_genDensity;
+        if (m_genThread.joinable()) m_genThread.join();
+        // Full generation done — build scene from generated grid
+        app->GenerateScene(m_partialTileGrid);
+        app->CreateBuffers();
+        app->CreateDescriptorSets();
+        app->CreateQueryPool();
+        // Set scheme from panel
+        BenchmarkConfig cfg = app->GetBenchmarkConfig();
         cfg.scheme = (RenderScheme)m_scheme;
-        cfg.chunkSize = 16;
         app->SetBenchmarkConfig(cfg);
-    }
-}
-```
-
 - [ ] **Step 4: Write GenerationThread()**
 
 ```cpp
@@ -616,7 +614,7 @@ git commit -m "feat: WFCGenerator incremental partial grid for visualization"
 
 ---
 
-### Task 7: GPUSceneManagement — Partial tileGrid rendering
+### Task 7: GPUSceneManagement — Partial tileGrid rendering via buffer update
 
 **Files:**
 - Modify: `GPUDrivenRendering/GPUSceneManagement.h`
@@ -625,7 +623,7 @@ git commit -m "feat: WFCGenerator incremental partial grid for visualization"
 - [ ] **Step 1: Add partial tileGrid setter and flag to header**
 
 ```cpp
-void SetPartialTileGrid(const std::vector<uint32_t>& grid, uint32_t gridSize);
+void UpdateSceneFromTileGrid(const std::vector<uint32_t>& grid);
 void SetRenderPartial(bool partial) { m_renderPartial = partial; }
 ```
 
@@ -635,62 +633,53 @@ Member:
 bool m_renderPartial = false;
 ```
 
-- [ ] **Step 2: Implement SetPartialTileGrid**
+- [ ] **Step 2: Implement UpdateSceneFromTileGrid**
 
-In `.cpp`:
+Recomputes instance data from tileGrid, then uploads to EXISTING buffers (no recreation).
+Reuses WriteInstanceData() staging-buffer pattern.
 
 ```cpp
-void GPUSceneManagement::SetPartialTileGrid(const std::vector<uint32_t>& grid, uint32_t gridSize) {
-    m_tileGrid = grid;
-    // Rebuild instance data from partial grid (skip tileId==0)
+void GPUSceneManagement::UpdateSceneFromTileGrid(const std::vector<uint32_t>& grid) {
     WFCGenerator gen;
-    auto instances = gen.TileGridToInstances(m_tileGrid, gridSize, m_cellSize);
-    // ... same as GenerateScene but using the partial grid ...
-    // Rebuild buffers with partial instance set
+    auto instances = gen.TileGridToInstances(grid, m_benchConfig.gridSize, m_cellSize);
+
+    // Rebuild CPU-side instance arrays (m_cullingData, m_renderData)
+    m_cullingData.resize(instances.size());
+    m_renderData.resize(instances.size());
+    for (size_t i = 0; i < instances.size(); ++i) {
+        m_cullingData[i] = { instances[i].posX, instances[i].posY, instances[i].posZ,
+            instances[i].scaleX * 0.5f, instances[i].scaleY * 0.5f, instances[i].scaleZ * 0.5f };
+        m_renderData[i]  = { instances[i].r, instances[i].g, instances[i].b, 1.0f };
+    }
+    m_totalInstances = (uint32_t)instances.size();
+
+    // Upload to existing device-local buffers via staging (same pattern as WriteInstanceData)
+    WriteInstanceData();
+
+    // Recompute chunk AABBs and chunk metadata from new instance layout
+    ComputeChunkAABBs();
 }
 ```
 
-Note: This reuses the existing `GenerateScene` pipeline but with a supplied grid instead of generating one. Extract the instance-building logic into a shared method.
+- [ ] **Step 3: Update RunFrame for partial rendering**
 
-- [ ] **Step 3: Extend GenerateScene to accept optional pre-built tileGrid**
-
-Add overload:
-
-```cpp
-void GenerateScene(const std::vector<uint32_t>& tileGrid);
-```
-
-Extract the common instance packing, chunk bucketing, AABB computation code into this overload. Make the existing `GenerateScene()` call this overload after WFC generation.
-
-- [ ] **Step 4: Update RenderFrame for partial rendering**
-
-In `RunFrame()`, just before the scheme switch:
+Replace the old GenerateScene/CreateBuffers block with the update-based approach:
 
 ```cpp
 if (m_renderPartial) {
-    // Rebuild scene from partial tileGrid each frame (fast for <10K cells)
-    GenerateScene(m_tileGrid);
-    CreateBuffers();
-    CreateDescriptorSets();
-    CreateQueryPool();
+    UpdateSceneFromTileGrid(m_tileGrid);
 }
 ```
 
-- [ ] **Step 5: Verify compilation**
+Buffers are created once during full Generate. Partial updates only modify contents.
+
+- [ ] **Step 4: Verify compilation**
 
 ```bash
 cmake --build . --target GPUDrivenRendering --config Debug
 ```
 
-- [ ] **Step 6: Commit**
-
-```bash
-git add GPUDrivenRendering/GPUSceneManagement.h GPUDrivenRendering/GPUSceneManagement.cpp
-git commit -m "feat: partial tileGrid rendering for generation visualization"
-```
-
----
-
+- [ ] **Step 5: Commit**
 ### Task 8: BenchmarkPanel — Benchmark section + ImPlot charts
 
 **Files:**
@@ -717,7 +706,7 @@ void BenchmarkPanel::RenderBenchmarkSection(GPUSceneManagement* app) {
     }
 
     if (!canRun && !isRecording) {
-        ImGui::BeginDisabled();
+        ImGui::BeginDisabled(true);
         ImGui::Button("Run Benchmark", ImVec2(150, 0));
         ImGui::EndDisabled();
     } else if (isRecording) {
@@ -815,10 +804,9 @@ void BenchmarkPanel::RenderResultsSection(GPUSceneManagement* app) {
         ImPlot::SetupAxesLimits(0, 3, 0, avg * 1.2, ImGuiCond_Always);
         // GPU bar
         double gpuAvg = n > 0 ? std::accumulate(m_lastResults.begin(), m_lastResults.end(), 0.0,
-            [](double sum, const FrameStats& s) { return sum + s.gpuTimeUs; }) / n : 0;
+        double cpuAvg = avg - gpuAvg;
         ImPlot::PlotBars("GPU", &gpuAvg, 1, 0.4, 1.0);
-        ImPlot::PlotBars("CPU", &avg, 1, 0.4, 2.0);
-        ImPlot::EndPlot();
+        ImPlot::PlotBars("CPU", &cpuAvg, 1, 0.4, 2.0);
     }
 }
 ```
@@ -858,7 +846,7 @@ benchPanel.Render(&app);
 
 // Generation visualization: update partial tileGrid each frame
 if (benchPanel.ShouldRenderPartial()) {
-    app.SetPartialTileGrid(benchPanel.GetPartialTileGrid(), app.GetGridSize());
+    app.UpdateSceneFromTileGrid(benchPanel.GetPartialTileGrid(), app.GetGridSize());
     app.SetRenderPartial(true);
 }
 if (benchPanel.GenerationReady() && benchPanel.GetState() == PanelState::Ready) {
