@@ -83,8 +83,8 @@ struct FrameStats {
 };
 
 struct BenchmarkConfig {
-	uint32_t gridSize     = 128;
-	uint32_t chunkSize    = 8;
+	uint32_t gridSize     = 512;
+	uint32_t chunkSize    = 16;
 	uint32_t density      = 50;
 	RenderScheme scheme   = RenderScheme::GPU_CullIndirect;
 	uint32_t seed         = 42;
@@ -123,8 +123,11 @@ protected:
 	void CreateBuffers();
 	void CreatePipelines();
 	void CreateDescriptorSets();
+	void CreateQueryPool();
 	void WriteInstanceData();
 	void ComputeChunkAABBs();
+	void ReadbackGPUVisibility();
+	void RegenerateChunks(uint32_t count);
 
 	void RenderScheme1(float dt);
 	void RenderScheme2(float dt);
@@ -183,11 +186,16 @@ protected:
 	bool m_isRecording;
 	bool m_benchmarkComplete;
 	uint32_t m_currentFrame;
+	uint32_t m_recordFrameIdx = 0;
+	uint32_t m_drawCallCount = 0;
+	VulkanBuffer m_visibilityStaging;
 	LARGE_INTEGER m_qpcFrequency;
 	LARGE_INTEGER m_frameStartQpc;
 
 	class ChunkMonitor* m_monitor = nullptr;
 	bool m_altWasHeld = false;
+	bool m_pendingReadback = false;
+	float m_cellSize = 4.0f;
 #ifdef USE_IMGUI
 	GuiWrapper* m_gui = nullptr;
 #endif

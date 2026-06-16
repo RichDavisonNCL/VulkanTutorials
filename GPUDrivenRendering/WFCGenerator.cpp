@@ -8,12 +8,12 @@
 using namespace NCL::Rendering::Vulkan;
 
 static const WFCTile s_tiles[] = {
-	{ 0, "EMPTY",    false, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f },
-	{ 1, "LOW",      true,  0.4f, 0.8f, 1.0f, 0.204f, 0.596f, 0.859f },
-	{ 2, "MID",      true,  1.2f, 2.0f, 1.0f, 0.180f, 0.800f, 0.443f },
-	{ 3, "HIGH",     true,  3.0f, 5.0f, 1.0f, 0.906f, 0.298f, 0.235f },
-	{ 4, "SPHERE_S", false, 0.3f, 0.6f, 0.5f, 0.953f, 0.612f, 0.071f },
-	{ 5, "SPHERE_L", false, 0.8f, 1.5f, 0.8f, 0.608f, 0.349f, 0.714f },
+	{ 0, "EMPTY",    false,  0.0f,  0.0f, 0.0f, 0.0f, 0.0f, 0.0f },
+	{ 1, "LOW",      true,   1.5f,  3.0f, 1.0f, 0.204f, 0.596f, 0.859f },
+	{ 2, "MID",      true,   4.0f,  8.0f, 1.0f, 0.180f, 0.800f, 0.443f },
+	{ 3, "HIGH",     true,  12.0f, 20.0f, 1.0f, 0.906f, 0.298f, 0.235f },
+	{ 4, "SPHERE_S", false,  1.0f,  2.0f, 0.5f, 0.953f, 0.612f, 0.071f },
+	{ 5, "SPHERE_L", false,  3.0f,  5.0f, 0.8f, 0.608f, 0.349f, 0.714f },
 };
 
 static const bool s_adjacency[6][6] = {

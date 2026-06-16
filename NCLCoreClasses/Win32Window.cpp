@@ -339,6 +339,17 @@ LRESULT CALLBACK Win32Window::WindowProc(HWND hWnd, UINT message, WPARAM wParam,
 		}
 	}
 
+
+	// Suppress WM_SYSKEYDOWN for Alt to prevent Windows from activating
+	// the system menu (which blocks the message pump). Alt is handled
+	// at the application level via GetAsyncKeyState(VK_MENU).
+	if (message == WM_SYSKEYDOWN && wParam == VK_MENU) {
+		return 0;
+	}
+	if (message == WM_SYSKEYUP && wParam == VK_MENU) {
+		return 0;
+	}
+
 	return DefWindowProc(hWnd, message, wParam, lParam);
 }
 

@@ -85,6 +85,10 @@ int main(int argc, char* argv[]) {
 
 	GPUSceneManagement app(*w, vkInit);
 
+	// Hide cursor early — SetBenchmarkConfig may take minutes for WFC generation.
+	// The Alt-toggle state machine in RunFrame handles show/hide from frame 0 onward.
+	while (ShowCursor(FALSE) >= 0);  // force counter to -1
+
 #ifdef USE_IMGUI
 	GuiWrapper* gui = nullptr;
 	if (!benchmarkMode) {
@@ -95,7 +99,9 @@ int main(int argc, char* argv[]) {
 #endif
 
 	if (benchmarkMode) {
+		std::cout << "[Main] Benchmark: calling SetBenchmarkConfig..." << std::endl;
 		app.SetBenchmarkConfig(benchConfig);
+		std::cout << "[Main] Benchmark: config done, running frames" << std::endl;
 		int totalFrames = benchConfig.warmupFrames + benchConfig.recordFrames;
 		int frameIdx = 0;
 		while (w->UpdateWindow() && frameIdx < totalFrames && !app.IsBenchmarkComplete()) {
@@ -107,10 +113,18 @@ int main(int argc, char* argv[]) {
 	else {
 		if (benchConfig.gridSize > 0) {
 			benchConfig.headless = false;
+			std::cout << "[Main] Interactive: calling SetBenchmarkConfig..." << std::endl;
 			app.SetBenchmarkConfig(benchConfig);
+			std::cout << "[Main] Interactive: config done, entering main loop" << std::endl;
 		}
+
+		int loopCount = 0;
 		while (w->UpdateWindow() && !Window::GetKeyboard()->KeyDown(KeyCodes::ESCAPE)) {
+			if (loopCount < 5 || loopCount % 100 == 0)
+				std::cout << "[Main] loop " << loopCount << " start" << std::endl;
 			app.RunFrame(w->GetTimer().GetTimeDeltaSeconds());
+			if (loopCount < 5 || loopCount % 100 == 0)
+				std::cout << "[Main] loop " << loopCount << " end" << std::endl;
 
 			if (Window::GetKeyboard()->KeyPressed(KeyCodes::NUM1))
 				app.SetScheme(RenderScheme::CPU_Instanced);
@@ -119,6 +133,7 @@ int main(int argc, char* argv[]) {
 			if (Window::GetKeyboard()->KeyPressed(KeyCodes::NUM3))
 				app.SetScheme(RenderScheme::GPU_CullIndirect);
 
+			++loopCount;
 		}
 		app.Finish();
 	}

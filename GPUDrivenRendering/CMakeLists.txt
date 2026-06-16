@@ -4,6 +4,8 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/*.h
 )
+# Exclude test files from main target
+list(FILTER SOURCES EXCLUDE REGEX ".*/Tests/.*")
 
 add_executable(${TARGET_NAME} ${SOURCES})
 
@@ -64,5 +66,21 @@ target_link_libraries(${TARGET_NAME} PRIVATE
 )
 
 set_target_properties(${TARGET_NAME} PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+# ── Unit test target (no Vulkan dependency, WFC + data layout only) ──
+set(TEST_TARGET GPUDrivenRendering_Tests)
+add_executable(${TEST_TARGET}
+    Tests/TestMain.cpp
+    WFCGenerator.cpp
+)
+target_include_directories(${TEST_TARGET} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/NCLCoreClasses
+)
+target_compile_features(${TEST_TARGET} PRIVATE cxx_std_20)
+target_link_libraries(${TEST_TARGET} PRIVATE NCLCoreClasses)
+set_target_properties(${TEST_TARGET} PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
