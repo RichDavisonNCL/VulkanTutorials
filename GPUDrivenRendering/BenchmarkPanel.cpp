@@ -11,6 +11,8 @@
 #include <chrono>
 #include <sstream>
 #include <iomanip>
+#include <numeric>
+#include <algorithm>
 
 using namespace NCL::Rendering::Vulkan;
 
@@ -108,16 +110,101 @@ void BenchmarkPanel::RenderGenerationSection(GPUSceneManagement* app) {
     }
 }
 
-void BenchmarkPanel::RenderBenchmarkSection(GPUSceneManagement*) {
+void BenchmarkPanel::RenderBenchmarkSection(GPUSceneManagement* app) {
     ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.0f, 1.0f), "Benchmark");
     ImGui::Separator();
-    ImGui::TextDisabled("(Task 8)");
+    bool canRun = (m_state == PanelState::Ready || m_state == PanelState::Results);
+    bool isRecording = (m_state == PanelState::Recording);
+    if (!isRecording) {
+        ImGui::RadioButton("Scheme 1 (CPU instanced)", &m_scheme, 1);
+        ImGui::RadioButton("Scheme 2 (CPU cull+indirect)", &m_scheme, 2);
+        ImGui::RadioButton("Scheme 3 (GPU cull+indirect)", &m_scheme, 3);
+        ImGui::InputInt("Warmup frames", &m_warmupFrames, 10, 60);
+        ImGui::InputInt("Record frames", &m_recordFrames, 50, 200);
+        if (m_warmupFrames < 0) m_warmupFrames = 0;
+        if (m_recordFrames < 1) m_recordFrames = 1;
+    }
+    if (!canRun && !isRecording) {
+        ImGui::BeginDisabled(true);
+        ImGui::Button("Run Benchmark", ImVec2(150, 0));
+        ImGui::EndDisabled();
+    } else if (isRecording) {
+        const auto& stats = app->GetFrameStats();
+        int recorded = (int)stats.size();
+        ImGui::ProgressBar((float)recorded / (float)m_recordFrames, ImVec2(200, 0));
+        ImGui::SameLine(); ImGui::Text("%d / %d", recorded, m_recordFrames);
+        if (recorded > m_chartFrame) {
+            for (int i = m_chartFrame; i < recorded; ++i)
+                m_frameTimes.push_back((float)stats[i].totalTimeUs);
+            m_chartFrame = recorded;
+        }
+        if (recorded >= m_recordFrames) {
+            m_state = PanelState::Results;
+            m_lastResults.assign(stats.begin(), stats.end());
+            m_lastScheme = m_scheme;
+            auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+            std::ostringstream csvName;
+            csvName << "results/benchmark_"
+                    << std::put_time(std::localtime(&t), "%Y%m%d_%H%M%S") << ".csv";
+            m_csvPath = csvName.str();
+        }
+    } else if (canRun) {
+        if (ImGui::Button("Run Benchmark", ImVec2(150, 0))) {
+            app->SetScheme((RenderScheme)m_scheme);
+            BenchmarkConfig cfg = app->GetBenchmarkConfig();
+            cfg.scheme = (RenderScheme)m_scheme;
+            cfg.warmupFrames = m_warmupFrames;
+            cfg.recordFrames = m_recordFrames;
+            m_frameTimes.clear();
+            m_chartFrame = 0;
+            m_csvPath.clear();
+            m_state = PanelState::Recording;
+            app->SetBenchmarkConfig(cfg);
+        }
+    }
 }
 
-void BenchmarkPanel::RenderResultsSection(GPUSceneManagement*) {
+void BenchmarkPanel::RenderResultsSection(GPUSceneManagement* app) {
     ImGui::TextColored(ImVec4(0.3f, 0.8f, 0.3f, 1.0f), "Results");
     ImGui::Separator();
-    ImGui::TextDisabled("(Task 8)");
+    if (m_lastResults.empty()) {
+        ImGui::TextDisabled("No results yet. Run a benchmark.");
+        return;
+    }
+    std::vector<double> totals;
+    for (auto& s : m_lastResults) totals.push_back(s.totalTimeUs);
+    std::sort(totals.begin(), totals.end());
+    size_t n = totals.size();
+    double avg = std::accumulate(totals.begin(), totals.end(), 0.0) / n;
+    double p1 = totals[n / 100];
+    double p99 = totals[n * 99 / 100];
+    ImGui::Text("Scheme %d | Frames: %zu | Draw calls: %u",
+                m_lastScheme, n, m_lastResults[0].drawCalls);
+    ImGui::Text("Total: avg=%.1f us  P1=%.1f  P99=%.1f", avg, p1, p99);
+    if (!m_csvPath.empty())
+        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "CSV: %s", m_csvPath.c_str());
+
+    if (ImPlot::BeginPlot("##FrameTimeChart", ImVec2(-1, 200),
+                          ImPlotFlags_NoTitle | ImPlotFlags_NoLegend)) {
+        ImPlot::SetupAxes("Frame", "us", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+        ImPlot::PlotLine("Total", m_frameTimes.data(), (int)m_frameTimes.size());
+        ImPlot::EndPlot();
+    }
+
+    if (ImPlot::BeginPlot("##CPUGPUBar", ImVec2(-1, 150), ImPlotFlags_NoTitle)) {
+        double gpuAvg = 0.0;
+        if (n > 0) {
+            double sum = 0.0;
+            for (auto& s : m_lastResults) sum += s.gpuTimeUs;
+            gpuAvg = sum / n;
+        }
+        ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_NoDecorations);
+        ImPlot::SetupAxesLimits(0, 3, 0, avg * 1.2, ImGuiCond_Always);
+        ImPlot::PlotBars("GPU", &gpuAvg, 1, 0.4, 1.0);
+        double cpuAvg = avg - gpuAvg;
+        ImPlot::PlotBars("CPU", &cpuAvg, 1, 0.4, 2.0);
+        ImPlot::EndPlot();
+    }
 }
 
 void BenchmarkPanel::GenerationThread(GPUSceneManagement* app, uint32_t gridSize,
