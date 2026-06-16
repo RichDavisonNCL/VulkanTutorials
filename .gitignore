@@ -384,3 +384,9 @@ MigrationBackup/
 .superpowers/
 .workbench/
 *.md
+
+# Superpowers + docs
+.superpowers/
+docs/superpowers/
+docs/*.md
+memory/
