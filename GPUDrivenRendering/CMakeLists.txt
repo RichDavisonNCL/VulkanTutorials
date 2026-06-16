@@ -35,6 +35,10 @@ if(COMPILE_WITH_IMGUI)
         ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
         ${IMGUI_DIR}/backends/imgui_impl_win32.cpp)
     target_sources(${TARGET_NAME} PRIVATE ${IMGUI_SOURCES})
+    target_sources(${TARGET_NAME} PRIVATE
+        ${CMAKE_SOURCE_DIR}/imgui/implot.cpp
+        ${CMAKE_SOURCE_DIR}/imgui/implot_items.cpp
+    )
 endif()
 
 # Shader compilation
