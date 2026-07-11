@@ -7,6 +7,7 @@
 #include <vector>
 #include <cstdint>
 #include <fstream>
+#include <filesystem>
 #include <algorithm>
 #include <numeric>
 #include <cmath>
@@ -77,9 +78,10 @@ struct ChunkInfo {
 static_assert(sizeof(ChunkInfo) == 48);
 
 struct FrameStats {
-	double cpuTimeUs;
-	double gpuTimeUs;
-	double totalTimeUs;
+	double cpuRecordUs;    // CPU command recording (cull + submit), excludes fence wait
+	double cpuWaitUs;      // CPU wait on swapchain acquire fence (present overhead)
+	double gpuExecUs;      // GPU execution time (timestamp query)
+	double frameWallUs;    // end-to-end wall-clock (record + wait), contains present noise
 	uint32_t drawCalls;
 	uint32_t visibleInstances;
 };
@@ -220,7 +222,15 @@ protected:
 	uint32_t m_drawCallCount = 0;
 	VulkanBuffer m_visibilityStaging;
 	LARGE_INTEGER m_qpcFrequency;
-	LARGE_INTEGER m_frameStartQpc;
+	LARGE_INTEGER m_frameStartQpc;   // wall-clock frame start (set in BeginMeasurement)
+	double m_cpuRecordAccumUs = 0;   // accumulated CPU recording time, excludes fence wait
+	LARGE_INTEGER m_segStartQpc;     // current CPU segment start
+	double m_cpuWaitUs = 0;          // fence-wait duration for current frame
+
+	// CPU timing segment helpers (exclude BeginRenderToScreen fence wait)
+	void CpuSegBegin();
+	void CpuSegEnd();
+	void MarkFenceWait(double waitUs);
 
 	class ChunkMonitor* m_monitor = nullptr;
 		uint32_t m_monitorGridChunks = 0;

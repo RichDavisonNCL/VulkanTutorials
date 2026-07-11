@@ -103,6 +103,7 @@ int main(int argc, char* argv[]) {
 
 	if (benchmarkMode) {
 		app.SetBenchmarkConfig(benchConfig);
+		app.SetBenchmarkEnabled(true);  // headless benchmark records unconditionally
 		int totalFrames = benchConfig.warmupFrames + benchConfig.recordFrames;
 		int frameIdx = 0;
 		while (w->UpdateWindow() && frameIdx < totalFrames && !app.IsBenchmarkComplete()) {

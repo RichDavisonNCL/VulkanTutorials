@@ -290,7 +290,8 @@ void GPUSceneManagement::RunFrame(float dt) {
 			vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWait);
 		if (r == vk::Result::eSuccess) {
 			for (uint32_t i = 0; i < m_frameStats.size(); ++i) {
-				m_frameStats[i].gpuTimeUs = (double)(rawQueries[2*i+1] - rawQueries[2*i])
+				// GPU execution time from timestamp queries (independent of CPU record).
+				m_frameStats[i].gpuExecUs = (double)(rawQueries[2*i+1] - rawQueries[2*i])
 					* m_gpuTimestampPeriod / 1000.0;
 			}
 		}
@@ -531,6 +532,7 @@ void GPUSceneManagement::RenderScheme1(float dt) {
 	FrameContext const& ctx = m_renderer->GetFrameContext();
 	BeginMeasurement();
 
+	CpuSegBegin();  // segment 1: frustum cull (CPU work)
 	Vector4 frustumPlanes[6];
 	ExtractFrustumPlanes(frustumPlanes);
 
@@ -541,8 +543,17 @@ void GPUSceneManagement::RenderScheme1(float dt) {
 			chunk.aabbMinX, chunk.aabbMinY, chunk.aabbMinZ,
 			chunk.aabbMaxX, chunk.aabbMaxY, chunk.aabbMaxZ);
 	}
+	CpuSegEnd();
 
+	// BeginRenderToScreen contains the swapchain acquire fence wait — measure
+	// it separately as present overhead, not pipeline CPU cost.
+	LARGE_INTEGER fw0, fw1;
+	QueryPerformanceCounter(&fw0);
 	m_renderer->BeginRenderToScreen(ctx.cmdBuffer);
+	QueryPerformanceCounter(&fw1);
+	MarkFenceWait((double)(fw1.QuadPart - fw0.QuadPart) * m_cpuTimestampPeriod / 1000.0);
+
+	CpuSegBegin();  // segment 2: pipeline bind + draw recording (CPU work)
 	ctx.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_graphicsPipeline);
 	ctx.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_graphicsPipeline.layout,
 		0, 1, &*m_sceneDescriptor, 0, nullptr);
@@ -566,6 +577,8 @@ void GPUSceneManagement::RenderScheme1(float dt) {
 	m_drawCallCount = drawCount;
 
 	ctx.cmdBuffer.endRendering();
+	CpuSegEnd();
+
 	EndMeasurement();
 }
 
@@ -573,6 +586,7 @@ void GPUSceneManagement::RenderScheme2(float dt) {
 	FrameContext const& ctx = m_renderer->GetFrameContext();
 	BeginMeasurement();
 
+	CpuSegBegin();  // segment 1: cull + fill indirect buffer (CPU work)
 	Vector4 frustumPlanes[6];
 	ExtractFrustumPlanes(frustumPlanes);
 
@@ -604,8 +618,15 @@ void GPUSceneManagement::RenderScheme2(float dt) {
 	memBarrier.dstStageMask  = vk::PipelineStageFlagBits2::eDrawIndirect;
 	memBarrier.dstAccessMask = vk::AccessFlagBits2::eIndirectCommandRead;
 	ctx.cmdBuffer.pipelineBarrier2(vk::DependencyInfo().setMemoryBarriers(memBarrier));
+	CpuSegEnd();
 
+	LARGE_INTEGER fw0, fw1;
+	QueryPerformanceCounter(&fw0);
 	m_renderer->BeginRenderToScreen(ctx.cmdBuffer);
+	QueryPerformanceCounter(&fw1);
+	MarkFenceWait((double)(fw1.QuadPart - fw0.QuadPart) * m_cpuTimestampPeriod / 1000.0);
+
+	CpuSegBegin();  // segment 2: indirect draw recording (CPU work)
 	ctx.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_graphicsPipeline);
 	ctx.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_graphicsPipeline.layout,
 		0, 1, &*m_sceneDescriptor, 0, nullptr);
@@ -622,6 +643,7 @@ void GPUSceneManagement::RenderScheme2(float dt) {
 	m_drawCallCount = 2;
 
 	ctx.cmdBuffer.endRendering();
+	CpuSegEnd();
 	EndMeasurement();
 }
 
@@ -629,6 +651,7 @@ void GPUSceneManagement::RenderScheme3(float dt) {
 	FrameContext const& ctx = m_renderer->GetFrameContext();
 	BeginMeasurement();
 
+	CpuSegBegin();  // segment 1: fillBuffer + compute dispatch recording (CPU work)
 	uint32_t indirectSize = (uint32_t)m_chunks.size() * 2 * 5 * sizeof(uint32_t);
 	ctx.cmdBuffer.fillBuffer(m_indirectBuffer.buffer, 0, indirectSize, 0);
 
@@ -665,8 +688,15 @@ void GPUSceneManagement::RenderScheme3(float dt) {
 	computeBarrier.buffer = m_indirectBuffer.buffer;
 	computeBarrier.size   = indirectSize;
 	ctx.cmdBuffer.pipelineBarrier2(vk::DependencyInfo().setBufferMemoryBarriers(computeBarrier));
+	CpuSegEnd();
 
+	LARGE_INTEGER fw0, fw1;
+	QueryPerformanceCounter(&fw0);
 	m_renderer->BeginRenderToScreen(ctx.cmdBuffer);
+	QueryPerformanceCounter(&fw1);
+	MarkFenceWait((double)(fw1.QuadPart - fw0.QuadPart) * m_cpuTimestampPeriod / 1000.0);
+
+	CpuSegBegin();  // segment 2: indirect draw recording (CPU work)
 	ctx.cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_graphicsPipeline);
 	ctx.cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_graphicsPipeline.layout,
 		0, 1, &*m_sceneDescriptor, 0, nullptr);
@@ -683,6 +713,7 @@ void GPUSceneManagement::RenderScheme3(float dt) {
 	m_drawCallCount = 2;
 
 	ctx.cmdBuffer.endRendering();
+	CpuSegEnd();
 	EndMeasurement();
 }
 
@@ -694,11 +725,34 @@ void GPUSceneManagement::BeginMeasurement() {
 	if (!m_isRecording) return;
 
 	QueryPerformanceCounter(&m_frameStartQpc);
+	m_cpuRecordAccumUs = 0.0;   // reset per-frame CPU recording accumulator
+	m_cpuWaitUs = 0.0;
 
 	FrameContext const& ctx = m_renderer->GetFrameContext();
 	uint32_t qBase = 2 * m_recordFrameIdx;
 	ctx.cmdBuffer.resetQueryPool(*m_queryPool, qBase, 2);
 	ctx.cmdBuffer.writeTimestamp2(vk::PipelineStageFlagBits2::eTopOfPipe, *m_queryPool, qBase);
+}
+
+// Begin a CPU recording segment (excludes fence wait between segments).
+void GPUSceneManagement::CpuSegBegin() {
+	if (!m_isRecording) return;
+	QueryPerformanceCounter(&m_segStartQpc);
+}
+
+// End a CPU recording segment, accumulating its duration.
+void GPUSceneManagement::CpuSegEnd() {
+	if (!m_isRecording) return;
+	LARGE_INTEGER now;
+	QueryPerformanceCounter(&now);
+	m_cpuRecordAccumUs += (double)(now.QuadPart - m_segStartQpc.QuadPart)
+	                     * m_cpuTimestampPeriod / 1000.0;
+}
+
+// Record the fence-wait duration (swapchain acquire), reported separately.
+void GPUSceneManagement::MarkFenceWait(double waitUs) {
+	if (!m_isRecording) return;
+	m_cpuWaitUs += waitUs;
 }
 
 void GPUSceneManagement::EndMeasurement() {
@@ -715,12 +769,13 @@ void GPUSceneManagement::EndMeasurement() {
 	for (bool v : m_chunkVisible) if (v) ++visCount;
 
 	FrameStats stats = {};
-	stats.totalTimeUs = (double)(endQpc.QuadPart - m_frameStartQpc.QuadPart)
+	stats.frameWallUs = (double)(endQpc.QuadPart - m_frameStartQpc.QuadPart)
 	                   * m_cpuTimestampPeriod / 1000.0;
-	stats.cpuTimeUs = stats.totalTimeUs;  // placeholder: will subtract GPU time after readback
+	stats.cpuRecordUs = m_cpuRecordAccumUs;   // cull + submit, excludes fence wait
+	stats.cpuWaitUs   = m_cpuWaitUs;          // swapchain acquire fence wait
 	stats.drawCalls   = m_drawCallCount;
 	stats.visibleInstances = visCount;
-	stats.gpuTimeUs = 0;  // filled in WriteCSVSummary after bulk readback
+	stats.gpuExecUs = 0;  // filled in deferred readback after bulk query read
 
 	m_frameStats.push_back(stats);
 	++m_recordFrameIdx;
@@ -751,17 +806,27 @@ static void computeStats(const std::vector<double>& values, double& avg, double&
 void GPUSceneManagement::WriteCSVSummary() {
 	if (m_benchConfig.outputPath.empty()) return;
 
-	std::ofstream file(m_benchConfig.outputPath);
-	file << "frame,cpu_us,gpu_us,total_us,draw_calls,visible_instances\n";
+	// Ensure parent directory exists — ofstream will not create it.
+	std::filesystem::path outPath(m_benchConfig.outputPath);
+	if (outPath.has_parent_path())
+		std::filesystem::create_directories(outPath.parent_path());
 
-	std::vector<double> cpuTimes, gpuTimes, totalTimes;
+	std::ofstream file(m_benchConfig.outputPath);
+	if (!file) {
+		std::cerr << "[Benchmark] Failed to open " << m_benchConfig.outputPath << " for writing\n";
+		return;
+	}
+	file << "frame,cpu_record_us,cpu_wait_us,gpu_exec_us,frame_wall_us,draw_calls,visible_instances\n";
+
+	std::vector<double> cpuRecord, cpuWait, gpuExec, frameWall;
 	for (uint32_t i = 0; i < m_frameStats.size(); ++i) {
 		const auto& s = m_frameStats[i];
-		file << i << "," << s.cpuTimeUs << "," << s.gpuTimeUs << ","
-		     << s.totalTimeUs << "," << s.drawCalls << "," << s.visibleInstances << "\n";
-		cpuTimes.push_back(s.cpuTimeUs);
-		gpuTimes.push_back(s.gpuTimeUs);
-		totalTimes.push_back(s.totalTimeUs);
+		file << i << "," << s.cpuRecordUs << "," << s.cpuWaitUs << "," << s.gpuExecUs << ","
+		     << s.frameWallUs << "," << s.drawCalls << "," << s.visibleInstances << "\n";
+		cpuRecord.push_back(s.cpuRecordUs);
+		cpuWait.push_back(s.cpuWaitUs);
+		gpuExec.push_back(s.gpuExecUs);
+		frameWall.push_back(s.frameWallUs);
 	}
 
 	auto writeRow = [&](const char* label, const std::vector<double>& vals) {
@@ -770,12 +835,14 @@ void GPUSceneManagement::WriteCSVSummary() {
 		file << label << "," << a << "," << mn << "," << mx << "," << p1 << "," << p99 << "," << sd << "\n";
 	};
 
-	file << "\nCPU_us_summary,avg,min,max,p1,p99,stddev\n";
-	writeRow("CPU", cpuTimes);
-	file << "\nGPU_us_summary,avg,min,max,p1,p99,stddev\n";
-	writeRow("GPU", gpuTimes);
-	file << "\nTotal_us_summary,avg,min,max,p1,p99,stddev\n";
-	writeRow("Total", totalTimes);
+	file << "\ncpu_record_us_summary,avg,min,max,p1,p99,stddev\n";
+	writeRow("cpu_record", cpuRecord);
+	file << "\ncpu_wait_us_summary,avg,min,max,p1,p99,stddev\n";
+	writeRow("cpu_wait", cpuWait);
+	file << "\ngpu_exec_us_summary,avg,min,max,p1,p99,stddev\n";
+	writeRow("gpu_exec", gpuExec);
+	file << "\nframe_wall_us_summary,avg,min,max,p1,p99,stddev\n";
+	writeRow("frame_wall", frameWall);
 
 	std::cout << "[Benchmark] CSV written: " << m_benchConfig.outputPath
 	          << " (" << m_frameStats.size() << " frames)\n";

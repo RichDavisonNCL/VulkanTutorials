@@ -161,7 +161,7 @@ void BenchmarkPanel::RenderBenchmarkSection(GPUSceneManagement* app) {
         ImGui::ProgressBar((float)recorded / (float)m_recordFrames, ImVec2(200, 0));
         ImGui::SameLine(); ImGui::Text("%d / %d", recorded, m_recordFrames);
 		if (recorded > (int)m_frameTimes.size())
-			m_frameTimes.push_back((float)stats.back().totalTimeUs);
+			m_frameTimes.push_back((float)stats.back().cpuRecordUs);
         if (recorded >= m_recordFrames) {
             m_state = PanelState::Results;
 			app->SetBenchmarkEnabled(false);
@@ -192,7 +192,7 @@ void BenchmarkPanel::RenderResultsSection(GPUSceneManagement* app) {
         return;
     }
     std::vector<double> totals;
-    for (auto& s : m_lastResults) totals.push_back(s.totalTimeUs);
+    for (auto& s : m_lastResults) totals.push_back(s.cpuRecordUs);
     std::sort(totals.begin(), totals.end());
     size_t n = totals.size();
     double avg = std::accumulate(totals.begin(), totals.end(), 0.0) / n;
@@ -215,7 +215,7 @@ void BenchmarkPanel::RenderResultsSection(GPUSceneManagement* app) {
         double gpuAvg = 0.0;
         if (n > 0) {
             double sum = 0.0;
-            for (auto& s : m_lastResults) sum += s.gpuTimeUs;
+            for (auto& s : m_lastResults) sum += s.gpuExecUs;
             gpuAvg = sum / n;
         }
         ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_NoDecorations);
