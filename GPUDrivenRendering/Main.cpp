@@ -78,6 +78,10 @@ int main(int argc, char* argv[]) {
 	if (benchmarkMode) {
 		winInit.width  = 256;
 		winInit.height = 256;
+		// Disable vsync in benchmark mode — FIFO throttles frames to display
+		// refresh (~5.5ms wait), masking true pipeline throughput. Mailbox
+		// presents without blocking on vertical sync.
+		vkInit.idealPresentMode = vk::PresentModeKHR::eMailbox;
 	}
 
 	Window* w = Window::CreateGameWindow(winInit);
