@@ -146,12 +146,14 @@ void GPUSceneManagement::SetBenchmarkConfig(const BenchmarkConfig& config) {
 	CreateQueryPool();
 
 	float sceneSize = m_benchConfig.gridSize * m_cellSize;
-	// Camera just behind near edge, moderate height — independent of scene scale.
-	// Z offset must NOT grow proportionally or buildings become sub-pixel at large N.
-	float camZ = -(m_cellSize * 10.0f);
-	float camY = std::max(120.0f, sceneSize * 0.08f);
-	m_camera.SetPosition(Vector3(sceneSize * 0.5f, camY, camZ));
-	m_camera.SetPitch(-35.0f).SetYaw(180.0f);
+	// Top-down overview: place camera above scene centre looking straight down,
+	// high enough that the full sceneSize x sceneSize grid fits in the 45deg FOV
+	// (h * tan(22.5) = sceneSize/2  ->  h ~= sceneSize * 1.2; use 1.4 for margin).
+	// This maximises visible instances so GPU load scales with total scene size,
+	// not just the fraction inside a narrow frustum.
+	float camY = sceneSize * 1.4f;
+	m_camera.SetPosition(Vector3(sceneSize * 0.5f, camY, sceneSize * 0.5f));
+	m_camera.SetPitch(-89.9f).SetYaw(180.0f);
 
 #ifdef USE_IMGUI
 	if (m_monitor) { delete m_monitor; m_monitor = nullptr; }
