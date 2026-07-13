@@ -9,6 +9,8 @@
 #include <random>
 #include <functional>
 #include <mutex>
+#include <queue>
+#include <utility>
 
 namespace NCL::Rendering::Vulkan {
 
@@ -56,8 +58,14 @@ public:
 	static constexpr uint32_t kEmptyTile = 0;
 
 private:
+	// Min-heap entry: (possibility count, cell index). std::greater orders
+	// smallest count first, ties broken by smallest index — exactly matching
+	// the original linear-scan tie-break, preserving collapse order & seeds.
+	using HeapEntry = std::pair<uint32_t, uint32_t>;
+	using CellHeap = std::priority_queue<HeapEntry, std::vector<HeapEntry>, std::greater<HeapEntry>>;
+
 	void Propagate(std::vector<std::vector<uint32_t>>& possibilities,
-		uint32_t gridSize, uint32_t changedX, uint32_t changedY);
+		uint32_t gridSize, uint32_t changedX, uint32_t changedY, CellHeap& heap);
 	bool IsValidAdjacency(uint32_t tileA, uint32_t tileB) const;
 
 	mutable std::mt19937 m_rng;

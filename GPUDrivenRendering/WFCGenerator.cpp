@@ -4,6 +4,8 @@
  */
 #include "WFCGenerator.h"
 #include <algorithm>
+#include <queue>
+#include <cstdint>
 
 using namespace NCL::Rendering::Vulkan;
 
@@ -48,17 +50,25 @@ std::vector<uint32_t> WFCGenerator::Generate(const WFCConfig& config) {
 	for (uint32_t i = 0; i < kTileCount; ++i) allTiles[i] = i;
 	for (uint32_t i = 0; i < total; ++i) possibilities[i] = allTiles;
 
-	for (uint32_t iter = 0; iter < total; ++iter) {
-		uint32_t bestIdx = 0;
-		size_t bestCount = kTileCount + 1;
-		for (uint32_t i = 0; i < total; ++i) {
-			size_t count = possibilities[i].size();
-			if (count > 1 && count < bestCount) {
-				bestCount = count;
-				bestIdx = i;
-			}
-		}
-		if (bestCount > kTileCount) break;
+	// Min-heap of (possibility count, index). Replaces the O(N^2) full scan
+	// per iteration with O(log N) top extraction — total O(N^2 log N).
+	// Lazy deletion: Propagate pushes updated (smaller-count) entries; stale
+	// entries whose count != current possibilities[idx].size() are skipped.
+	// (count, index) ordering with std::greater reproduces the original
+	// "smallest count, ties by smallest index" tie-break exactly.
+	CellHeap heap;
+	for (uint32_t i = 0; i < total; ++i)
+		heap.push({ (uint32_t)possibilities[i].size(), i });
+
+	uint32_t iter = 0;
+	while (!heap.empty()) {
+		auto [entryCount, bestIdx] = heap.top();
+		heap.pop();
+
+		// Skip stale entries (count no longer matches) and already-collapsed
+		// or fully-constrained cells (count <= 1 are not collapse candidates).
+		if (entryCount != (uint32_t)possibilities[bestIdx].size()) continue;
+		if (possibilities[bestIdx].size() <= 1) continue;
 
 		float totalWeight = 0.0f;
 		for (uint32_t t : possibilities[bestIdx]) totalWeight += weights[t];
@@ -73,25 +83,29 @@ std::vector<uint32_t> WFCGenerator::Generate(const WFCConfig& config) {
 
 		possibilities[bestIdx] = { chosen };
 		grid[bestIdx] = chosen;
-		Propagate(possibilities, N, bestIdx % N, bestIdx / N);
+		Propagate(possibilities, N, bestIdx % N, bestIdx / N, heap);
 
-		if (config.partialGrid && config.gridMutex && (iter % 200 == 0 || iter == total - 1)) {
+		if (config.partialGrid && config.gridMutex && (iter % 200 == 0)) {
 			std::lock_guard<std::mutex> lock(*config.gridMutex);
 			*config.partialGrid = grid;
 		}
-
 		if (config.onProgress && (iter % 500 == 0)) {
 			config.onProgress(iter + 1, total);
 		}
+		++iter;
 	}
 
+	if (config.partialGrid && config.gridMutex) {
+		std::lock_guard<std::mutex> lock(*config.gridMutex);
+		*config.partialGrid = grid;
+	}
 	if (config.onProgress) config.onProgress(total, total);
 
 	return grid;
 }
 
 void WFCGenerator::Propagate(std::vector<std::vector<uint32_t>>& possibilities,
-	uint32_t gridSize, uint32_t startX, uint32_t startY) {
+	uint32_t gridSize, uint32_t startX, uint32_t startY, CellHeap& heap) {
 
 	std::vector<std::pair<uint32_t, uint32_t>> stack;
 	stack.emplace_back(startX, startY);
@@ -123,8 +137,13 @@ void WFCGenerator::Propagate(std::vector<std::vector<uint32_t>>& possibilities,
 					}),
 				neighborPoss.end());
 
-			if (neighborPoss.size() < before && neighborPoss.size() == 1) {
-				stack.emplace_back(nx, ny);
+			if (neighborPoss.size() < before) {
+				// Neighbour's count shrank — push an updated heap entry so the
+				// main loop can pick it up (lazy deletion of the stale entry).
+				heap.push({ (uint32_t)neighborPoss.size(), ni });
+				if (neighborPoss.size() == 1) {
+					stack.emplace_back(nx, ny);
+				}
 			}
 		}
 	}
