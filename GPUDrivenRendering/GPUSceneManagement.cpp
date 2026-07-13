@@ -113,7 +113,7 @@ void GPUSceneManagement::Initialise() {
 
 	// Query pool created in CreateQueryPool() once config is known.
 
-	m_camera.SetFieldOfVision(45.0f).SetNearPlane(1.0f).SetFarPlane(12000.0f);
+	m_camera.SetFieldOfVision(45.0f).SetNearPlane(1.0f).SetFarPlane(100000.0f);
 	m_camera.SetPosition(Vector3(128, 120, -200));
 	m_camera.SetPitch(-35.0f).SetYaw(180.0f);
 	m_camera.SetController(m_controller);
