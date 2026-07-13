@@ -54,6 +54,25 @@ GPUSceneManagement::~GPUSceneManagement() {
 	m_cubeMesh.reset();
 	m_sphereMesh.reset();
 	delete m_memoryManager;
+
+	// Release all device-dependent Vulkan handles BEFORE destroying the
+	// device (delete m_renderer). These members would otherwise be destructed
+	// after the destructor body, when the device is already gone — a
+	// use-after-free that crashes on teardown (notably with the compute
+	// pipeline path in scheme 3).
+	m_graphicsPipeline.pipeline.reset();
+	m_graphicsPipeline.layout.reset();
+	m_computePipeline.pipeline.reset();
+	m_computePipeline.layout.reset();
+	m_sceneDescriptor.reset();
+	m_computeDescriptor.reset();
+	m_cameraDescriptor.reset();
+	m_sceneLayout.reset();
+	m_computeLayout.reset();
+	m_cameraLayout.reset();
+	m_defaultSampler.reset();
+	m_queryPool.reset();
+
 	delete m_renderer;
 	if (m_monitor) delete m_monitor;
 }
@@ -424,6 +443,15 @@ void GPUSceneManagement::ComputeChunkAABBs() {
 
 void GPUSceneManagement::CreateBuffers() {
 	FrameContext const& ctx = m_renderer->GetFrameContext();
+
+	// Discard previous allocations if this is a re-generation (e.g. panel
+	// [Generate] after the 16x16 startup scene). VulkanBuffer::operator=
+	// would otherwise leak the old VMA allocation, asserting on teardown.
+	m_renderer->GetDevice().waitIdle();
+	if (m_cullingBuffer.buffer)  m_memoryManager->DiscardBuffer(m_cullingBuffer,  DiscardMode::Immediate);
+	if (m_renderBuffer.buffer)   m_memoryManager->DiscardBuffer(m_renderBuffer,   DiscardMode::Immediate);
+	if (m_indirectBuffer.buffer) m_memoryManager->DiscardBuffer(m_indirectBuffer, DiscardMode::Immediate);
+	if (m_chunkBuffer.buffer)    m_memoryManager->DiscardBuffer(m_chunkBuffer,    DiscardMode::Immediate);
 
 	m_cullingBuffer = m_memoryManager->CreateBuffer(
 		{ .size = sizeof(CullingDatum) * m_totalInstances, .usage = vk::BufferUsageFlagBits::eStorageBuffer },
