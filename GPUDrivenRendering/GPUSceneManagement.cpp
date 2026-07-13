@@ -17,6 +17,7 @@
 #include "VulkanDescriptorSetLayoutBuilder.h"
 #include "VulkanVMAMemoryManager.h"
 #include "WFCGenerator.h"
+#include "WFCCache.h"
 
 #include "ChunkMonitor.h"
 #include "Win32Window.h"
@@ -159,7 +160,18 @@ void GPUSceneManagement::SetBenchmarkConfig(const BenchmarkConfig& config) {
 	          << " chunk=" << config.chunkSize << " density=" << config.density
 	          << " scheme=" << (int)config.scheme << " seed=" << config.seed << "\n";
 
-	GenerateScene();
+	// Try WFC cache first — same (grid, seed, density) reuses the generated
+	// scene instead of re-running WFC (minutes at 1024^2). On miss, generate
+	// and save so subsequent schemes / runs load instantly.
+	std::vector<uint32_t> cachedGrid;
+	uint32_t cachedSize = 0;
+	if (WFCCache::Load(cachedGrid, cachedSize, config.gridSize, config.seed, config.density)) {
+		m_tileGrid = std::move(cachedGrid);
+		GenerateScene(m_tileGrid);
+	} else {
+		GenerateScene();
+		WFCCache::Save(m_tileGrid, config.gridSize, config.seed, config.density);
+	}
 	CreateBuffers();
 	CreateDescriptorSets();
 	CreateQueryPool();
