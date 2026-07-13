@@ -47,17 +47,22 @@ def aggregate(out):
             rdr = csv.reader(open(f))
             for row in rdr:
                 if len(row) < 2: continue
-                if row[0] == "Total":
-                    info.update(total_avg_us=row[1], total_min_us=row[2], total_max_us=row[3],
-                               total_p1_us=row[4], total_p99_us=row[5], total_stddev=row[6])
-                elif row[0] == "CPU": info["cpu_avg_us"] = row[1]
-                elif row[0] == "GPU": info["gpu_avg_us"] = row[1]
+                if row[0].startswith("#"): continue   # skip metadata header
+                # summary rows: label,avg,min,max,p1,p99,stddev
+                if row[0] == "cpu_record":
+                    info.update(cpu_record_avg=row[1], cpu_record_p99=row[5])
+                elif row[0] == "gpu_exec":
+                    info.update(gpu_exec_avg=row[1], gpu_exec_p99=row[5])
+                elif row[0] == "frame_wall":
+                    info.update(frame_wall_avg=row[1], frame_wall_p99=row[5])
+                elif row[0] == "cpu_wait":
+                    info.update(cpu_wait_avg=row[1])
             rows.append(info)
         except: pass
     if not rows: return
     fns = ["file","grid","chunk","density","scheme","seed","update",
-           "total_avg_us","total_min_us","total_max_us","total_p1_us","total_p99_us","total_stddev",
-           "cpu_avg_us","gpu_avg_us"]
+           "cpu_record_avg","cpu_record_p99","gpu_exec_avg","gpu_exec_p99",
+           "frame_wall_avg","frame_wall_p99","cpu_wait_avg"]
     with open(out / "_aggregate.csv", "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=fns, extrasaction="ignore")
         w.writeheader(); w.writerows(rows)

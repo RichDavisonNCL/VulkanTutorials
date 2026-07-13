@@ -11,11 +11,22 @@ add_executable(${TARGET_NAME} ${SOURCES})
 
 target_include_directories(${TARGET_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}    # for generated GitVersion.h
     ${CMAKE_SOURCE_DIR}/NCLCoreClasses
     ${CMAKE_SOURCE_DIR}/VulkanRendering
     ${CMAKE_SOURCE_DIR}/GLTFLoader
     ${CMAKE_SOURCE_DIR}/VulkanTutorials
 )
+
+# Regenerate GitVersion.h before every build (captures commit + dirty state)
+add_custom_target(gitversion
+    COMMAND ${CMAKE_COMMAND}
+        -DSRCDIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DDSTDIR=${CMAKE_CURRENT_BINARY_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/GenGitVersion.cmake
+    COMMENT "Capturing git commit for GitVersion.h"
+)
+add_dependencies(${TARGET_NAME} gitversion)
 
 target_compile_features(${TARGET_NAME} PRIVATE cxx_std_20)
 

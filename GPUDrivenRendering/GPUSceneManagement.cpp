@@ -18,6 +18,7 @@
 #include "VulkanVMAMemoryManager.h"
 #include "WFCGenerator.h"
 #include "WFCCache.h"
+#include "GitVersion.h"
 
 #include "ChunkMonitor.h"
 #include "Win32Window.h"
@@ -858,6 +859,17 @@ void GPUSceneManagement::WriteCSVSummary() {
 		std::cerr << "[Benchmark] Failed to open " << m_benchConfig.outputPath << " for writing\n";
 		return;
 	}
+
+	// Reproducibility metadata — parsers must skip lines starting with '#'.
+	vk::PhysicalDeviceProperties props = m_renderer->GetPhysicalDevice().getProperties();
+	file << "# commit=" << GIT_COMMIT << "\n";
+	file << "# dirty=" << (GIT_DIRTY ? "true" : "false") << "\n";
+	file << "# gpu=" << props.deviceName.data() << "\n";
+	file << "# grid=" << m_benchConfig.gridSize << " chunk=" << m_benchConfig.chunkSize
+	     << " density=" << m_benchConfig.density << " scheme=" << (int)m_benchConfig.scheme
+	     << " seed=" << m_benchConfig.seed << "\n";
+	file << "# warmup=" << m_benchConfig.warmupFrames << " record=" << m_benchConfig.recordFrames << "\n";
+	file << "# present_mode=mailbox\n";
 	file << "frame,cpu_record_us,cpu_wait_us,gpu_exec_us,frame_wall_us,draw_calls,visible_instances\n";
 
 	std::vector<double> cpuRecord, cpuWait, gpuExec, frameWall;
