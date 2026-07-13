@@ -69,32 +69,52 @@ def aggregate(out):
     print(f"Aggregate: {len(rows)} rows")
 
 def main():
+    global WARMUP, RECORD
     ap = argparse.ArgumentParser()
-    ap.add_argument("--exe", type=Path); ap.add_argument("--outdir", type=Path, default=Path("results"))
+    ap.add_argument("--exe", type=Path)
+    ap.add_argument("--outdir", type=Path, default=Path("results"))
     ap.add_argument("--dry-run", action="store_true")
+    # Dimension overrides — default to the full matrix if not given. Any subset
+    # can be pinned to run a focused slice (e.g. chunk sweep at fixed grid).
+    ap.add_argument("--grids",     type=int, nargs="+", default=GRID_SIZES)
+    ap.add_argument("--chunks",    type=int, nargs="+", default=CHUNK_SIZES)
+    ap.add_argument("--densities", type=int, nargs="+", default=DENSITIES)
+    ap.add_argument("--schemes",   type=int, nargs="+", default=SCHEMES)
+    ap.add_argument("--seeds",     type=int, nargs="+", default=SEEDS)
+    ap.add_argument("--warmup",    type=int, default=WARMUP)
+    ap.add_argument("--record",    type=int, default=RECORD)
+    ap.add_argument("--no-local-update", action="store_true",
+                    help="skip the 128^2 local-update tests")
     args = ap.parse_args()
+
+    WARMUP, RECORD = args.warmup, args.record
     exe = args.exe or find_exe()
     out = args.outdir; out.mkdir(parents=True, exist_ok=True)
 
     tests = []
-    for g in GRID_SIZES:
-        for c in [x for x in CHUNK_SIZES if x <= g//2]:
-            for d in DENSITIES:
-                for s in SCHEMES:
-                    for seed in SEEDS:
+    for g in args.grids:
+        for c in [x for x in args.chunks if x <= g // 2]:
+            for d in args.densities:
+                for s in args.schemes:
+                    for seed in args.seeds:
                         tests.append((g, c, d, s, seed, 0))
-    for u in [1,4,16]:
-        for s in SCHEMES:
-            for seed in SEEDS:
-                tests.append((128, 8, 50, s, seed, u))
+    if not args.no_local_update:
+        for u in [1, 4, 16]:
+            for s in args.schemes:
+                for seed in args.seeds:
+                    tests.append((128, 8, 50, s, seed, u))
 
-    print(f"Tests: {len(tests)} | Est: ~{len(tests)*T_SEC/60:.0f} min ({len(tests)*T_SEC/3600:.1f}h)")
+    print(f"Tests: {len(tests)}  warmup={WARMUP} record={RECORD}")
+    print(f"  grids={args.grids} chunks={args.chunks} densities={args.densities}"
+          f" schemes={args.schemes} seeds={args.seeds}")
     if args.dry_run:
-        for t in tests[:5]: print(f"  {t}")
+        for t in tests: print(f"  grid={t[0]} chunk={t[1]} dens={t[2]} scheme={t[3]} seed={t[4]} update={t[5]}")
         return
 
     ok = fail = 0; t0 = time.monotonic()
-    for g, c, d, s, seed, u in tests:
+    for i, (g, c, d, s, seed, u) in enumerate(tests):
+        print(f"[{i+1}/{len(tests)}] grid={g} chunk={c} dens={d} scheme={s} seed={seed}"
+              + (f" update={u}" if u else ""), flush=True)
         if run_test(exe, out, g, c, d, s, seed, u): ok += 1
         else: fail += 1
     print(f"Done {time.monotonic()-t0:.0f}s. OK={ok} FAIL={fail}")
