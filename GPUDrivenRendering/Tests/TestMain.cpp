@@ -200,6 +200,49 @@ static void test_indirect_layout() {
 }
 
 // ---------------------------------------------------------------------------
+// WFC output signature — guards reproducibility across algorithm changes.
+// FNV-1a hash of the full tile grid for fixed configs. If a refactor (e.g.
+// heap-based cell selection) changes the collapse order, these hashes change
+// and the test fails, catching silent scene divergence.
+// ---------------------------------------------------------------------------
+
+static uint64_t gridHash(const std::vector<uint32_t>& g) {
+	uint64_t h = 1469598103934665603ULL;  // FNV-1a offset basis
+	for (uint32_t v : g) {
+		h ^= v;
+		h *= 1099511628211ULL;
+	}
+	return h;
+}
+
+static void test_wfc_signature() {
+	std::cout << "test_wfc_signature... ";
+	struct Case { uint32_t grid, seed, dens; float ew, ow; uint64_t expect; };
+	// expect=0 means "print, don't assert" — fill in golden values after first run.
+	Case cases[] = {
+		{ 32, 42,   50, 5.0f, 5.0f, 18005985082608524000ULL },
+		{ 64, 1337, 50, 5.0f, 5.0f, 5417721568054646825ULL },
+		{ 48, 99,   50, 6.0f, 4.0f, 2679920729302134472ULL },
+	};
+	bool anyPrint = false;
+	for (auto& c : cases) {
+		WFCConfig cfg; cfg.gridSize = c.grid; cfg.seed = c.seed;
+		cfg.emptyWeight = c.ew; cfg.otherWeight = c.ow;
+		WFCGenerator gen;
+		uint64_t h = gridHash(gen.Generate(cfg));
+		if (c.expect == 0) {
+			std::cout << "\n  [baseline] grid=" << c.grid << " seed=" << c.seed
+			          << " hash=" << h << "ULL";
+			anyPrint = true;
+		} else {
+			T_ASSERT_EQ(h, c.expect, "WFC signature changed — collapse order differs!");
+		}
+	}
+	if (anyPrint) std::cout << "\n  (fill golden hashes above into cases[].expect)\n";
+	std::cout << "PASS" << std::endl; ++g_passed;
+}
+
+// ---------------------------------------------------------------------------
 int main() {
 	std::cout << "=== GPUDrivenRendering Tests ===" << std::endl << std::endl;
 
@@ -214,6 +257,7 @@ int main() {
 	test_density_low();
 	test_density_medium();
 	test_density_high();
+	test_wfc_signature();
 
 	// Data layout
 	test_culling_datum_size();
