@@ -293,7 +293,7 @@ void GPUSceneManagement::RunFrame(float dt) {
 		}
 
 		// ChunkMonitor — recreate when scene dimensions change
-		if (m_gridChunks > 0 && m_gridChunks <= 128) {
+		if (m_gridChunks > 0) {
 			if (!m_monitor || m_monitorGridChunks != m_gridChunks) {
 				delete m_monitor;
 				m_monitor = new ChunkMonitor(m_gridChunks, m_benchConfig.chunkSize, m_benchConfig.gridSize);
