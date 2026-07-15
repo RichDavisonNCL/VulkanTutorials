@@ -225,23 +225,29 @@ void GPUSceneManagement::ReadbackGPUVisibility() {
 void GPUSceneManagement::RunFrame(float dt) {
 	if (m_hostWindow.IsMinimised()) return;
 
-	bool altHeld = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+	// Benchmark mode must not consume real OS input state (Alt key, mouse
+	// look) — it corrupts the fixed top-down benchmark camera pose set in
+	// SetBenchmarkConfig() with incidental mouse movement during long runs.
+	bool altHeld = false;
+	if (!m_benchmarkEnabled) {
+		altHeld = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
 
-	// ShowCursor uses an internal reference counter. Force it to exactly
-	// 0 (visible) or -1 (hidden) on each state transition.
-	if (altHeld != m_altWasHeld) {
-		m_altWasHeld = altHeld;
-		HWND hwnd = static_cast<Win32Code::Win32Window&>(m_hostWindow).GetHandle();
-		if (altHeld) {
-			while (ShowCursor(TRUE) < 0);
-			ClipCursor(nullptr);
-		} else {
-			while (ShowCursor(FALSE) >= 0);
-			RECT r; GetClientRect(hwnd, &r);
-			POINT tl{ r.left, r.top }, br{ r.right, r.bottom };
-			ClientToScreen(hwnd, &tl); ClientToScreen(hwnd, &br);
-			RECT cr{ tl.x, tl.y, br.x, br.y };
-			ClipCursor(&cr);
+		// ShowCursor uses an internal reference counter. Force it to exactly
+		// 0 (visible) or -1 (hidden) on each state transition.
+		if (altHeld != m_altWasHeld) {
+			m_altWasHeld = altHeld;
+			HWND hwnd = static_cast<Win32Code::Win32Window&>(m_hostWindow).GetHandle();
+			if (altHeld) {
+				while (ShowCursor(TRUE) < 0);
+				ClipCursor(nullptr);
+			} else {
+				while (ShowCursor(FALSE) >= 0);
+				RECT r; GetClientRect(hwnd, &r);
+				POINT tl{ r.left, r.top }, br{ r.right, r.bottom };
+				ClientToScreen(hwnd, &tl); ClientToScreen(hwnd, &br);
+				RECT cr{ tl.x, tl.y, br.x, br.y };
+				ClipCursor(&cr);
+			}
 		}
 	}
 
@@ -249,7 +255,7 @@ void GPUSceneManagement::RunFrame(float dt) {
 
 	ReadbackGPUVisibility();
 
-	if (!altHeld)
+	if (!m_benchmarkEnabled && !altHeld)
 		m_camera.UpdateCamera(dt);
 
 	UploadCameraUniform();
