@@ -1,0 +1,12 @@
+NCL::Rendering::Vulkan::VulkanRenderer::InitPhysicalDevice Vulkan using physical device NVIDIA GeForce RTX 4080 SUPER
+NCL::Rendering::Vulkan::VulkanRenderer::InitDeviceQueueIndices Device supports async compute!
+NCL::Rendering::Vulkan::VulkanRenderer::InitDeviceQueueIndices Device supports async copy!
+NCL::Rendering::Vulkan::VulkanRenderer::OnWindowResize New dimensions: 240 , 217
+[GPUDriven] SetBenchmarkConfig: grid=512 chunk=16 density=50 scheme=1 seed=42
+[GPUDriven] Generating scene...
+[DEBUG GenScene] gridSize=512 chunkSize=16 tileGrid.size=262144
+[DEBUG GenScene] instances=176710 m_gridChunks=0
+[GPUDriven] 176710 instances in 1024 chunks (grid 512, chunk 16), scheme=1
+[GPUDriven] First frame rendered
+[DIAG S1] cull=162.1 beginRender=5250.2 drawRec=91.5 us
+[Benchmark] frame 159 (recording 100 of 200)

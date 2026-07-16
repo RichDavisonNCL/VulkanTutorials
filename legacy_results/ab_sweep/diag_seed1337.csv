@@ -1,0 +1,24 @@
+# commit=c1d4b38
+# dirty=true
+# gpu=NVIDIA GeForce RTX 4080 SUPER
+# grid=4096 chunk=16 density=80 scheme=1 seed=1337
+# warmup=5 record=5
+# present_mode=mailbox
+frame,cpu_record_us,cpu_wait_us,gpu_exec_us,frame_wall_us,draw_calls,visible_instances
+0,31365.3,43.4,31549.1,31422,36874,36597
+1,29489.2,32.1,32062.5,29525.5,36874,36597
+2,29644.3,90.2,31505.9,29741.5,36525,36251
+3,25615.1,40.1,22586.1,25659.9,26166,25962
+4,18991.9,60.8,8288.93,19057.2,9219,9150
+
+cpu_record_us_summary,avg,min,max,p1,p99,stddev
+cpu_record,27021.2,18991.9,31365.3,18991.9,29644.3,4433.73
+
+cpu_wait_us_summary,avg,min,max,p1,p99,stddev
+cpu_wait,53.32,32.1,90.2,32.1,60.8,20.686
+
+gpu_exec_us_summary,avg,min,max,p1,p99,stddev
+gpu_exec,25198.5,8288.93,32062.5,8288.93,31549.1,9165
+
+frame_wall_us_summary,avg,min,max,p1,p99,stddev
+frame_wall,27081.2,19057.2,31422,19057.2,29741.5,4433.94
