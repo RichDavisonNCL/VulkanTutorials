@@ -69,6 +69,7 @@ int main(int argc, char* argv[]) {
 		else if (arg == "-recordframes")   { benchConfig.recordFrames = std::stoi(argv[++i]); }
 		else if (arg == "-output")         { benchConfig.outputPath    = argv[++i]; }
 		else if (arg == "-updatesize")     { benchConfig.updateSize    = std::stoi(argv[++i]); }
+		else if (arg == "-updatebatched")  { benchConfig.updateBatched = std::stoi(argv[++i]) != 0; }
 		else if (arg == "-w")              { winInit.width             = std::stoi(argv[++i]); }
 		else if (arg == "-h")              { winInit.height            = std::stoi(argv[++i]); }
 		else if (arg == "-lockcursor")     { lockCursor = true; }
@@ -108,6 +109,44 @@ int main(int argc, char* argv[]) {
 	if (benchmarkMode) {
 		app.SetBenchmarkConfig(benchConfig);
 		app.SetBenchmarkEnabled(true);  // headless benchmark records unconditionally
+
+		// Local-update pilot: when -UpdateSize N is passed, measure the standalone
+		// cost of RegenerateChunks(N) over K repeats and exit — no render loop.
+		// Answers "is the update cost measurable above noise, and does it scale?"
+		if (benchConfig.updateSize > 0) {
+			const int kWarmup = 10, kRepeat = 100;
+			for (int i = 0; i < kWarmup; ++i) app.RunLocalUpdate(benchConfig.updateSize);
+
+			std::vector<double> samples;
+			samples.reserve(kRepeat);
+			for (int i = 0; i < kRepeat; ++i) {
+				app.RunLocalUpdate(benchConfig.updateSize);
+				samples.push_back(app.GetLastUpdateUs());
+			}
+
+			std::sort(samples.begin(), samples.end());
+			double sum = 0.0;
+			for (double s : samples) sum += s;
+			double avg = sum / samples.size();
+			double var = 0.0;
+			for (double s : samples) var += (s - avg) * (s - avg);
+			double stddev = std::sqrt(var / samples.size());
+			double p99 = samples[(size_t)(samples.size() * 99 / 100)];
+
+			std::cout << "\n[Pilot] mode=" << (benchConfig.updateBatched ? "batched" : "perchunk")
+			          << " updateSize=" << benchConfig.updateSize
+			          << " scene=" << benchConfig.gridSize << "^2 chunk=" << benchConfig.chunkSize
+			          << " density=" << benchConfig.density << " seed=" << benchConfig.seed
+			          << " scheme=" << (int)benchConfig.scheme << "\n";
+			std::cout << "[Pilot] cost_us over " << kRepeat << " repeats: "
+			          << "avg=" << avg << " min=" << samples.front() << " max=" << samples.back()
+			          << " p99=" << p99 << " stddev=" << stddev << "\n";
+
+			app.Finish();
+			Window::DestroyGameWindow();
+			return 0;
+		}
+
 		int totalFrames = benchConfig.warmupFrames + benchConfig.recordFrames;
 		int frameIdx = 0;
 		while (w->UpdateWindow() && frameIdx < totalFrames && !app.IsBenchmarkComplete()) {

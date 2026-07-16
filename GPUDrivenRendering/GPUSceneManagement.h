@@ -95,6 +95,7 @@ struct BenchmarkConfig {
 	uint32_t warmupFrames = 120;
 	uint32_t recordFrames = 1200;
 	uint32_t updateSize   = 0;
+	bool updateBatched    = true;   // batch all region copies into one submit
 	std::string outputPath;
 	bool headless         = false;
 };
@@ -134,6 +135,8 @@ public:
 	const std::vector<uint32_t>& GetTileGrid() const { return m_tileGrid; }
 	uint32_t GetGridSize() const { return m_benchConfig.gridSize; }
 	bool IsBenchmarkRecording() const { return m_isRecording; }
+	double GetLastUpdateUs() const { return m_lastUpdateUs; }
+	void RunLocalUpdate(uint32_t count) { RegenerateChunks(count); }
 
 #ifdef USE_IMGUI
 	void SetGui(GuiWrapper* gui) { m_gui = gui; }
@@ -239,6 +242,7 @@ protected:
 	bool m_benchmarkEnabled = false;
 	bool m_renderPartial = false;
 	float m_cellSize = 4.0f;
+	double m_lastUpdateUs = 0.0;   // pilot: last RegenerateChunks transfer cost
 #ifdef USE_IMGUI
 	GuiWrapper* m_gui = nullptr;
 	BenchmarkPanel* m_benchPanel = nullptr;

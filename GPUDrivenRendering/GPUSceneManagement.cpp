@@ -945,44 +945,98 @@ void GPUSceneManagement::RegenerateChunks(uint32_t updateCount) {
 		}
 	}
 
-	// Re-upload affected SSBO regions via staging
+	// Re-upload affected SSBO regions via staging. Time only this transfer
+	// work (staging alloc + memcpy + copyBuffer + submit/wait) — this is the
+	// "buffer update cost" the pilot probes. Two modes isolate the effect of
+	// submission batching (the only variable that differs between them):
+	//   perchunk — one submit + fence wait per chunk (naive counterfactual)
+	//   batched  — all copies in one command buffer, a single submit + wait
+	// Copy regions stay one-per-chunk in both (SSBO regions are non-contiguous
+	// and cannot be merged); only the submit count changes (N vs 1).
+	LARGE_INTEGER updBegin;
+	QueryPerformanceCounter(&updBegin);
+	uint64_t updBytes = 0;
+
 	FrameContext const& ctx = m_renderer->GetFrameContext();
-	for (uint32_t ci : candidates) {
-		const auto& chunk = m_chunks[ci];
-		uint32_t offset = chunk.instanceOffset;
-		uint32_t count  = chunk.instanceCount;
 
-		auto stgCull = m_memoryManager->CreateBuffer(
-			{ .size = sizeof(CullingDatum) * count, .usage = vk::BufferUsageFlagBits::eTransferSrc },
-			vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, "StgCullUpd");
-		memcpy(stgCull.Map<CullingDatum>(), &m_cullingData[offset], sizeof(CullingDatum) * count);
-		stgCull.Unmap();
+	if (m_benchConfig.updateBatched) {
+		std::vector<VulkanBuffer> staging;
+		staging.reserve(candidates.size() * 2);
+		vk::UniqueCommandBuffer cmd = CmdBufferCreateBegin(ctx.device, ctx.commandPools[CommandType::Graphics], "UpdateBatched");
+		for (uint32_t ci : candidates) {
+			const auto& chunk = m_chunks[ci];
+			uint32_t offset = chunk.instanceOffset;
+			uint32_t count  = chunk.instanceCount;
+			updBytes += (uint64_t)count * (sizeof(CullingDatum) + sizeof(RenderDatum));
 
-		auto stgRender = m_memoryManager->CreateBuffer(
-			{ .size = sizeof(RenderDatum) * count, .usage = vk::BufferUsageFlagBits::eTransferSrc },
-			vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, "StgRenderUpd");
-		memcpy(stgRender.Map<RenderDatum>(), &m_renderData[offset], sizeof(RenderDatum) * count);
-		stgRender.Unmap();
+			auto stgCull = m_memoryManager->CreateBuffer(
+				{ .size = sizeof(CullingDatum) * count, .usage = vk::BufferUsageFlagBits::eTransferSrc },
+				vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, "StgCullUpd");
+			memcpy(stgCull.Map<CullingDatum>(), &m_cullingData[offset], sizeof(CullingDatum) * count);
+			stgCull.Unmap();
 
-		vk::UniqueCommandBuffer cmd = CmdBufferCreateBegin(ctx.device, ctx.commandPools[CommandType::Graphics], "Update");
-		vk::BufferCopy cpCull{0, offset * sizeof(CullingDatum), sizeof(CullingDatum) * count};
-		cmd->copyBuffer(stgCull.buffer, m_cullingBuffer.buffer, 1, &cpCull);
-		vk::BufferCopy cpRender{0, offset * sizeof(RenderDatum), sizeof(RenderDatum) * count};
-		cmd->copyBuffer(stgRender.buffer, m_renderBuffer.buffer, 1, &cpRender);
+			auto stgRender = m_memoryManager->CreateBuffer(
+				{ .size = sizeof(RenderDatum) * count, .usage = vk::BufferUsageFlagBits::eTransferSrc },
+				vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, "StgRenderUpd");
+			memcpy(stgRender.Map<RenderDatum>(), &m_renderData[offset], sizeof(RenderDatum) * count);
+			stgRender.Unmap();
+
+			vk::BufferCopy cpCull{0, offset * sizeof(CullingDatum), sizeof(CullingDatum) * count};
+			cmd->copyBuffer(stgCull.buffer, m_cullingBuffer.buffer, 1, &cpCull);
+			vk::BufferCopy cpRender{0, offset * sizeof(RenderDatum), sizeof(RenderDatum) * count};
+			cmd->copyBuffer(stgRender.buffer, m_renderBuffer.buffer, 1, &cpRender);
+
+			// Staging buffers must outlive the single submit — discard after the wait.
+			staging.push_back(std::move(stgCull));
+			staging.push_back(std::move(stgRender));
+		}
 		CmdBufferEndSubmitWait(*cmd, ctx.device, ctx.queues[CommandType::Graphics]);
+		for (auto& s : staging) m_memoryManager->DiscardBuffer(s, DiscardMode::Immediate);
+	} else {
+		for (uint32_t ci : candidates) {
+			const auto& chunk = m_chunks[ci];
+			uint32_t offset = chunk.instanceOffset;
+			uint32_t count  = chunk.instanceCount;
+			updBytes += (uint64_t)count * (sizeof(CullingDatum) + sizeof(RenderDatum));
 
-		m_memoryManager->DiscardBuffer(stgCull, DiscardMode::Immediate);
-		m_memoryManager->DiscardBuffer(stgRender, DiscardMode::Immediate);
+			auto stgCull = m_memoryManager->CreateBuffer(
+				{ .size = sizeof(CullingDatum) * count, .usage = vk::BufferUsageFlagBits::eTransferSrc },
+				vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, "StgCullUpd");
+			memcpy(stgCull.Map<CullingDatum>(), &m_cullingData[offset], sizeof(CullingDatum) * count);
+			stgCull.Unmap();
+
+			auto stgRender = m_memoryManager->CreateBuffer(
+				{ .size = sizeof(RenderDatum) * count, .usage = vk::BufferUsageFlagBits::eTransferSrc },
+				vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, "StgRenderUpd");
+			memcpy(stgRender.Map<RenderDatum>(), &m_renderData[offset], sizeof(RenderDatum) * count);
+			stgRender.Unmap();
+
+			vk::UniqueCommandBuffer cmd = CmdBufferCreateBegin(ctx.device, ctx.commandPools[CommandType::Graphics], "Update");
+			vk::BufferCopy cpCull{0, offset * sizeof(CullingDatum), sizeof(CullingDatum) * count};
+			cmd->copyBuffer(stgCull.buffer, m_cullingBuffer.buffer, 1, &cpCull);
+			vk::BufferCopy cpRender{0, offset * sizeof(RenderDatum), sizeof(RenderDatum) * count};
+			cmd->copyBuffer(stgRender.buffer, m_renderBuffer.buffer, 1, &cpRender);
+			CmdBufferEndSubmitWait(*cmd, ctx.device, ctx.queues[CommandType::Graphics]);
+
+			m_memoryManager->DiscardBuffer(stgCull, DiscardMode::Immediate);
+			m_memoryManager->DiscardBuffer(stgRender, DiscardMode::Immediate);
+		}
 	}
 
 	// Force indirect buffer refill for schemes 2 (next frame CPU fill will pick up changes)
 	// Scheme 3 GPU compute reads the new SSBO automatically.
 
-	std::cout << "[Update] " << updateCount << " chunks updated, "
-	          << "total instances affected: ";
+	LARGE_INTEGER updEnd;
+	QueryPerformanceCounter(&updEnd);
+	m_lastUpdateUs = (double)(updEnd.QuadPart - updBegin.QuadPart)
+	               * m_cpuTimestampPeriod / 1000.0;
+
 	uint32_t totalAffected = 0;
 	for (uint32_t ci : candidates) totalAffected += m_chunks[ci].instanceCount;
-	std::cout << totalAffected << "\n";
+	std::cout << "[Update] mode=" << (m_benchConfig.updateBatched ? "batched" : "perchunk")
+	          << " size=" << updateCount << " chunks=" << candidates.size()
+	          << " instances=" << totalAffected << " bytes=" << updBytes
+	          << " cost=" << m_lastUpdateUs << " us\n";
 }
 
 /** Offscreen rendering stubs — not yet implemented.
