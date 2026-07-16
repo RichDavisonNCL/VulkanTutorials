@@ -6,7 +6,7 @@ Features: tqdm progress, checkpoint/resume, crash recovery, CSV aggregation.
 import argparse, csv, subprocess, sys, time
 from pathlib import Path
 
-GRID_SIZES, CHUNK_SIZES = [16, 32, 64, 128, 256, 512], [4, 8, 16]
+GRID_SIZES, CHUNK_SIZES = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096], [4, 8, 16]
 DENSITIES, SCHEMES, SEEDS = [20, 50, 80], [1, 2, 3], [42, 1337, 9999]
 WARMUP, RECORD = 120, 1200
 T_SEC = (WARMUP + RECORD) / 60.0
