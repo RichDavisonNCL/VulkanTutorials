@@ -908,6 +908,44 @@ void GPUSceneManagement::WriteCSVSummary() {
 	          << " (" << m_frameStats.size() << " frames)\n";
 }
 
+/** Writes the standalone local-update pilot samples to CSV: per-repeat cost plus
+ *  a summary row. Same metadata-header convention as WriteCSVSummary so the Python
+ *  aggregator parses both formats uniformly (lines starting with '#' are skipped).
+ */
+void GPUSceneManagement::WriteUpdatePilotCSV(const std::vector<double>& samples,
+                                             uint32_t updateSize, const std::string& path) {
+	std::filesystem::path outPath(path);
+	if (outPath.has_parent_path())
+		std::filesystem::create_directories(outPath.parent_path());
+
+	std::ofstream file(path);
+	if (!file) {
+		std::cerr << "[Pilot] Failed to open " << path << " for writing\n";
+		return;
+	}
+
+	vk::PhysicalDeviceProperties props = m_renderer->GetPhysicalDevice().getProperties();
+	file << "# commit=" << GIT_COMMIT << "\n";
+	file << "# dirty=" << (GIT_DIRTY ? "true" : "false") << "\n";
+	file << "# gpu=" << props.deviceName.data() << "\n";
+	file << "# grid=" << m_benchConfig.gridSize << " chunk=" << m_benchConfig.chunkSize
+	     << " density=" << m_benchConfig.density << " scheme=" << (int)m_benchConfig.scheme
+	     << " seed=" << m_benchConfig.seed << "\n";
+	file << "# mode=" << (m_benchConfig.updateBatched ? "batched" : "perchunk")
+	     << " updateSize=" << updateSize << " repeats=" << samples.size() << "\n";
+
+	file << "repeat,cost_us\n";
+	for (size_t i = 0; i < samples.size(); ++i)
+		file << i << "," << samples[i] << "\n";
+
+	double a, mn, mx, p1, p99, sd;
+	computeStats(samples, a, mn, mx, p1, p99, sd);
+	file << "\nupdate_cost_us_summary,avg,min,max,p1,p99,stddev\n";
+	file << "update_cost," << a << "," << mn << "," << mx << "," << p1 << "," << p99 << "," << sd << "\n";
+
+	std::cout << "[Pilot] CSV written: " << path << " (" << samples.size() << " repeats)\n";
+}
+
 /** Regenerates instance data for a subset of chunks, simulating local scene edits.
  *  updateCount random non-empty chunks are selected and their instances randomized
  *  (new scaleY, new color). Only the affected SSBO regions are re-uploaded.

@@ -175,6 +175,11 @@ protected:
 	void EndMeasurement();
 	void WriteCSVSummary();
 
+public:
+	void WriteUpdatePilotCSV(const std::vector<double>& samples, uint32_t updateSize,
+	                         const std::string& path);
+protected:
+
 	VulkanInitialisation m_vkInit;
 	VulkanRenderer*      m_renderer      = nullptr;
 	VulkanMemoryManager* m_memoryManager = nullptr;

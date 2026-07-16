@@ -10,22 +10,28 @@ GRID_SIZES, CHUNK_SIZES = [16, 32, 64, 128, 256, 512], [4, 8, 16]
 DENSITIES, SCHEMES, SEEDS = [20, 50, 80], [1, 2, 3], [42, 1337, 9999]
 WARMUP, RECORD = 120, 1200
 T_SEC = (WARMUP + RECORD) / 60.0
+# Local-update arm (standalone RegenerateChunks cost), fixed 128^2/chunk8/dens50.
+UPDATE_SIZES, UPDATE_MODES = [1, 2, 4, 8, 16, 32], ["batched", "perchunk"]
 
 def find_exe():
     for c in [Path("cmake-build-debug-visual-studio/GPUDrivenRendering/Debug/GPUDrivenRendering.exe")]:
         if c.exists(): return c.resolve()
     raise FileNotFoundError("GPUDrivenRendering.exe not found. Build first or use --exe.")
 
-def run_test(exe, out, g, c, d, s, seed, u=0):
+def run_test(exe, out, g, c, d, s, seed, u=0, batched=True):
     name = f"grid{g}_chunk{c}_dens{d}_scheme{s}_seed{seed}"
-    if u: name += f"_update{u}"
+    if u: name += f"_update{u}_{'batched' if batched else 'perchunk'}"
     p = out / f"{name}.csv"
     if p.exists(): return True
     cmd = [str(exe), "-Benchmark", "-GridSize", str(g), "-ChunkSize", str(c),
            "-Density", str(d), "-Scheme", str(s), "-Seed", str(seed),
-           "-WarmupFrames", str(WARMUP), "-RecordFrames", str(RECORD),
            "-Output", str(p)]
-    if u: cmd += ["-UpdateSize", str(u)]
+    if u:
+        # Local update is a standalone measurement (RegenerateChunks in isolation);
+        # no render-frame flags. The exe runs the pilot and exits after writing CSV.
+        cmd += ["-UpdateSize", str(u), "-updatebatched", "1" if batched else "0"]
+    else:
+        cmd += ["-WarmupFrames", str(WARMUP), "-RecordFrames", str(RECORD)]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=int(T_SEC*3+60))
         if r.returncode != 0:
@@ -35,38 +41,58 @@ def run_test(exe, out, g, c, d, s, seed, u=0):
     except: return False
 
 def aggregate(out):
-    rows = []
+    # Two arms produce different metrics — route to separate clean tables.
+    # Render: grid{G}_chunk{C}_dens{D}_scheme{S}_seed{SEED}.csv
+    # Update: grid{G}_chunk{C}_dens{D}_scheme{S}_seed{SEED}_update{U}_{batched|perchunk}.csv
+    render_rows, update_rows = [], []
     for f in sorted(out.glob("*.csv")):
         if f.name.startswith("_"): continue
         try:
             parts = f.stem.split("_")
-            info = {"file": f.name, "grid": int(parts[0][4:]), "chunk": int(parts[1][5:]),
+            base = {"file": f.name, "grid": int(parts[0][4:]), "chunk": int(parts[1][5:]),
                     "density": int(parts[2][4:]), "scheme": int(parts[3][6:]),
-                    "seed": int(parts[4][4:]), "update": 0}
-            if len(parts) > 5 and "update" in parts[5]: info["update"] = int(parts[5][6:])
+                    "seed": int(parts[4][4:])}
+            is_update = len(parts) > 5 and parts[5].startswith("update")
             rdr = csv.reader(open(f))
-            for row in rdr:
-                if len(row) < 2: continue
-                if row[0].startswith("#"): continue   # skip metadata header
-                # summary rows: label,avg,min,max,p1,p99,stddev
-                if row[0] == "cpu_record":
-                    info.update(cpu_record_avg=row[1], cpu_record_p99=row[5])
-                elif row[0] == "gpu_exec":
-                    info.update(gpu_exec_avg=row[1], gpu_exec_p99=row[5])
-                elif row[0] == "frame_wall":
-                    info.update(frame_wall_avg=row[1], frame_wall_p99=row[5])
-                elif row[0] == "cpu_wait":
-                    info.update(cpu_wait_avg=row[1])
-            rows.append(info)
+            if is_update:
+                info = dict(base, update_size=int(parts[5][6:]),
+                            mode=parts[6] if len(parts) > 6 else "")
+                for row in rdr:
+                    if len(row) < 2 or row[0].startswith("#"): continue
+                    if row[0] == "update_cost":
+                        info.update(update_cost_avg=row[1], update_cost_p99=row[5],
+                                    update_cost_stddev=row[6])
+                update_rows.append(info)
+            else:
+                info = dict(base, update=0)
+                for row in rdr:
+                    if len(row) < 2 or row[0].startswith("#"): continue
+                    # summary rows: label,avg,min,max,p1,p99,stddev
+                    if row[0] == "cpu_record":
+                        info.update(cpu_record_avg=row[1], cpu_record_p99=row[5])
+                    elif row[0] == "gpu_exec":
+                        info.update(gpu_exec_avg=row[1], gpu_exec_p99=row[5])
+                    elif row[0] == "frame_wall":
+                        info.update(frame_wall_avg=row[1], frame_wall_p99=row[5])
+                    elif row[0] == "cpu_wait":
+                        info.update(cpu_wait_avg=row[1])
+                render_rows.append(info)
         except: pass
-    if not rows: return
-    fns = ["file","grid","chunk","density","scheme","seed","update",
-           "cpu_record_avg","cpu_record_p99","gpu_exec_avg","gpu_exec_p99",
-           "frame_wall_avg","frame_wall_p99","cpu_wait_avg"]
-    with open(out / "_aggregate.csv", "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=fns, extrasaction="ignore")
-        w.writeheader(); w.writerows(rows)
-    print(f"Aggregate: {len(rows)} rows")
+    if render_rows:
+        fns = ["file","grid","chunk","density","scheme","seed","update",
+               "cpu_record_avg","cpu_record_p99","gpu_exec_avg","gpu_exec_p99",
+               "frame_wall_avg","frame_wall_p99","cpu_wait_avg"]
+        with open(out / "_aggregate.csv", "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=fns, extrasaction="ignore")
+            w.writeheader(); w.writerows(render_rows)
+        print(f"Aggregate (render): {len(render_rows)} rows")
+    if update_rows:
+        fns = ["file","grid","chunk","density","scheme","seed","update_size","mode",
+               "update_cost_avg","update_cost_p99","update_cost_stddev"]
+        with open(out / "_aggregate_update.csv", "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=fns, extrasaction="ignore")
+            w.writeheader(); w.writerows(update_rows)
+        print(f"Aggregate (update): {len(update_rows)} rows")
 
 def main():
     global WARMUP, RECORD
@@ -85,37 +111,49 @@ def main():
     ap.add_argument("--record",    type=int, default=RECORD)
     ap.add_argument("--no-local-update", action="store_true",
                     help="skip the 128^2 local-update tests")
+    ap.add_argument("--no-render", action="store_true",
+                    help="skip the render matrix (run only the local-update arm)")
+    ap.add_argument("--update-sizes", type=int, nargs="+", default=UPDATE_SIZES)
+    ap.add_argument("--update-modes", nargs="+", default=UPDATE_MODES,
+                    choices=["batched", "perchunk"])
     args = ap.parse_args()
 
     WARMUP, RECORD = args.warmup, args.record
     exe = args.exe or find_exe()
     out = args.outdir; out.mkdir(parents=True, exist_ok=True)
 
+    # Each test: (grid, chunk, density, scheme, seed, update_size, batched)
     tests = []
-    for g in args.grids:
-        for c in [x for x in args.chunks if x <= g // 2]:
-            for d in args.densities:
+    if not args.no_render:
+        for g in args.grids:
+            for c in [x for x in args.chunks if x <= g // 2]:
+                for d in args.densities:
+                    for s in args.schemes:
+                        for seed in args.seeds:
+                            tests.append((g, c, d, s, seed, 0, True))
+    if not args.no_local_update:
+        for u in args.update_sizes:
+            for mode in args.update_modes:
                 for s in args.schemes:
                     for seed in args.seeds:
-                        tests.append((g, c, d, s, seed, 0))
-    if not args.no_local_update:
-        for u in [1, 4, 16]:
-            for s in args.schemes:
-                for seed in args.seeds:
-                    tests.append((128, 8, 50, s, seed, u))
+                        tests.append((128, 8, 50, s, seed, u, mode == "batched"))
 
     print(f"Tests: {len(tests)}  warmup={WARMUP} record={RECORD}")
     print(f"  grids={args.grids} chunks={args.chunks} densities={args.densities}"
           f" schemes={args.schemes} seeds={args.seeds}")
+    print(f"  update_sizes={args.update_sizes} update_modes={args.update_modes}")
     if args.dry_run:
-        for t in tests: print(f"  grid={t[0]} chunk={t[1]} dens={t[2]} scheme={t[3]} seed={t[4]} update={t[5]}")
+        for t in tests:
+            tag = (f" update={t[5]} mode={'batched' if t[6] else 'perchunk'}" if t[5] else "")
+            print(f"  grid={t[0]} chunk={t[1]} dens={t[2]} scheme={t[3]} seed={t[4]}{tag}")
         return
 
     ok = fail = 0; t0 = time.monotonic()
-    for i, (g, c, d, s, seed, u) in enumerate(tests):
-        print(f"[{i+1}/{len(tests)}] grid={g} chunk={c} dens={d} scheme={s} seed={seed}"
-              + (f" update={u}" if u else ""), flush=True)
-        if run_test(exe, out, g, c, d, s, seed, u): ok += 1
+    for i, (g, c, d, s, seed, u, batched) in enumerate(tests):
+        tag = (f" update={u} mode={'batched' if batched else 'perchunk'}" if u else "")
+        print(f"[{i+1}/{len(tests)}] grid={g} chunk={c} dens={d} scheme={s} seed={seed}{tag}",
+              flush=True)
+        if run_test(exe, out, g, c, d, s, seed, u, batched): ok += 1
         else: fail += 1
     print(f"Done {time.monotonic()-t0:.0f}s. OK={ok} FAIL={fail}")
     aggregate(out)

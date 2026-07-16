@@ -124,23 +124,28 @@ int main(int argc, char* argv[]) {
 				samples.push_back(app.GetLastUpdateUs());
 			}
 
-			std::sort(samples.begin(), samples.end());
-			double sum = 0.0;
-			for (double s : samples) sum += s;
-			double avg = sum / samples.size();
-			double var = 0.0;
-			for (double s : samples) var += (s - avg) * (s - avg);
-			double stddev = std::sqrt(var / samples.size());
-			double p99 = samples[(size_t)(samples.size() * 99 / 100)];
+			if (!benchConfig.outputPath.empty()) {
+				app.WriteUpdatePilotCSV(samples, benchConfig.updateSize, benchConfig.outputPath);
+			} else {
+				// No output path — print stats to stdout (manual/interactive probe).
+				std::sort(samples.begin(), samples.end());
+				double sum = 0.0;
+				for (double s : samples) sum += s;
+				double avg = sum / samples.size();
+				double var = 0.0;
+				for (double s : samples) var += (s - avg) * (s - avg);
+				double stddev = std::sqrt(var / samples.size());
+				double p99 = samples[(size_t)(samples.size() * 99 / 100)];
 
-			std::cout << "\n[Pilot] mode=" << (benchConfig.updateBatched ? "batched" : "perchunk")
-			          << " updateSize=" << benchConfig.updateSize
-			          << " scene=" << benchConfig.gridSize << "^2 chunk=" << benchConfig.chunkSize
-			          << " density=" << benchConfig.density << " seed=" << benchConfig.seed
-			          << " scheme=" << (int)benchConfig.scheme << "\n";
-			std::cout << "[Pilot] cost_us over " << kRepeat << " repeats: "
-			          << "avg=" << avg << " min=" << samples.front() << " max=" << samples.back()
-			          << " p99=" << p99 << " stddev=" << stddev << "\n";
+				std::cout << "\n[Pilot] mode=" << (benchConfig.updateBatched ? "batched" : "perchunk")
+				          << " updateSize=" << benchConfig.updateSize
+				          << " scene=" << benchConfig.gridSize << "^2 chunk=" << benchConfig.chunkSize
+				          << " density=" << benchConfig.density << " seed=" << benchConfig.seed
+				          << " scheme=" << (int)benchConfig.scheme << "\n";
+				std::cout << "[Pilot] cost_us over " << kRepeat << " repeats: "
+				          << "avg=" << avg << " min=" << samples.front() << " max=" << samples.back()
+				          << " p99=" << p99 << " stddev=" << stddev << "\n";
+			}
 
 			app.Finish();
 			Window::DestroyGameWindow();
