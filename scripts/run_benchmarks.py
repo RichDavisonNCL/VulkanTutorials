@@ -15,19 +15,25 @@ T_SEC = (WARMUP + RECORD) / 60.0
 UPDATE_SIZES, UPDATE_MODES = [1, 2, 4, 8, 16, 32], ["batched", "perchunk"]
 
 def est_timeout(g, c, u):
-    """Per-config subprocess timeout (s). Large grids with small chunks are slow:
-    cull/draw cost scales with chunk count = (grid/chunk)^2. Measured worst case
-    4096/chunk4/scheme2 ~571s; this gives it ~600s+ with generous headroom, and a
-    180s floor for small configs. Over-waiting is harmless overnight; under-waiting
-    silently drops data (the bug this replaces)."""
+    """Per-config subprocess timeout (s). Cost has TWO drivers, both matter:
+      - CPU cull/draw recording ~ chunk count = (grid/chunk)^2  (small chunks slow)
+      - GPU exec ~ instance count ~ grid^2 * density              (large dense grids slow)
+    The second was learned the hard way: seed9999/dens80/4096/chunk16 hit 614ms/frame
+    (~811s full run) despite having the FEWEST chunks — dense scenes pack more
+    instances per chunk, and GPU work scales with instances, not chunks. A
+    chunk-count-only formula under-sized it (283s) and dropped it. So take the max
+    of a chunk term and a grid-area term. Over-waiting is harmless (timeout is a
+    ceiling; healthy runs return early); under-waiting silently drops data."""
     if u:
         return 120                      # standalone update pilot: tiny, seconds
     frames = WARMUP + RECORD
-    chunks = (g / c) ** 2               # cost driver
-    # k tuned so 4096/chunk4 (~571s measured) gets ~1800s (~3x headroom); smaller
-    # configs scale down to the 180s floor. Cap at 1h guards a genuinely hung run.
-    secs = 180 + frames * chunks * 1.2e-6
-    return int(min(secs, 3600))
+    chunks = (g / c) ** 2               # CPU cost driver
+    area = g * g                        # instance/GPU cost driver
+    chunk_term = frames * chunks * 1.2e-6
+    area_term  = frames * area   * 4.0e-7   # 4096^2*1320*4e-7 ~= 8850s cap-bound; gives
+                                            # 4096 grids generous room regardless of chunk
+    secs = 180 + max(chunk_term, area_term)
+    return int(min(secs, 5400))         # cap 90min guards a genuinely hung run
 
 def find_exe():
     for c in [Path("cmake-build-debug-visual-studio/GPUDrivenRendering/Debug/GPUDrivenRendering.exe")]:
