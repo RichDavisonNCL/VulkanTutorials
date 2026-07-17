@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Automated benchmark runner for GPU-Driven Scene Management evaluation.
-Enumerates 486 core + 27 local update = 513 tests.
-Features: tqdm progress, checkpoint/resume, crash recovery, CSV aggregation.
+Enumerates 702 render + 108 local-update = 810 tests (9 grids x 3 chunks x 3
+densities x 3 schemes x 3 seeds, minus chunk>grid/2; plus update arm).
+Features: per-config timeout, checkpoint/resume, failure recording, CSV aggregation.
 """
 import argparse, csv, subprocess, sys, time
 from pathlib import Path
@@ -12,6 +13,21 @@ WARMUP, RECORD = 120, 1200
 T_SEC = (WARMUP + RECORD) / 60.0
 # Local-update arm (standalone RegenerateChunks cost), fixed 128^2/chunk8/dens50.
 UPDATE_SIZES, UPDATE_MODES = [1, 2, 4, 8, 16, 32], ["batched", "perchunk"]
+
+def est_timeout(g, c, u):
+    """Per-config subprocess timeout (s). Large grids with small chunks are slow:
+    cull/draw cost scales with chunk count = (grid/chunk)^2. Measured worst case
+    4096/chunk4/scheme2 ~571s; this gives it ~600s+ with generous headroom, and a
+    180s floor for small configs. Over-waiting is harmless overnight; under-waiting
+    silently drops data (the bug this replaces)."""
+    if u:
+        return 120                      # standalone update pilot: tiny, seconds
+    frames = WARMUP + RECORD
+    chunks = (g / c) ** 2               # cost driver
+    # k tuned so 4096/chunk4 (~571s measured) gets ~1800s (~3x headroom); smaller
+    # configs scale down to the 180s floor. Cap at 1h guards a genuinely hung run.
+    secs = 180 + frames * chunks * 1.2e-6
+    return int(min(secs, 3600))
 
 def find_exe():
     for c in [Path("cmake-build-debug-visual-studio/GPUDrivenRendering/Debug/GPUDrivenRendering.exe")]:
@@ -33,12 +49,22 @@ def run_test(exe, out, g, c, d, s, seed, u=0, batched=True):
     else:
         cmd += ["-WarmupFrames", str(WARMUP), "-RecordFrames", str(RECORD)]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=int(T_SEC*3+60))
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=est_timeout(g, c, u))
         if r.returncode != 0:
-            (p.with_suffix(".fail")).write_text(r.stderr + r.stdout)
+            p.with_suffix(".fail").write_text(f"exit={r.returncode}\n\n{r.stderr}\n{r.stdout}")
             return False
         return True
-    except: return False
+    except subprocess.TimeoutExpired as e:
+        # Explicit: record the timeout and remove any partial CSV so a rerun retries it.
+        # (Previously a bare `except` swallowed this, leaving no CSV and no marker.)
+        if p.exists(): p.unlink()
+        p.with_suffix(".fail").write_text(
+            f"TIMEOUT after {e.timeout}s\ncmd={' '.join(map(str, cmd))}\n")
+        print(f"    TIMEOUT ({e.timeout}s) — recorded .fail", flush=True)
+        return False
+    except Exception as ex:
+        p.with_suffix(".fail").write_text(f"EXCEPTION: {ex!r}\ncmd={' '.join(map(str, cmd))}\n")
+        return False
 
 def aggregate(out):
     # Two arms produce different metrics — route to separate clean tables.
@@ -156,6 +182,10 @@ def main():
         if run_test(exe, out, g, c, d, s, seed, u, batched): ok += 1
         else: fail += 1
     print(f"Done {time.monotonic()-t0:.0f}s. OK={ok} FAIL={fail}")
+    fails = sorted(out.glob("*.fail"))
+    if fails:
+        print(f"!! {len(fails)} config(s) FAILED — inspect these .fail files:")
+        for fp in fails: print(f"   {fp.name}")
     aggregate(out)
 
 if __name__ == "__main__": main()
