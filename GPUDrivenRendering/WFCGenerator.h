@@ -37,6 +37,12 @@ struct WFCConfig {
 	uint32_t seed            = 42;
 	float emptyWeight        = 5.0f;
 	float otherWeight        = 5.0f;
+	// Optional per-family overrides for the 5 non-empty tiles, split from
+	// otherWeight's single value. Negative (default) means "use otherWeight
+	// for this family" — existing configs that only set otherWeight are
+	// unaffected byte-for-byte. Only meaningful when >= 0.
+	float cubeWeight         = -1.0f;
+	float sphereWeight       = -1.0f;
 	WFCProgressCallback onProgress;
 	std::vector<uint32_t>* partialGrid = nullptr;
 	std::mutex* gridMutex = nullptr;

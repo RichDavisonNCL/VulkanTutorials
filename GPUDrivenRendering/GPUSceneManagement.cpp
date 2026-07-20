@@ -163,15 +163,19 @@ void GPUSceneManagement::SetBenchmarkConfig(const BenchmarkConfig& config) {
 
 	// Try WFC cache first — same (grid, seed, density) reuses the generated
 	// scene instead of re-running WFC (minutes at 1024^2). On miss, generate
-	// and save so subsequent schemes / runs load instantly.
+	// and save so subsequent schemes / runs load instantly. Weight-override
+	// runs (cube/sphere weight sweep) bypass the cache entirely: density no
+	// longer determines the tile weights in that mode, so the (grid,seed,
+	// density) cache key would collide with the formal matrix's cached scenes.
+	bool usingWeightOverride = config.cubeWeightOverride >= 0.0f || config.sphereWeightOverride >= 0.0f;
 	std::vector<uint32_t> cachedGrid;
 	uint32_t cachedSize = 0;
-	if (WFCCache::Load(cachedGrid, cachedSize, config.gridSize, config.seed, config.density)) {
+	if (!usingWeightOverride && WFCCache::Load(cachedGrid, cachedSize, config.gridSize, config.seed, config.density)) {
 		m_tileGrid = std::move(cachedGrid);
 		GenerateScene(m_tileGrid);
 	} else {
 		GenerateScene();
-		WFCCache::Save(m_tileGrid, config.gridSize, config.seed, config.density);
+		if (!usingWeightOverride) WFCCache::Save(m_tileGrid, config.gridSize, config.seed, config.density);
 	}
 	CreateBuffers();
 	CreateDescriptorSets();
@@ -364,6 +368,8 @@ void GPUSceneManagement::GenerateScene() {
 		case 50: wfcCfg.emptyWeight = 5.0f; wfcCfg.otherWeight = 5.0f; break;
 		case 80: wfcCfg.emptyWeight = 2.0f; wfcCfg.otherWeight = 10.0f; break;
 	}
+	wfcCfg.cubeWeight   = m_benchConfig.cubeWeightOverride;
+	wfcCfg.sphereWeight = m_benchConfig.sphereWeightOverride;
 
 	m_tileGrid = gen.Generate(wfcCfg);
 	GenerateScene(m_tileGrid);

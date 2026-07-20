@@ -98,6 +98,13 @@ struct BenchmarkConfig {
 	bool updateBatched    = true;   // batch all region copies into one submit
 	std::string outputPath;
 	bool headless         = false;
+	// Supplementary-experiment override: split the density-derived otherWeight
+	// into independent cube/sphere weights. Unset (<0, default) means the
+	// normal density switch in GenerateScene() applies, byte-identical to the
+	// formal 810-config matrix. When set, bypasses the WFC disk cache (this
+	// path is for the small weight-ratio sweep, not the cached formal matrix).
+	float cubeWeightOverride   = -1.0f;
+	float sphereWeightOverride = -1.0f;
 };
 
 class GPUSceneManagement {

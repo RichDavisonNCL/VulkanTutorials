@@ -44,7 +44,12 @@ std::vector<uint32_t> WFCGenerator::Generate(const WFCConfig& config) {
 	std::vector<std::vector<uint32_t>> possibilities(total);
 	std::vector<float> weights(kTileCount);
 	weights[0] = config.emptyWeight;
-	for (uint32_t i = 1; i < kTileCount; ++i) weights[i] = config.otherWeight;
+	for (uint32_t i = 1; i < kTileCount; ++i) {
+		float w = config.otherWeight;
+		if (s_tiles[i].isCube && config.cubeWeight >= 0.0f) w = config.cubeWeight;
+		if (!s_tiles[i].isCube && config.sphereWeight >= 0.0f) w = config.sphereWeight;
+		weights[i] = w;
+	}
 
 	std::vector<uint32_t> allTiles(kTileCount);
 	for (uint32_t i = 0; i < kTileCount; ++i) allTiles[i] = i;
