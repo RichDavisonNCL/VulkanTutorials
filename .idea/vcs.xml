@@ -5,5 +5,6 @@
     <mapping directory="$PROJECT_DIR$/GLTFLoader" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/NCLCoreClasses" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/VulkanRendering" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../imgui_docking" vcs="Git" />
   </component>
 </project>
