@@ -36,8 +36,19 @@ def est_timeout(g, c, u):
     return int(min(secs, 5400))         # cap 90min guards a genuinely hung run
 
 def find_exe():
-    for c in [Path("cmake-build-debug-visual-studio/GPUDrivenRendering/Debug/GPUDrivenRendering.exe")]:
-        if c.exists(): return c.resolve()
+    # Prefer Release: the thesis performance numbers must come from an optimized
+    # build. Debug (inlining off, iterator debugging, runtime checks) inflates CPU
+    # command-recording cost ~10-50x and, crucially, does so unevenly across the
+    # three schemes' code paths — so Debug ratios are not trustworthy. Fall back to
+    # Debug only if Release was never built (and warn loudly).
+    rel = Path("cmake-build-debug-visual-studio/GPUDrivenRendering/Release/GPUDrivenRendering.exe")
+    dbg = Path("cmake-build-debug-visual-studio/GPUDrivenRendering/Debug/GPUDrivenRendering.exe")
+    if rel.exists(): return rel.resolve()
+    if dbg.exists():
+        print("!! WARNING: using DEBUG exe — performance numbers will be Debug artifacts. "
+              "Build Release (cmake --build ... --config Release) before the real run.",
+              flush=True)
+        return dbg.resolve()
     raise FileNotFoundError("GPUDrivenRendering.exe not found. Build first or use --exe.")
 
 def run_test(exe, out, g, c, d, s, seed, u=0, batched=True):

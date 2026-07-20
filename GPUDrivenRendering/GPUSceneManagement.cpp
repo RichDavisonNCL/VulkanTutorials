@@ -823,7 +823,7 @@ void GPUSceneManagement::EndMeasurement() {
 	stats.cpuRecordUs = m_cpuRecordAccumUs;   // cull + submit, excludes fence wait
 	stats.cpuWaitUs   = m_cpuWaitUs;          // swapchain acquire fence wait
 	stats.drawCalls   = m_drawCallCount;
-	stats.visibleInstances = visCount;
+	stats.visibleChunks = visCount;
 	stats.gpuExecUs = 0;  // filled in deferred readback after bulk query read
 
 	m_frameStats.push_back(stats);
@@ -876,13 +876,13 @@ void GPUSceneManagement::WriteCSVSummary() {
 	     << " seed=" << m_benchConfig.seed << "\n";
 	file << "# warmup=" << m_benchConfig.warmupFrames << " record=" << m_benchConfig.recordFrames << "\n";
 	file << "# present_mode=mailbox\n";
-	file << "frame,cpu_record_us,cpu_wait_us,gpu_exec_us,frame_wall_us,draw_calls,visible_instances\n";
+	file << "frame,cpu_record_us,cpu_wait_us,gpu_exec_us,frame_wall_us,draw_calls,visible_chunks\n";
 
 	std::vector<double> cpuRecord, cpuWait, gpuExec, frameWall;
 	for (uint32_t i = 0; i < m_frameStats.size(); ++i) {
 		const auto& s = m_frameStats[i];
 		file << i << "," << s.cpuRecordUs << "," << s.cpuWaitUs << "," << s.gpuExecUs << ","
-		     << s.frameWallUs << "," << s.drawCalls << "," << s.visibleInstances << "\n";
+		     << s.frameWallUs << "," << s.drawCalls << "," << s.visibleChunks << "\n";
 		cpuRecord.push_back(s.cpuRecordUs);
 		cpuWait.push_back(s.cpuWaitUs);
 		gpuExec.push_back(s.gpuExecUs);

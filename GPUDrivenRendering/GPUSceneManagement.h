@@ -83,7 +83,7 @@ struct FrameStats {
 	double gpuExecUs;      // GPU execution time (timestamp query)
 	double frameWallUs;    // end-to-end wall-clock (record + wait), contains present noise
 	uint32_t drawCalls;
-	uint32_t visibleInstances;
+	uint32_t visibleChunks;
 };
 
 struct BenchmarkConfig {
