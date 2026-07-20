@@ -36,6 +36,9 @@ target_compile_definitions(${TARGET_NAME} PRIVATE
     VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
     VK_NO_PROTOTYPES
     ASSETROOTLOCATION="${CMAKE_SOURCE_DIR}/Assets/"
+    # $<CONFIG> resolves per-build (Debug/Release/...) on multi-config
+    # generators (VS), unlike CMAKE_BUILD_TYPE which is empty for those.
+    BUILD_CONFIG_NAME="$<CONFIG>"
 )
 
 # ImGui support (optional, for interactive debug mode)

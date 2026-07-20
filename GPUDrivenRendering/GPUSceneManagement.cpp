@@ -29,6 +29,53 @@ using namespace NCL;
 using namespace Rendering;
 using namespace Vulkan;
 
+namespace {
+	// FNV-1a hash of the running executable's own bytes, for CSV provenance
+	// (distinguishes rebuilds sharing the same commit/dirty state, e.g. after
+	// an uncommitted edit). Same constants as Tests/TestMain.cpp's gridHash.
+	// Read failure (e.g. sandboxed/locked file) yields "unavailable" rather
+	// than a fabricated value.
+	std::string SelfExeHash() {
+		char path[MAX_PATH];
+		DWORD len = GetModuleFileNameA(nullptr, path, MAX_PATH);
+		if (len == 0 || len == MAX_PATH) return "unavailable";
+
+		std::ifstream file(path, std::ios::binary);
+		if (!file) return "unavailable";
+
+		uint64_t h = 1469598103934665603ULL;  // FNV-1a offset basis
+		char buf[65536];
+		while (file.read(buf, sizeof(buf)) || file.gcount() > 0) {
+			std::streamsize n = file.gcount();
+			for (std::streamsize i = 0; i < n; ++i) {
+				h ^= (unsigned char)buf[i];
+				h *= 1099511628211ULL;  // FNV-1a prime
+			}
+		}
+		char hex[17];
+		snprintf(hex, sizeof(hex), "%016llx", (unsigned long long)h);
+		return std::string(hex);
+	}
+
+	// NVIDIA packs driverVersion as major(10)/minor(8)/secondary(8)/tertiary(6)
+	// bits rather than the standard VK_VERSION_* macros; decode when the
+	// vendor ID matches (0x10DE), otherwise report the raw encoded value so
+	// the field is still honest for other vendors.
+	std::string DecodeDriverVersion(uint32_t vendorID, uint32_t driverVersion) {
+		char buf[64];
+		if (vendorID == 0x10DE) {
+			snprintf(buf, sizeof(buf), "%u.%u.%u.%u (raw=%u)",
+				(driverVersion >> 22) & 0x3ff, (driverVersion >> 14) & 0xff,
+				(driverVersion >> 6) & 0xff, driverVersion & 0x3f, driverVersion);
+		} else {
+			snprintf(buf, sizeof(buf), "%u.%u.%u (raw=%u)",
+				VK_VERSION_MAJOR(driverVersion), VK_VERSION_MINOR(driverVersion),
+				VK_VERSION_PATCH(driverVersion), driverVersion);
+		}
+		return std::string(buf);
+	}
+}
+
 GPUSceneManagement::GPUSceneManagement(Window& window, VulkanInitialisation& vkInit)
 	: m_hostWindow(window), m_controller(*window.GetKeyboard(), *window.GetMouse())
 	, m_vkInit(vkInit), m_totalInstances(0), m_gridChunks(0)
@@ -876,7 +923,10 @@ void GPUSceneManagement::WriteCSVSummary() {
 	vk::PhysicalDeviceProperties props = m_renderer->GetPhysicalDevice().getProperties();
 	file << "# commit=" << GIT_COMMIT << "\n";
 	file << "# dirty=" << (GIT_DIRTY ? "true" : "false") << "\n";
+	file << "# build_config=" << BUILD_CONFIG_NAME << "\n";
+	file << "# exe_hash=" << SelfExeHash() << "\n";
 	file << "# gpu=" << props.deviceName.data() << "\n";
+	file << "# driver_version=" << DecodeDriverVersion(props.vendorID, props.driverVersion) << "\n";
 	file << "# grid=" << m_benchConfig.gridSize << " chunk=" << m_benchConfig.chunkSize
 	     << " density=" << m_benchConfig.density << " scheme=" << (int)m_benchConfig.scheme
 	     << " seed=" << m_benchConfig.seed << "\n";
@@ -933,7 +983,10 @@ void GPUSceneManagement::WriteUpdatePilotCSV(const std::vector<double>& samples,
 	vk::PhysicalDeviceProperties props = m_renderer->GetPhysicalDevice().getProperties();
 	file << "# commit=" << GIT_COMMIT << "\n";
 	file << "# dirty=" << (GIT_DIRTY ? "true" : "false") << "\n";
+	file << "# build_config=" << BUILD_CONFIG_NAME << "\n";
+	file << "# exe_hash=" << SelfExeHash() << "\n";
 	file << "# gpu=" << props.deviceName.data() << "\n";
+	file << "# driver_version=" << DecodeDriverVersion(props.vendorID, props.driverVersion) << "\n";
 	file << "# grid=" << m_benchConfig.gridSize << " chunk=" << m_benchConfig.chunkSize
 	     << " density=" << m_benchConfig.density << " scheme=" << (int)m_benchConfig.scheme
 	     << " seed=" << m_benchConfig.seed << "\n";
