@@ -10,9 +10,10 @@ from pathlib import Path
 EXE = Path("cmake-build-debug-visual-studio/GPUDrivenRendering/Release/GPUDrivenRendering.exe")
 OUT = Path("results_weightsweep")
 GRID, CHUNK, SEEDS = 1024, 16, [42, 1337, 9999]
-# 11 points, cube:sphere from all-cube to all-sphere, total weight fixed at 10
-# to match the formal matrix's density=50 otherWeight=5+5 magnitude.
-WEIGHT_POINTS = [(10 - i, i) for i in range(0, 11)]  # (cubeWeight, sphereWeight)
+# 21 points, cube:sphere from all-cube to all-sphere in 5% steps, total weight
+# fixed at 20 (matches the formal matrix's density=50 otherWeight=5+5
+# magnitude scaled up for finer integer steps).
+WEIGHT_POINTS = [(20 - i, i) for i in range(0, 21)]  # (cubeWeight, sphereWeight)
 WARMUP, RECORD = 120, 1200
 
 def run_one(cube_w, sphere_w, seed):
