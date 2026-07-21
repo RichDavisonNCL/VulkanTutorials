@@ -1,7 +1,17 @@
+import json
+import re
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from scripts.dissertation_evidence import compute_locked_claims, load_csv
+from scripts.dissertation_evidence import (
+    compute_locked_claims,
+    load_csv,
+    main,
+    write_outputs,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -56,6 +66,112 @@ class LockedClaimTests(unittest.TestCase):
         ]
         with self.assertRaises(ValueError):
             compute_locked_claims(missing, self.update)
+
+    def test_duplicate_update_key_raises_value_error(self):
+        duplicate = dict(self.update[0])
+        with self.assertRaises(ValueError):
+            compute_locked_claims(self.render, self.update + [duplicate])
+
+    def test_missing_c1_s2_row_raises_value_error(self):
+        s1 = next(row for row in self.render if row["scheme"] == 1 and row["grid"] >= 256)
+        missing = [
+            row
+            for row in self.render
+            if not (
+                row["scheme"] == 2
+                and (row["grid"], row["chunk"], row["density"], row["seed"])
+                == (s1["grid"], s1["chunk"], s1["density"], s1["seed"])
+            )
+        ]
+        with self.assertRaisesRegex(ValueError, "missing S2 rendering-path row for C1"):
+            compute_locked_claims(missing, self.update)
+
+    def test_missing_c3_seed_raises_value_error(self):
+        missing = [
+            row
+            for row in self.render
+            if not (
+                row["scheme"] == 3
+                and row["grid"] == 4096
+                and row["chunk"] == 16
+                and row["density"] == 80
+                and row["seed"] == 9999
+            )
+        ]
+        with self.assertRaisesRegex(ValueError, "C3 S3 rendering-path seed 9999"):
+            compute_locked_claims(missing, self.update)
+
+    def test_c1_zero_denominator_raises_contextual_value_error(self):
+        rows = [dict(row) for row in self.render]
+        s1 = next(row for row in rows if row["scheme"] == 1 and row["grid"] >= 256)
+        s2 = next(
+            row
+            for row in rows
+            if row["scheme"] == 2
+            and (row["grid"], row["chunk"], row["density"], row["seed"])
+            == (s1["grid"], s1["chunk"], s1["density"], s1["seed"])
+        )
+        s2["cpu_record_avg"] = 0.0
+        with self.assertRaisesRegex(ValueError, "C1 denominator"):
+            compute_locked_claims(rows, self.update)
+
+    def test_c3_zero_denominator_raises_contextual_value_error(self):
+        rows = [dict(row) for row in self.render]
+        next(
+            row
+            for row in rows
+            if row["scheme"] == 3
+            and row["grid"] == 4096
+            and row["chunk"] == 16
+            and row["density"] == 80
+            and row["seed"] == 42
+        )["gpu_exec_avg"] = 0.0
+        with self.assertRaisesRegex(ValueError, "C3 denominator"):
+            compute_locked_claims(rows, self.update)
+
+    def test_c4_zero_denominator_raises_contextual_value_error(self):
+        rows = [dict(row) for row in self.update]
+        for row in rows:
+            if row["update_size"] == 32 and row["mode"] == "batched":
+                row["update_cost_avg"] = 0.0
+        with self.assertRaisesRegex(ValueError, "C4 denominator"):
+            compute_locked_claims(self.render, rows)
+
+    def test_cli_records_actual_source_files_in_both_artifacts(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            render_path = temp / "custom-render.csv"
+            update_path = temp / "custom-update.csv"
+            output = temp / "evidence"
+            shutil.copyfile(ROOT / "results" / "_aggregate.csv", render_path)
+            shutil.copyfile(ROOT / "results" / "_aggregate_update.csv", update_path)
+            with patch(
+                "sys.argv",
+                [
+                    "dissertation_evidence.py",
+                    "--render",
+                    str(render_path),
+                    "--update",
+                    str(update_path),
+                    "--out",
+                    str(output),
+                ],
+            ):
+                main()
+            document = json.loads((output / "locked-claims.json").read_text(encoding="utf-8"))
+            markdown = (output / "locked-claims.md").read_text(encoding="utf-8")
+            self.assertEqual(document["source_files"], [str(render_path), str(update_path)])
+            self.assertIn(str(render_path), markdown)
+            self.assertIn(str(update_path), markdown)
+
+    def test_paired_artifacts_share_generated_timestamp(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir)
+            write_outputs(self.claims, output)
+            document = json.loads((output / "locked-claims.json").read_text(encoding="utf-8"))
+            markdown = (output / "locked-claims.md").read_text(encoding="utf-8")
+            timestamp = re.search(r"Generated UTC: ([^\r\n]+)", markdown).group(1)
+            self.assertEqual(document["generated_at_utc"], timestamp)
 
 
 if __name__ == "__main__":

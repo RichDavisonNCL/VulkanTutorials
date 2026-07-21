@@ -26,13 +26,13 @@
       "ratio": 21.804458408520695
     }
   },
-  "generated_at_utc": "2026-07-21T04:40:34.105044Z",
+  "generated_at_utc": "2026-07-21T04:46:39.346352Z",
   "rounding_policy": {
     "prose": "C1 uses 4 decimals; C2 CPU uses 3 decimals and GPU uses whole microseconds; C3 ratios use 2 decimals; C4 means and ratio use 2 decimals.",
     "raw_values": "Python float values extracted from the aggregate CSV files"
   },
   "source_files": [
-    "results/_aggregate.csv",
-    "results/_aggregate_update.csv"
+    "results\\_aggregate.csv",
+    "results\\_aggregate_update.csv"
   ]
 }

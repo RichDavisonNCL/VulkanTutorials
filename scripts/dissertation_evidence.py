@@ -3,6 +3,7 @@
 import argparse
 import csv
 import json
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import fmean
@@ -54,6 +55,13 @@ def _one_row(rows, predicate, label):
     return matches[0]
 
 
+def _require_positive_finite_denominator(value, claim, label):
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(
+            f"{claim} denominator must be finite and positive for {label}: {value!r}"
+        )
+
+
 def compute_locked_claims(render_rows, update_rows):
     """Compute the C1--C4 observations with strict duplicate and row checks."""
     render_key = ("grid", "chunk", "density", "scheme", "seed")
@@ -76,7 +84,9 @@ def compute_locked_claims(render_rows, update_rows):
         key = (row["grid"], row["chunk"], row["density"], row["seed"])
         if key not in s2_index:
             raise ValueError(f"missing S2 rendering-path row for C1 key: {key}")
-        ratios.append(row["cpu_record_avg"] / s2_index[key]["cpu_record_avg"])
+        denominator = s2_index[key]["cpu_record_avg"]
+        _require_positive_finite_denominator(denominator, "C1", f"S2 key {key}")
+        ratios.append(row["cpu_record_avg"] / denominator)
     if not ratios:
         raise ValueError("missing matched S1/S2 rows for C1")
 
@@ -116,6 +126,12 @@ def compute_locked_claims(render_rows, update_rows):
             raise ValueError(f"missing C4 {mode} update rows")
         modes[mode] = fmean(values)
 
+    c3_seed42 = c3_rows[42]["gpu_exec_avg"]
+    c3_seed1337 = c3_rows[1337]["gpu_exec_avg"]
+    _require_positive_finite_denominator(c3_seed42, "C3", "seed42 GPU elapsed time")
+    _require_positive_finite_denominator(c3_seed1337, "C3", "seed1337 GPU elapsed time")
+    _require_positive_finite_denominator(modes["batched"], "C4", "batched mean update cost")
+
     return {
         "C1": {
             "pair_count": len(ratios),
@@ -134,8 +150,8 @@ def compute_locked_claims(render_rows, update_rows):
             "seed42_gpu_us": c3_rows[42]["gpu_exec_avg"],
             "seed1337_gpu_us": c3_rows[1337]["gpu_exec_avg"],
             "seed9999_gpu_us": c3_rows[9999]["gpu_exec_avg"],
-            "ratio_vs_seed42": c3_rows[9999]["gpu_exec_avg"] / c3_rows[42]["gpu_exec_avg"],
-            "ratio_vs_seed1337": c3_rows[9999]["gpu_exec_avg"] / c3_rows[1337]["gpu_exec_avg"],
+            "ratio_vs_seed42": c3_rows[9999]["gpu_exec_avg"] / c3_seed42,
+            "ratio_vs_seed1337": c3_rows[9999]["gpu_exec_avg"] / c3_seed1337,
         },
         "C4": {
             "batched_mean_us": modes["batched"],
@@ -145,13 +161,14 @@ def compute_locked_claims(render_rows, update_rows):
     }
 
 
-def _markdown(claims):
+def _markdown(claims, source_files, generated_at_utc):
     c1, c2, c3, c4 = (claims[name] for name in ("C1", "C2", "C3", "C4"))
+    source_list = ", ".join(f"`{path}`" for path in source_files)
     return f"""# Locked dissertation evidence
 
-Generated UTC: {datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')}
+Generated UTC: {generated_at_utc}
 
-Source files: `results/_aggregate.csv`, `results/_aggregate_update.csv`
+Source files: {source_list}
 
 ## C1 — S1/S2 CPU preparation-and-command-recording comparison
 
@@ -179,13 +196,15 @@ Rounded prose value: For the 32-chunk standalone buffer-update microbenchmark ac
 """
 
 
-def write_outputs(claims, out_dir):
+def write_outputs(claims, out_dir, source_files=None):
     """Write the JSON and Markdown evidence artifacts, and only those artifacts."""
     output = Path(out_dir)
     output.mkdir(parents=True, exist_ok=True)
+    source_files = list(SOURCE_FILES if source_files is None else map(str, source_files))
+    generated_at_utc = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     document = {
-        "source_files": SOURCE_FILES,
-        "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "source_files": source_files,
+        "generated_at_utc": generated_at_utc,
         "claims": claims,
         "rounding_policy": {
             "raw_values": "Python float values extracted from the aggregate CSV files",
@@ -195,7 +214,9 @@ def write_outputs(claims, out_dir):
     (output / "locked-claims.json").write_text(
         json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    (output / "locked-claims.md").write_text(_markdown(claims), encoding="utf-8")
+    (output / "locked-claims.md").write_text(
+        _markdown(claims, source_files, generated_at_utc), encoding="utf-8"
+    )
 
 
 def main():
@@ -206,7 +227,7 @@ def main():
     args = parser.parse_args()
 
     claims = compute_locked_claims(load_csv(args.render), load_csv(args.update))
-    write_outputs(claims, args.out)
+    write_outputs(claims, args.out, source_files=[args.render, args.update])
     print(f"C1 pair_count={claims['C1']['pair_count']}")
     print(f"C2 s3_gpu_us={claims['C2']['s3_gpu_us']:.0f}")
     print(f"C3 seed9999_gpu_us={claims['C3']['seed9999_gpu_us']:.0f}")
