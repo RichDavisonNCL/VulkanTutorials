@@ -1,7 +1,7 @@
 # CSC8599 Dissertation 中文母稿重构设计
 
 **日期：** 2026-07-21
-**状态：** 已确认设计，等待作者文件级审核
+**状态：** 已确认设计；在线术语审计完成
 **适用项目：** CSC8599 Academic Supervised Project
 **论文工作标题：** *A Vulkan-based Evaluation of GPU-Driven Scene Management for PCG Modular Scenes*
 
@@ -9,7 +9,7 @@
 
 本设计用于指导 `thesis.md` 的中文母稿重构，以及后续英文翻译、ACM 排版、软件整理和技术视频制作。当前阶段不受 20 页篇幅约束。工作顺序为：先建立内容完整且证据可靠的中文母稿，完成技术与数据核验，再翻译成英文，之后处理排版和压缩。
 
-本设计只使用已有 benchmark、正式 CSV、独立复测和补充扫描。项目不新增 benchmark，不把缺失实验伪装成已完成内容。允许对已有数据进行重新汇总、计算、制图和一致性检查，也允许运行构建与单元测试来验证提交软件。
+本设计只使用已有 benchmark、正式 CSV、independent process executions 和 supplementary sweeps。项目不新增 benchmark，不把缺失实验伪装成已完成内容。允许对已有数据进行重新汇总、计算、制图和一致性检查，也允许运行构建与单元测试来验证提交软件。
 
 ## 2. 项目背景与课程定位
 
@@ -18,7 +18,7 @@ CSC8599 的 Academic Supervised Project 由 dissertation 与 software 两部分�
 导师批准的项目范围包括：
 
 - 以 Wave Function Collapse 作为模块化场景生成方法和 case study；
-- 在 Vulkan 中实现和比较三种 CPU/GPU 场景管理路径；
+- 在 Vulkan 中实现和比较三种 CPU/GPU rendering paths；
 - 测量改变 pipeline usage 所产生的成本与收益；
 - 分析场景规模、chunk 粒度、内容构成和局部更新的影响；
 - 将 GPU-assisted WFC 视为 contingent extension。
@@ -42,9 +42,9 @@ CSC8599 的 Academic Supervised Project 由 dissertation 与 software 两部分�
 - 不声称提出新的 WFC 算法。
 - 不声称提出新的 Vulkan indirect drawing 原理。
 - 不声称三个 pipeline stage 已被纯粹、独立地隔离。
-- 不把局部 CPU interval 表述成端到端 frame time。
-- 不把 combined GPU timestamp interval 归因到单一 GPU stage。
-- 不把 weight tier 表述成实际 occupancy。
+- 不把局部 CPU preparation-and-command-recording time 表述成端到端 frame time。
+- 不把由 timestamp queries 测得的 GPU elapsed time 归因到单一 GPU stage。
+- 不把 tile-weight preset 表述成实际 non-empty-tile proportion；`occupancy` 一词保留给 GPU occupancy 语境。
 - 不声称结论能够直接推广到其他 GPU、相机、材质系统或生产引擎。
 - 不新增 benchmark，不构造缺少来源的新数字。
 
@@ -52,24 +52,24 @@ CSC8599 的 Academic Supervised Project 由 dissertation 与 software 两部分�
 
 ### 4.1 论文身份
 
-论文是一项实现特定的 Vulkan 场景管理工程评价。WFC 负责生成具有规模、分块和内容构成变化的程序化 workload；三种 scene-management paths 提供 CPU/GPU 工作分配对照；自动化 benchmark 与分析工具负责观察这些实现路径的行为。
+论文是一项实现特定的 Vulkan 场景管理工程评价。WFC 负责生成具有规模、分块和内容构成变化的程序化 workload；三种 rendering paths 提供 CPU/GPU 工作分配对照；自动化 benchmark 与分析工具负责观察这些实现路径的行为。全文将 S1、S2 和 S3 称为 rendering paths；`scheme` 只在引用代码、CLI 或 CSV 字段时使用。
 
 ### 4.2 核心研究问题
 
 建议英文版本：
 
-> How do three implementation-specific CPU- and GPU-driven scene-management paths affect the measured CPU-side preparation and command-recording interval and the combined GPU timestamp interval when rendering modular scenes produced by a simplified WFC implementation, and how do these trade-offs vary with grid scale, chunk granularity, and observed geometry composition?
+> How do three implementation-specific CPU- and GPU-driven rendering paths affect CPU preparation-and-command-recording time and GPU elapsed time measured with timestamp queries when rendering modular scenes produced by a simplified WFC implementation, and how do these trade-offs vary with grid size, chunk size, and scene mesh composition?
 
 建议中文版本：
 
-> 在渲染由简化 WFC 实现生成的模块化场景时，三种实现特定的 CPU/GPU 场景管理路径如何影响被测 CPU 侧准备与命令录制区间，以及组合 GPU 时间戳区间？这些权衡如何随网格规模、chunk 粒度和观测到的几何构成变化？
+> 在渲染由简化 WFC 实现生成的模块化场景时，三种实现特定的 CPU/GPU rendering paths 如何影响 CPU 准备与命令录制时间，以及由 timestamp queries 测得的 GPU elapsed time？这些权衡如何随 grid size、chunk size 和场景 mesh composition 变化？
 
 ### 4.3 子问题
 
-1. 从逐 chunk direct recording 切换到 CPU-written fixed-length indirect records，会怎样改变 CPU 侧准备与命令录制区间？
-2. 将 visibility work 移入 compute path 后，被测 CPU 区间与组合 GPU 区间之间出现什么权衡？
-3. WFC 输出的实际几何构成如何影响 GPU workload？
-4. 在共享 scene representation 下，buffer update 的提交粒度如何影响 standalone upload cost？
+1. 从逐 chunk direct indexed draw-command recording 切换到由主机填充、供 multi-draw indirect (MDI) 使用的 indirect draw buffer，会怎样改变 CPU preparation-and-command-recording time？
+2. 将 frustum-culling work 移入 compute path 后，被测 CPU time 与 GPU elapsed time 之间出现什么权衡？
+3. WFC 输出的实际 scene mesh composition 如何影响 GPU workload？
+4. 在共享 scene representation 下，buffer update 的提交粒度如何影响 standalone buffer-update time？
 
 ## 5. 贡献模型
 
@@ -77,59 +77,65 @@ CSC8599 的 Academic Supervised Project 由 dissertation 与 software 两部分�
 
 - 简化 WFC 模块场景生成与缓存；
 - Split-SSBO 场景表示；
-- 三种 Vulkan scene-management paths；
-- CPU culling、compute culling、direct draws 和 indirect records；
+- 三种 Vulkan rendering paths；
+- CPU/compute frustum culling、direct indexed draw commands 和 multi-draw indirect (MDI) commands；
 - 局部 buffer update 路径；
 - benchmark CLI、自动化 runner、CSV metadata、分析脚本与测试。
+
+正文锁定以下 path names，首次出现时给出完整定义，后续使用 S1、S2 和 S3：
+
+- S1 — CPU-frustum-culling direct-draw path；
+- S2 — CPU-frustum-culling MDI path；
+- S3 — compute-frustum-culling MDI path。
 
 ### 5.2 评价贡献
 
 - 702 个 steady-state rendering configurations；
-- 108 个 standalone update configurations；
-- 每个正式配置包含 120 warmup frames 和 1200 within-run recorded frames；
-- 75 份 selected-regime independent-process repeat validation；
-- 独立的 geometry-composition supplementary sweeps。
+- 108 个 standalone buffer-update microbenchmark configurations；
+- 每个正式配置包含 120 warm-up frames 和单次 process execution 内的 1200 measurement frames；
+- 75 次 selected-regime independent process executions，用于检查 execution-level variation；
+- 独立的 scene-mesh-composition supplementary sweeps。
 
 ### 5.3 工程观察
 
-- indirect path 在中大规模测试配置下显著降低被测 CPU-side interval；
-- fixed-length GPU-driven path 在极细 chunk 压力配置下产生很高的组合 GPU interval；
-- 名义参数相近的程序化场景可能具有完全不同的几何 workload；
-- batched buffer upload 相比逐 chunk submit-and-wait 具有显著优势。
+- indirect rendering path 在中大规模测试配置下显著降低被测 CPU preparation-and-command-recording time；
+- 使用 non-compacted indirect draw buffer 的 GPU-driven MDI path 在极细 chunk 的 stress-test configuration 下产生很高的 GPU elapsed time；
+- 名义参数相近的程序化场景可能具有完全不同的 scene mesh composition 和 geometry workload；
+- batched buffer update 相比逐 chunk submit-and-wait 具有显著优势。
 
 ## 6. 四条锁定主张
 
-### 6.1 S1 到 S2 的 CPU-side interval
+### 6.1 S1 到 S2 的 CPU preparation-and-command-recording time
 
 **数据来源：** `results/_aggregate.csv`。
-**匹配范围：** 135 对 `grid >= 256`，相同 grid、chunk、weight tier 和 seed。
+**匹配范围：** 135 对 `grid >= 256`，相同 grid size、chunk size、tile-weight preset 和 seed。
 **计算：** `cpu_record_avg(S1) / cpu_record_avg(S2)`。
 **范围：** 1.7366 到 9.9405。
 
 允许表述：
 
-> 在 135 对 grid≥256 的匹配配置中，从逐 chunk direct recording（S1）切换到 CPU culling 加主机写入 fixed-length indirect records（S2），使被测 CPU-side preparation and command-recording interval 下降 1.74–9.94×。
+> 在 135 对 grid≥256 的匹配配置中，从逐 chunk direct indexed draw-command recording（S1）切换到 CPU frustum culling 加由主机填充、供 multi-draw indirect (MDI) 使用的 indirect draw buffer（S2），使被测 CPU preparation-and-command-recording time 下降 1.74–9.94×。
 
-必须同时说明：S1 与 S2 共享 CPU frustum test；S2 还包含 indirect buffer map、十个字段的逐 chunk 重写、unmap、barrier recording 和两条 indirect API commands。因此，该比较反映整条实现路径差异，不能被描述为 isolated indirect-draw effect。
+必须同时说明：S1 与 S2 共享 CPU frustum culling；S2 还包含 indirect buffer map、十个字段的逐 chunk 重写、unmap、barrier recording，以及两条 `vkCmdDrawIndexedIndirect` commands 的录制。因此，该比较反映整条 rendering path 差异，不能被描述为 isolated indirect-draw effect。
 
-### 6.2 S3 的 236.2ms 压力点
+### 6.2 S3 的 236.2ms stress-test result
 
-**配置：** grid=4096、chunk=4、tier=50、seed=42。
-**S1：** CPU-side interval 44,540.6µs；combined GPU interval 38,723.6µs。
-**S2：** CPU-side interval 7,422.7µs；combined GPU interval 44,730.5µs。
-**S3：** CPU-side interval 44.745µs；combined GPU interval 236,173µs。
+**配置：** grid=4096、chunk=4、tile-weight preset 50、seed=42。
+**S1：** CPU preparation-and-command-recording time 44,540.6µs；GPU elapsed time 38,723.6µs。
+**S2：** CPU preparation-and-command-recording time 7,422.7µs；GPU elapsed time 44,730.5µs。
+**S3：** CPU preparation-and-command-recording time 44.745µs；GPU elapsed time 236,173µs。
 
 允许表述：
 
-> 在该压力配置中，S3 的报告 CPU-side interval 降至 44.7µs，而 combined GPU timestamp interval 达到 236.2ms。该结果展示了当前 fixed-length GPU-driven path 的明确 CPU/GPU 权衡。
+> 在该 stress-test configuration 中，S3 的报告 CPU preparation-and-command-recording time 降至 44.7µs，而由 timestamp queries 测得的 GPU elapsed time 达到 236.2ms。该结果展示了当前 non-compacted MDI path 的明确 CPU/GPU timing trade-off。
 
-必须同时说明：GPU timestamp 覆盖 buffer fill、barriers、compute、fixed-length indirect processing 和 graphics。现有 measurement 无法判定某个单独 stage 的责任。S3 的 O(N) visibility readback 位于 CPU measurement 之前，因此 44.7µs 不代表完整 CPU frame cost。
+必须同时说明：timestamp-query span 覆盖 buffer fill、barriers、compute dispatch、non-compacted indirect-command processing 和 graphics。现有 measurement 无法判定某个单独 stage 的责任。S3 的 O(N) visibility readback 位于 `cpu_record` measurement 之前，因此 44.7µs 不代表完整 CPU frame cost。
 
-使用“观测到的压力点”，避免使用已定位的边界、饱和点或 compute dispatch cause。
+使用“observed stress-test result”或“stress-test configuration”，避免使用已定位的 boundary、saturation point 或 compute-dispatch cause。
 
-### 6.3 WFC 几何构成与 11.36–11.37×
+### 6.3 WFC scene mesh composition 与 11.36–11.37×
 
-**配置：** grid=4096、chunk=16、tier=80、Scheme 3。
+**配置：** grid=4096、chunk=16、tile-weight preset 80、S3 rendering path。
 **seed42：** 52,879.3µs。
 **seed1337：** 52,910.9µs。
 **seed9999：** 600,999µs。
@@ -143,21 +149,21 @@ CSC8599 的 Academic Supervised Project 由 dissertation 与 software 两部分�
 
 允许表述：
 
-> 在 grid=4096、chunk=16、tier=80 的 Scheme 3 数据中，seed9999 的 combined GPU interval 比 seed42/1337 高 11.36–11.37×；缓存解析同时显示场景构成由近乎全 cube 转为近乎全 sphere。两项观测高度一致，补充扫描进一步支持几何构成与 GPU 时间之间的关联。
+> 在 grid=4096、chunk=16、tile-weight preset 80 的 S3 数据中，seed9999 的 GPU elapsed time 比 seed42/1337 高 11.36–11.37×；缓存解析同时显示 scene mesh composition 由近乎全 cube 转为近乎全 sphere。两项观测高度一致，补充扫描进一步支持 mesh composition 与 GPU time 之间的关联。
 
-seed 只作为生成路径变量。几何构成是更直接的 workload descriptor。补充 sweep 使用另一 binary，必须被报告为独立 supplementary dataset。
+seed 只作为生成路径变量。scene mesh composition 是更直接的 workload descriptor。补充 sweep 使用另一 binary，必须被报告为独立 supplementary dataset。
 
 ### 6.4 Batched update 的约 21.8×
 
 **数据来源：** `results/_aggregate_update.csv`。
-**配置：** 32-chunk standalone buffer-upload microbenchmark。
-**全部 seeds 与 schemes 汇总：** 87.07µs 对 1,898.44µs，21.80×。
+**配置：** 32-chunk standalone buffer-update microbenchmark。
+**全部 seeds 与 rendering paths 汇总：** 87.07µs 对 1,898.44µs，21.80×。
 **seed42 下三方案平均：** 86.47µs 对 1,896.53µs，21.93×。
 **各方案范围：** 20.93–23.24×。
 
 允许表述：
 
-> 在 32-chunk standalone buffer-upload microbenchmark 中，单次 batched submit-and-wait 相比逐 chunk submit-and-wait 的朴素参考路径快约 21.8×。
+> 在 32-chunk standalone buffer-update microbenchmark 中，单次 batched submit-and-wait 相比逐 chunk submit-and-wait 的朴素参考路径快约 21.8×。
 
 必须同时说明：timer 覆盖 staging allocation、memcpy、copy command recording、submit 和 wait；CPU 数据修改位于计时起点之前。该结果属于提交粒度案例，不代表完整动态帧成本。
 
@@ -173,15 +179,15 @@ seed 只作为生成路径变量。几何构成是更直接的 workload descript
 
 正文不得列出 cylinder。
 
-### 7.2 Weight tier
+### 7.2 Tile-weight preset 与实际场景填充
 
-`emptyWeight` 作用于一个 EMPTY tile；`otherWeight` 分别作用于五个非空 tile。输入权重组合 8:2、5:5、2:10 不等于 20%、50%、80% occupancy。中文母稿统一使用 low、medium、high weight tier 或 tier 20、50、80，并另行报告实测 occupancy。
+`emptyWeight` 作用于一个 EMPTY tile；`otherWeight` 分别作用于五个非空 tile。输入权重组合 8:2、5:5、2:10 不等于 20%、50%、80% 的 non-empty-tile proportion。中文母稿统一使用 low、medium、high tile-weight preset，或 preset 20、50、80；数字是实验配置标签，另行报告实测 non-empty-tile proportion。`occupancy` 一词不用于场景填充，避免与 GPU occupancy 混淆。
 
-4096² cache 的观测 occupancy 约为：
+4096² cache 的 observed non-empty-tile proportion 约为：
 
-- tier 20：39.1%；
-- tier 50：67.3%；
-- tier 80：87.7–90.8%。
+- tile-weight preset 20：39.1%；
+- tile-weight preset 50：67.3%；
+- tile-weight preset 80：87.7–90.8%。
 
 ### 7.3 Singleton materialisation
 
@@ -212,15 +218,15 @@ seed 只作为生成路径变量。几何构成是更直接的 workload descript
 ### 8.2 Repeat validation
 
 - 五类 selected regimes；
-- 三种 schemes；
-- 每组五次 independent-process runs；
+- 三种 rendering paths（原始数据中的 `scheme` 字段）；
+- 每组五次 independent process executions；
 - 共 75 份 CSV。
 
-用途是报告 selected regimes 的 run-level variation，不能代替整个正式矩阵的完整重复。
+用途是报告 selected regimes 的 execution-level variation，不能代替整个正式矩阵的完整 execution-level repetitions。
 
 ### 8.3 Supplementary sweeps
 
-percolation/weight sweep 使用另一 commit、dirty state 和 executable hash。它们用于补充分析几何构成关联，不与 formal matrix 混成同一实验批次。
+percolation/weight sweep 使用另一 commit、dirty state 和 executable hash。它们用于补充分析 scene mesh composition 关联，不与 formal matrix 混成同一实验批次。
 
 ### 8.4 图表 metadata
 
@@ -236,7 +242,7 @@ percolation/weight sweep 使用另一 commit、dirty state 和 executable hash�
 
 ## 9. 指标定义
 
-### 9.1 CPU-side preparation and command-recording interval
+### 9.1 CPU preparation-and-command-recording time
 
 该指标对应现有 `cpu_record`，可能包含：
 
@@ -245,21 +251,21 @@ percolation/weight sweep 使用另一 commit、dirty state 和 executable hash�
 - push constants；
 - draw/dispatch/barrier command recording。
 
-不同 scheme 包含的工作并不完全相同。正文使用完整名称，图表可保留字段名 `cpu_record`，图注必须定义边界。
+不同 rendering path 包含的工作并不完全相同。`cpu_record` 是项目定义的复合计时指标，并非 Vulkan 规范中的术语。正文使用 CPU preparation-and-command-recording time；图表可保留字段名 `cpu_record`，图注必须定义计时边界。该数值由若干 CPU 计时段累加得到，因此避免称为单一 continuous interval。
 
-### 9.2 CPU wait interval
+### 9.2 CPU wait time
 
 `cpu_wait` 与 acquire/fence 或 swapchain 相关行为需按实际源码描述。它不能与 `cpu_record` 简单相加后自动成为端到端 frame time，除非边界得到源码证明。
 
-### 9.3 Combined GPU timestamp interval
+### 9.3 GPU elapsed time measured with timestamp queries
 
-现有 `gpu_exec` 使用 top-to-bottom timestamp，覆盖方案命令区间内的组合 GPU 工作。该指标适合跨方案观察整体 GPU interval，缺少 stage-level attribution 能力。
+现有 `gpu_exec` 由 command span 两端的 Vulkan timestamp queries 计算，覆盖相应 rendering path 内的组合 GPU 工作。正文称其为 GPU elapsed time measured with timestamp queries；需要强调它是 timestamp-query span，不具有 stage-level attribution 能力。
 
-### 9.4 Frame wall interval
+### 9.4 Recorded frame wall-clock span
 
 现有 `frame_wall` 排除了若干发生在 measurement 起点之前或终点之后的工作，不能称为完整墙钟帧时间，也不能用于声明完整 throughput。
 
-### 9.5 Standalone update interval
+### 9.5 Standalone buffer-update time
 
 该指标只描述 isolated upload path。正文避免将它换算成“若干正常帧”；若需要提供 60Hz 语境，可以用 16.67ms budget 计算，并明确它仍未包含与 rendering integration 相关的调度效应。
 
@@ -284,7 +290,7 @@ percolation/weight sweep 使用另一 commit、dirty state 和 executable hash�
 
 1. Vulkan command recording 与 direct/indirect drawing；
 2. CPU/GPU visibility culling；
-3. GPU-driven scene management 与 fixed/compacted command lists；
+3. GPU-driven rendering 与 non-compacted/compacted indirect-command buffers；
 4. PCG/WFC 场景生成与 rendering workload；
 5. GPU benchmark methodology；
 6. Xylem 等相邻系统；
@@ -292,7 +298,7 @@ percolation/weight sweep 使用另一 commit、dirty state 和 executable hash�
 
 定位句：
 
-> 现有研究已经展示多种 GPU-driven rendering 技术。本项目在统一的程序化 workload 与共享渲染框架中，比较三条具体 Vulkan scene-management paths，并记录这些实现随规模、分块和几何构成变化时的工程权衡。
+> 现有研究已经展示多种 GPU-driven rendering 技术。本项目在统一的程序化 workload 与共享渲染框架中，比较三条具体 Vulkan rendering paths，并记录这些实现随 grid size、chunk size 和 scene mesh composition 变化时的工程权衡。
 
 需要修正 Xylem、Gonakhchyan、Aokana 和 Unterguggenberger 的描述与元数据。删除缺少检索协议的“唯一”“尚无”“没有工作”等排他性措辞。
 
@@ -303,21 +309,21 @@ percolation/weight sweep 使用另一 commit、dirty state 和 executable hash�
 1. System Requirements and Scope；
 2. Simplified WFC Scene Generator and Cache；
 3. Split-SSBO Scene Representation；
-4. Three Scene-Management Paths；
+4. Three Rendering Paths；
 5. Synchronisation and Memory Flow；
 6. Local Update Path；
 7. Automation, Tests and Personal Contribution。
 
 需要按源码写清：
 
-- S1：CPU culling 加 per-chunk direct API commands；
-- S2：CPU culling 加 host-written fixed-length indirect records；
+- S1：CPU frustum culling 加 per-chunk direct draw-command recording；
+- S2：CPU frustum culling 加 host-populated indirect draw buffer；该 buffer 供 MDI 使用，采用固定的 2N-record layout，不执行 command compaction；
 - S2 每帧重写全部十个 indirect fields；
-- S3：buffer clear、barrier、compute culling、barrier、fixed-length indirect processing；
+- S3：buffer clear、barrier、compute frustum culling、barrier、GPU-populated indirect draw buffer 和 MDI；该 buffer 沿用固定的 2N-record layout；
 - S3 shader 使用普通 stores；
 - local size 为 64，每个 invocation 处理一个 chunk；
 - grid4096/chunk4 对应 16,384 workgroups 和 1,048,576 invocations；
-- 两条 indirect API commands 各处理 N 条 indirect records；
+- 两条 `vkCmdDrawIndexedIndirect` commands 各处理 N 条 `VkDrawIndexedIndirectCommand` records；
 - visibility readback 的调用位置和作用；
 - indirect buffer 的 host-visible/host-coherent 要求；
 - local update timer 的起止边界。
@@ -332,8 +338,8 @@ percolation/weight sweep 使用另一 commit、dirty state 和 executable hash�
 2. Hardware and Build；
 3. Scene Generation and Cache Protocol；
 4. Metric Boundaries；
-5. Sampling and Within-Run Statistics；
-6. Independent-Process Repeat Validation；
+5. Frame Sampling and Within-Execution Variation；
+6. Independent Process Executions and Execution-Level Variation；
 7. Dataset Provenance；
 8. Threats to Validity。
 
@@ -345,13 +351,13 @@ Threats to validity 集中说明：
 - 简单 meshes 和材质；
 - naïve CPU culling；
 - host-visible indirect buffer；
-- fixed-length command list；
-- S3 readback 位于 CPU interval 外；
-- GPU interval 缺少 stage breakdown；
-- 1200 frames 属于 within-run samples；
-- 正式矩阵没有完整 independent-process repetitions；
+- non-compacted indirect draw buffer with a fixed 2N-record layout；
+- S3 readback 位于 `cpu_record` measurement 之外；
+- GPU elapsed time 缺少 stage breakdown；
+- 1200 frames 属于单次 process execution 内的 frame samples；
+- 正式矩阵没有完整 execution-level repetitions；
 - dirty artifact provenance；
-- weight tier 与 occupancy 的区别。
+- tile-weight preset 与 observed non-empty-tile proportion 的区别。
 
 ### 10.5 Results & Evaluation
 
@@ -365,24 +371,24 @@ Threats to validity 集中说明：
 
 建议小节：
 
-- Indirect Path and CPU-side Interval；
-- CPU–GPU Trade-offs and the 236.2ms Stress Case；
-- PCG Geometry Composition and GPU Workload；
-- Standalone Buffer-Upload Granularity；
-- Selected-Regime Repeat Validation。
+- Indirect Rendering Path and CPU Preparation-and-Command-Recording Time；
+- CPU–GPU Trade-offs in the 236.2ms Stress-Test Configuration；
+- PCG Scene Mesh Composition and GPU Workload；
+- Standalone Buffer-Update Submission Granularity；
+- Selected-Regime Execution-Level Repetitions。
 
-不得使用 `max(cpu_record, gpu_exec)` 作为完整 frame bottleneck。可以并列展示两个 interval，讨论工作从 CPU 区间转向 GPU 区间的现象。
+不得使用 `max(cpu_record, gpu_exec)` 作为完整 frame bottleneck。可以并列展示 CPU preparation-and-command-recording time 与 GPU elapsed time，讨论被测工作在 CPU 和 GPU 之间的分配变化。
 
 ### 10.6 Discussion
 
 围绕导师提出的 smart pipeline usage 展开：
 
-- 减少逐 chunk API recording 对 CPU-side interval 有明确价值；
-- 将工作移入 GPU path 需要同步观察组合 GPU interval；
-- 极细 partition 会扩大 fixed-length workloads；
-- PCG 系统应记录实际 geometry workload，而只记录 generator labels 会掩盖成本差异；
+- 减少逐 chunk draw-command recording 对 CPU preparation-and-command-recording time 有明确价值；
+- 将工作移入 GPU-driven path 需要同步观察由 timestamp queries 测得的 GPU elapsed time；
+- 极细 partition 会扩大 non-compacted indirect draw buffer 中需要处理的 records 数量；
+- PCG 系统应记录实际 scene mesh composition；只记录 generator labels 会掩盖成本差异；
 - batched submit-and-wait 优于频繁逐 chunk submit-and-wait；
-- pipeline choice 依赖 workload、粒度、memory placement 和目标 metric。
+- rendering-path selection 依赖 workload、粒度、memory placement 和目标 metric。
 
 讨论中将 236.2ms 作为有价值的负面工程观察。避免用未测量机制补足故事。
 
@@ -394,7 +400,7 @@ Threats to validity 集中说明：
 - 四条受限结论；
 - 对系统设计成功部分的评价；
 - 对 metric boundary、artifact provenance 和验证安排的反思；
-- 说明若重新规划项目，会更早建立 clean artifact、run-level repeats 和 stage-level GPU timestamps；
+- 说明若重新规划项目，会更早建立 clean artifact、execution-level repetitions 和 per-stage GPU timestamps；
 - 将 visibility-ratio evaluation、compacted draws、多 GPU、device-local indirect buffers 和 GPU-assisted WFC 列入 future work。
 
 结论不得引入 Results 中没有出现的新数字或新因果解释。
@@ -403,18 +409,36 @@ Threats to validity 集中说明：
 
 全文统一：
 
-| 当前易误用术语 | 中文母稿统一术语 |
+| 当前易误用术语或原始标签 | 中文母稿统一术语 |
 |---|---|
-| density 20/50/80% | weight tier 20/50/80 |
-| CPU frame time | CPU-side preparation and command-recording interval |
-| GPU execution time | combined GPU timestamp interval |
-| two draw calls | two recorded indirect API commands |
+| density 20/50/80% | tile-weight preset 20/50/80；另报 observed non-empty-tile proportion |
+| scheme 1/2/3 | rendering path S1/S2/S3；`scheme` 只用于代码、CLI 或 CSV 字段 |
+| CPU frame time | CPU preparation-and-command-recording time（`cpu_record`，项目定义的复合计时指标） |
+| GPU execution time | GPU elapsed time measured with timestamp queries（`gpu_exec`） |
+| fixed-length indirect records | non-compacted indirect draw buffer with a fixed 2N-record layout |
+| two draw calls | two recorded `vkCmdDrawIndexedIndirect` commands；每条 command 执行 N 个 indirect draws |
 | one workgroup per chunk | one invocation per chunk; 64 invocations per workgroup |
-| atomic write | ordinary store to an exclusive indirect record |
-| pipeline bottleneck | observed CPU/GPU interval trade-off |
-| GPU culling saturation boundary | observed fine-granularity stress point |
+| atomic write | ordinary store to an exclusive indirect-command record |
+| occupancy（场景填充含义） | observed non-empty-tile proportion |
+| geometry composition | scene mesh composition |
+| within-run samples/statistics | within-execution frame samples/variation |
+| independent-process repeat validation | independent process executions；execution-level repetitions/variation |
+| pipeline bottleneck | observed CPU/GPU timing trade-off |
+| GPU culling saturation boundary | observed fine-granularity stress-test configuration/result |
 | standard/full WFC | simplified WFC implementation |
+| standalone buffer-upload test | standalone buffer-update microbenchmark |
 | scene representation comparison | shared representation and standalone update-path evaluation |
+
+### 11.1 在线术语核对依据
+
+- Khronos 的 [`vkCmdDrawIndexedIndirect`](https://docs.vulkan.org/refpages/latest/refpages/source/vkCmdDrawIndexedIndirect.html) reference page 将该调用描述为录制 indexed indirect drawing command，并规定 draw parameters 来自 `VkDrawIndexedIndirectCommand` 数组，`drawCount` 表示执行的 draws 数量。论文据此区分 recorded Vulkan commands 与 indirect draw-command records。
+- Khronos 的 [GPU-side command generation](https://docs.vulkan.org/tutorial/latest/Advanced_Vulkan_Compute/07_GPU_Driven_Pipelines/03_gpu_side_command_generation.html) 和 [Multi-Draw Indirect](https://docs.vulkan.org/tutorial/latest/Advanced_Vulkan_Compute/07_GPU_Driven_Pipelines/04_multi_draw_indirect_mdi.html) 教程采用 GPU-driven pipeline、CPU-side culling、draw indirect buffer、indirect draw command 和 MDI 等术语。
+- Khronos 的 [`vkCmdWriteTimestamp2`](https://docs.vulkan.org/refpages/latest/refpages/source/vkCmdWriteTimestamp2.html) reference page 称该命令把 device timestamp 写入 query object。`gpu_exec` 是两个 timestamp query results 的差值，因此正文采用 GPU elapsed time measured with timestamp queries，并披露其 pipeline-stage boundaries。
+- WFC 原作者的 [WaveFunctionCollapse repository](https://github.com/mxgmn/WaveFunctionCollapse) 使用 observation、propagation、entropy、contradiction 和 simple tiled model。`tile-weight preset` 在本文中明确标为实验输入配置名称，不冒充 WFC 社区的算法术语。
+- Kalibera 与 Jones 的 [Rigorous Benchmarking in Reasonable Time](https://kar.kent.ac.uk/33611/45/p63-kaliber.pdf) 区分单次 execution 内的 iteration variation，以及不同 executions 的 means 之间的 execution variation。论文据此使用 within-execution frame samples 与 execution-level repetitions/variation。
+- AMD GPUOpen 的 [Occupancy explained](https://gpuopen.com/learn/occupancy-explained/) 将 occupancy 定义为已分配 wavefronts 与可用 slots 的比例。为避免和 GPU profiling 概念冲突，场景填充统一写为 observed non-empty-tile proportion。
+
+代码、CLI 和 CSV 中的既有字段名保持不变。正文在字段首次出现时给出映射，之后只使用本表中的论文术语。
 
 ## 12. 主张语言等级
 
@@ -426,7 +450,7 @@ Threats to validity 集中说明：
 - observed；
 - recorded；
 - differed by；
-- reduced the reported interval by。
+- reduced the reported time by。
 
 ### 12.2 数据支持的解释
 
@@ -497,7 +521,7 @@ README 至少覆盖：
 - CMake/Visual Studio build；
 - unit tests；
 - interactive run；
-- scheme selection；
+- rendering-path selection（CLI 中的 `scheme`）；
 - benchmark CLI；
 - results directories；
 - analysis scripts；
@@ -551,12 +575,12 @@ README 至少覆盖：
 
 视频承担“项目确实工作”和“个人理解系统”的证明功能。建议结构：
 
-1. 项目问题和三条 scene-management paths；
+1. 项目问题和三条 rendering paths；
 2. WFC scene generation 与 cache；
-3. interactive scene 与 scheme switching；
+3. interactive scene 与 rendering-path switching；
 4. CPU/GPU overlay 和 chunk count；
 5. normal-scale comparison；
-6. fine-granularity stress case；
+6. fine-granularity stress-test configuration；
 7. geometry-family difference；
 8. local update modes；
 9. benchmark CLI、CSV 和 analysis scripts；
@@ -609,10 +633,10 @@ README 至少覆盖：
 | 风险 | 影响 | 应对 |
 |---|---|---|
 | dirty historical executable 无对应 patch | 限制精确源码复现 | 公开 commit/hash/dirty 状态，限定复现声明 |
-| S3 readback 不在 CPU interval 内 | 不能声明完整 CPU frame cost | 使用准确指标名，在方法与讨论中披露 |
-| GPU timestamp 无 stage breakdown | 不能解释 236.2ms 具体来源 | 保留整体压力观察，机制列入 future work |
+| S3 readback 不在 `cpu_record` measurement 内 | 不能声明完整 CPU frame cost | 使用准确指标名，在方法与讨论中披露 |
+| GPU timestamp-query span 无 stage breakdown | 不能解释 236.2ms 具体来源 | 保留整体 stress-test result，机制列入 future work |
 | 单 GPU 与全可见相机 | 限制外推 | 将结论限定到测试平台和 workload |
-| weight tier 与 occupancy 不同 | 可能误导场景密度解释 | 统一术语并报告实测 occupancy |
+| tile-weight preset 与 non-empty-tile proportion 不同 | 可能误导场景填充解释 | 统一术语并报告实测 non-empty-tile proportion |
 | supplementary sweep 使用另一 binary | 可能造成数据混写 | 独立 subsection、独立 metadata |
 | 当前 README 面向教程集合 | 个人贡献和运行方式不清楚 | 编写 project-specific README |
 | 中文到英文翻译扩大结论 | 证据强度漂移 | 中文母稿作为内容基准，翻译后逐条对照 |
@@ -628,8 +652,8 @@ README 至少覆盖：
 - 所有机制能追溯到源码；
 - 所有引文判断能追溯到原始来源；
 - observation、interpretation、hypothesis 语言分级一致；
-- 没有把局部 interval 写成完整 frame time；
-- 没有把 weight tier 写成 occupancy；
+- 没有把 `cpu_record` 或 timestamp-query span 写成完整 frame time；
+- 没有把 tile-weight preset 写成 non-empty-tile proportion；
 - formal、repeat 和 supplementary 数据没有混写；
 - WFC tile catalogue 与源码一致；
 - S2/S3 实现描述与源码一致；
@@ -678,7 +702,7 @@ README 至少覆盖：
 ## 21. 设计决策摘要
 
 1. 采用工程评价型 dissertation 主线。
-2. 保留标题和三条 scene-management paths。
+2. 保留标题，并将三条实现方案统一称为 rendering paths。
 3. 使用收窄后的 implementation-specific RQ。
 4. 锁定四条亮点及其数据口径。
 5. WFC 定位为 simplified implementation 和 workload generator。
