@@ -2,7 +2,7 @@
 
 Audit date: 2026-07-21  
 Audited artifact: `D:\D-Code\Code-Essay\thesis.md`  
-Audited manuscript SHA-256: `B803CDE67213B21CA6045C6ADE4D538F87CE97E27640ABC0976C6B3D2CE3A47C`
+Audited manuscript SHA-256: `505A71E1B7CEFE6C6E5ABF71EC58CA1200FF71AF19D076772222CFEA49A22772`
 Rewrite scope: Chapter 2 and the reference list  
 Source policy: primary papers, publisher or institutional records, Khronos documentation, and the original WFC repository
 
@@ -10,7 +10,7 @@ Source policy: primary papers, publisher or institutional records, Khronos docum
 
 The rewritten Chapter 2 uses six sections and 17 reference keys. The reference list contains the same 17 keys. Chapter-2-to-reference exact-key closure reports zero orphan citations and zero unused references. A separate whole-manuscript scan finds two legacy year-only forms in unchanged chapters: Unterguggenberger et al. `[2021]` and Haar and Aaltonen `[2015]`. Their full sources are present in the reference list, but the bracket strings are not full citation keys; Task 8 must normalise them. RayBench, RenderBench, and GPU Zen 3 were removed because they did not directly support the revised argument. All source-register rows below end in `verified`, `reworded`, or `removed`.
 
-The audit corrects the earlier Vulkan version error, the Aokana venue, the Xylem compute-route description, the Gonakhchyan evidence boundary, and the configured-versus-observed proportions in Unterguggenberger et al. The second review pass also corrects indirect-count semantics, consolidates the whole-path inference boundary, and pins the WFC repository to an identified revision. It removes literature-exclusivity claims and uses official sources for direct drawing, indirect drawing, indirect-count drawing, compute dispatch, timestamp queries, Vulkan 1.3 core promotions, and the Khronos MDI sample.
+The audit corrects the earlier Vulkan version error, the Aokana venue, the Xylem compute-route description, the Gonakhchyan evidence boundary, and the configured-versus-observed proportions in Unterguggenberger et al. The second review pass also corrects indirect-count semantics, consolidates the whole-path inference boundary, and pins the WFC repository to an identified revision. A third prose pass moves low-level project details to Chapters 3 and 4, shortens the positioning statement, and retains only the implementation facts needed to define the comparison. It removes literature-exclusivity claims and uses official sources for direct drawing, indirect drawing, indirect-count drawing, compute dispatch, timestamp queries, Vulkan 1.3 core promotions, and the Khronos MDI sample.
 
 ## Final source register
 
@@ -51,13 +51,13 @@ The audit corrects the earlier Vulkan version error, the Aokana venue, the Xylem
 
 ## Claim decisions
 
-The revised command-recording discussion distinguishes an API command recorded in a Vulkan command buffer from the N indirect-command records consumed by that API command. It also distinguishes the implemented non-compacted fixed 2N-record layout from a compacted command buffer and count-based drawing. Count-based drawing does not require compaction: valid records may already occupy the first K positions while a count buffer supplies K. Compaction is one way to form that prefix and entails additional count maintenance and record reordering. Source inspection confirms that S2 and S3 each record two `vkCmdDrawIndexedIndirect` API commands, each traverses N records, invisible records use `instanceCount=0`, and each S3 invocation writes its two assigned records without atomics. Status: `reworded`.
+The revised command-recording discussion distinguishes an API command recorded in a Vulkan command buffer from the N indirect-command records consumed by that API command. It also distinguishes the implemented non-compacted fixed 2N-record layout from a compacted command buffer and count-based drawing. Count-based drawing does not require compaction: valid records may already occupy the first K positions while a count buffer supplies K. Compaction is one way to form that prefix and entails additional count maintenance and record reordering. Chapter 2 retains the shared fixed-layout boundary, the host-versus-compute update distinction, `instanceCount=0`, and the absence of compaction or count-based drawing. Source inspection corroborates the lower-level record and store details documented in Chapter 3. Status: `reworded`.
 
-The revised WFC discussion uses Gumin's terminology while preserving the implementation boundary. The project selects a cell by candidate count rather than Shannon entropy and has no tile rotation, backtracking, or contradiction recovery. The catalogue is EMPTY plus three cube tiles and two sphere tiles. Source inspection additionally confirms the propagation control flow: a neighbour whose candidate set shrinks but remains non-singleton only receives a new heap entry, while recursive propagation continues when the neighbour becomes a singleton. The chapter treats WFC as workload generation and makes no repair or optimisation claim. Status: `reworded`.
+The revised WFC discussion uses Gumin's terminology while preserving the implementation boundary. Chapter 2 retains candidate-count selection rather than Shannon entropy, the absence of tile rotation, backtracking, and contradiction recovery, and the generator's role as workload construction. The catalogue and propagation control flow remain source-verified and are documented in Chapter 3. The chapter makes no repair or optimisation claim. Status: `reworded`.
 
-The revised methodology distinguishes within-execution frame samples from independent process executions using Kalibera and Jones. It defines `gpu_exec` as a top-to-bottom timestamp-query span and states that the available queries cannot produce stage-level attribution. Status: `verified`.
+The revised methodology uses Kalibera and Jones to distinguish within-execution variation from independent process execution, and uses the Khronos timestamp semantics to rule out stage-level attribution. Detailed sample, warm-up, CPU-timing, and artifact boundaries remain in Chapter 4. Status: `verified`.
 
-The revised positioning makes no field-wide absence, priority, or exclusivity claim. It describes an implementation-specific comparison of three Vulkan rendering paths under a shared procedural workload and representation, plus a standalone update arm. It also lists the host mapping, record population, clear, dispatch, barrier, indirect processing, and readback differences that prevent clean single-stage causal attribution. Status: `reworded`.
+The revised positioning makes no field-wide absence, priority, or exclusivity claim. It describes an implementation-specific comparison of three Vulkan rendering paths under a shared procedural workload and representation, plus a standalone update arm. It states that simultaneous changes in mapping, command generation, and synchronization limit inference to complete paths; the detailed operation inventory remains in the design and evaluation chapters. Status: `reworded`.
 
 ## Citation and reference closure
 
