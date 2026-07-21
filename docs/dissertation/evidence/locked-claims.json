@@ -1,0 +1,38 @@
+{
+  "claims": {
+    "C1": {
+      "pair_count": 135,
+      "ratio_max": 9.94048076184625,
+      "ratio_min": 1.7366206011401966
+    },
+    "C2": {
+      "s1_cpu_us": 44540.6,
+      "s1_gpu_us": 38723.6,
+      "s2_cpu_us": 7422.7,
+      "s2_gpu_us": 44730.5,
+      "s3_cpu_us": 44.7452,
+      "s3_gpu_us": 236173.0
+    },
+    "C3": {
+      "ratio_vs_seed1337": 11.35869924722505,
+      "ratio_vs_seed42": 11.365487062045071,
+      "seed1337_gpu_us": 52910.9,
+      "seed42_gpu_us": 52879.3,
+      "seed9999_gpu_us": 600999.0
+    },
+    "C4": {
+      "batched_mean_us": 87.06644444444444,
+      "perchunk_mean_us": 1898.4366666666667,
+      "ratio": 21.804458408520695
+    }
+  },
+  "generated_at_utc": "2026-07-21T04:40:34.105044Z",
+  "rounding_policy": {
+    "prose": "C1 uses 4 decimals; C2 CPU uses 3 decimals and GPU uses whole microseconds; C3 ratios use 2 decimals; C4 means and ratio use 2 decimals.",
+    "raw_values": "Python float values extracted from the aggregate CSV files"
+  },
+  "source_files": [
+    "results/_aggregate.csv",
+    "results/_aggregate_update.csv"
+  ]
+}
