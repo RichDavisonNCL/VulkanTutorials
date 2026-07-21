@@ -36,6 +36,24 @@ Anchors below were rechecked against the current `WFCFix` worktree at Task BASE 
 | Evidence-pipeline tests | `scripts/tests/test_dissertation_evidence.py:20-178`; `scripts/dissertation_evidence.py:28-230` | Python regressions cover claim extraction keys, missing/duplicate rows, denominators, source-file provenance, and paired timestamps. They validate existing evidence handling and do not create benchmark observations. |
 | Analysis/figure validation | `scripts/make_dissertation_figures.py:86-299, 445-552` | Existing artifacts are validated, filtered, and rendered with locked-claim and label checks. Check-only/self-test paths do not generate benchmark data. |
 
+## Evaluation method evidence and measurement boundaries
+
+The Chapter 4 method was rechecked at Task BASE `80af6cc337eceb0882bcb3b4ab999ff5758a7843` on 2026-07-21. Counts below come from read-only inspection of existing aggregates and raw files; no benchmark or data-generation command was run.
+
+| Method item | Source or artifact anchor | Verified interpretation and boundary |
+|---|---|---|
+| Formal rendering matrix | `scripts/run_benchmarks.py:10-15, 42-118, 138-206`; `results/_aggregate.csv`; the 702 raw files named by its `file` column | The aggregate has 702 unique grid/chunk/preset/path/seed keys and no missing raw file. Grid 16 uses chunk 4/8; grids 32--4096 use chunk 4/8/16; presets are 20/50/80, paths are S1/S2/S3, and seeds are 42/1337/9999. Every raw rendering header says `warmup=120 record=1200`, and every file has 1200 frame rows. |
+| Standalone update matrix and sampling | `GPUDrivenRendering/Main.cpp:116-156`; `GPUDrivenRendering/GPUSceneManagement.cpp:975-1011`; `results/_aggregate_update.csv`; the 108 raw files named by its `file` column | The aggregate has 108 unique keys at grid128/chunk8/preset50 across three path labels, three seeds, update sizes 1/2/4/8/16/32, and batched/perchunk. The entry point performs 10 unrecorded warm-ups and 100 recorded updates; each raw file says `repeats=100` and has 100 observation rows. |
+| `cpu_record` and `cpu_wait` | `GPUDrivenRendering/GPUSceneManagement.cpp:640-685, 694-751, 759-821, 842-860` | `cpu_record` is CPU preparation-and-command-recording time formed by summing QPC segments. Fence/acquire waits are accumulated separately as CPU wait time (`cpu_wait`). Neither field covers CPU work outside its markers; S3 visibility readback is also outside `cpu_record`. |
+| `gpu_exec` and `frame_wall` | `GPUDrivenRendering/GPUSceneManagement.cpp:373-390, 825-840, 863-890` | `gpu_exec` is GPU elapsed time measured with top-of-pipe and bottom-of-pipe timestamp queries over the combined command span, with no stage breakdown. `frame_wall` is the recorded frame wall-clock span between project markers and omits work before/after them. |
+| `update_cost` | `GPUDrivenRendering/GPUSceneManagement.cpp:1021-1137` | CPU candidate selection and data modification precede the timer. Staging allocation/copy, command-buffer behavior, submission, wait, and staging disposal are inside. Batched/perchunk are whole-update-path arms isolated from rendering integration. |
+| Within-execution versus execution-level units | `GPUDrivenRendering/GPUSceneManagement.cpp:247-257, 373-390, 825-909, 919-969`; `scripts/run_repeat_validation.py:23-81`; `results_repeatvalidation/*.csv` | The 1200 formal frame rows measure within-execution variation, not independent process repetitions. Repeat validation contains exactly 75 raw files: five regimes, three paths and five process launches. Its execution-level variation applies only to the selected regimes. |
+| Selected repeat regimes | `scripts/run_repeat_validation.py:28-35`; repeat filenames and raw configuration headers | A=4096/4/preset50/seed42; B=1024/4/preset50/seed42; C=16/4/preset50/seed42; D=4096/16/preset80/seed9999; E=1024/16/preset50/seed42. Each regime has S1/S2/S3 runs 1--5. |
+| Formal and repeat artifact identity | `GPUDrivenRendering/GPUSceneManagement.cpp:925-942, 991-1002`; all raw files referenced by `results/_aggregate*.csv`; `results_repeatvalidation/*.csv` | Formal rendering, formal update, and repeat raw headers all report RTX 4080 SUPER, driver 610.47.0.0, Release, commit `407efde`, `dirty=true`, and executable hash `e415726b9b02c3e5`. Aggregate CSVs do not independently supply this metadata. The unarchived dirty patch prevents byte-for-byte reconstruction from the current checkout. |
+| Supplementary weight-sweep identity | `results_weightsweep/*.csv`; root `results_weightsweep_*.csv` derived files | All 63 raw headers report `407efde`, `dirty=true`, Release, and `e415726b9b02c3e5`. Overrides and purpose keep this tier separate from the formal matrix; derived summaries do not replace raw-header provenance. |
+| Supplementary percolation identity | `results_percolation_sweep/*.csv` excluding underscore-prefixed derived files; `results_percolation_summary_full.csv` | All 99 raw headers report `e945014`, `dirty=true`, Release, and `e72c6eedf521222c`. This tier has a distinct executable identity and must not be pooled with formal or weight-sweep rows. |
+| Cache provenance tier | `GPUDrivenRendering/WFCCache.cpp:10-60`; `cache/*.bin` | Cache payloads embed grid size and tile IDs only. Commit, dirty state, executable hash, seed, and preset are absent from the binary; filenames/external records cannot turn those absent fields into embedded metadata. |
+
 ## Contribution ownership boundary
 
 The approved project design explicitly identifies the Vulkan 1.3 baseline, VMA memory management, mesh loading, and camera/uniform facilities as existing repository infrastructure (`docs/2026-05-15-gpu-driven-scene-management-design-cn.md:191-201`). Chapter 3's inherited-infrastructure row is limited to those items. WFC/cache, GPU scene management, compute shader, CLI/automation, tests, and analysis are labelled repository-verifiable project-delivery scope. Repository history does not establish exclusive line-level authorship for every component, so the manuscript makes no sole-authorship claim.
@@ -48,9 +66,8 @@ The approved project design explicitly identifies the Vulkan 1.3 baseline, VMA m
 - Local-update time is an isolated upload-path timer; CPU data modification precedes it. Batched/per-chunk results compare whole update arms that also differ in command-buffer creation and staging lifetime/disposal, so they do not isolate submit/wait causality.
 - Chapter 3 records mechanisms and limitations only. Empirical observations remain governed by `claim-ledger.md`.
 
-## External manuscript checkpoint
+## External manuscript checkpoints
 
-- Chapter: `# 3. Design and Implementation`
-- Completion date: 2026-07-21
-- External manuscript: `D:\\D-Code\\Code-Essay\\thesis.md`
-- SHA-256: `60AD2EB5101D569B1031D74DE90597180CCD3E34679D95D4684C72F6DE5B70F9`
+- Chapter 3 checkpoint: `# 3. Design and Implementation`, completed 2026-07-21, SHA-256 `60AD2EB5101D569B1031D74DE90597180CCD3E34679D95D4684C72F6DE5B70F9`.
+- Chapter 4 checkpoint: `# 4. Evaluation Method`, completed 2026-07-21, SHA-256 `B93653BB524F6A6D3CA7747A91B5652B43DDA562E3CD5823BDE251BEB5E8CA68`.
+- External manuscript: `D:\\D-Code\\Code-Essay\\thesis.md`.
