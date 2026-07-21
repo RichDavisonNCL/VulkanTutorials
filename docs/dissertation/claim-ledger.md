@@ -12,20 +12,21 @@ This ledger locks the direct observations used by the dissertation. Later work m
 ## Claim-use controls
 
 - Refer to S1, S2, and S3 as rendering paths. Reserve `scheme` for source code, CLI, or CSV fields.
-- Name `cpu_record` as CPU preparation-and-command-recording time. It is a project-defined sum of timed CPU segments; fence/acquire waits, S3 visibility readback, and work outside the markers are excluded, so it is not complete CPU frame cost.
-- Name `cpu_wait` as CPU wait time. It records the marked fence/acquire wait separately and does not represent preparation, recording, or every wait in the process.
+- Name `cpu_record` as CPU preparation-and-command-recording time. It is a project-defined sum of timed CPU segments; the separately marked `BeginRenderToScreen` interval, S3 visibility readback, and other work outside the markers are excluded, so it is not complete CPU frame cost.
+- Name `cpu_wait` as CPU wait time while stating its project-specific raw boundary. The field wraps the whole `BeginRenderToScreen` call and includes `waitForFences`, image-transition command recording, viewport/scissor setup, and `beginRendering`; it is not a pure wait metric. The earlier timeline-semaphore wait, `acquireNextImageKHR`, command-buffer reset, and command-buffer begin in `BeginFrame` are outside its markers. Never attribute this field solely to waiting.
 - Name `gpu_exec` as GPU elapsed time measured with timestamp queries. Its top-of-pipe to bottom-of-pipe command span combines stages and supports no single-stage attribution.
 - Name `frame_wall` as recorded frame wall-clock span and retain its project-diagnostic status. Its partial boundary excludes work outside the recorded markers, so it is not complete end-to-end frame time and must not support a complete throughput claim.
-- Name `update_cost` as standalone buffer-update time. CPU candidate selection and data modification precede the timer; staging allocation/copy, command-buffer behavior, submission, wait, and disposal are inside. Batched/perchunk is a whole-update-path comparison isolated from rendering integration.
+- Name `update_cost` as standalone buffer-update time. CPU candidate selection and data modification precede the timer; staging allocation/copy, command-buffer behavior, submission, wait, and disposal are inside. Every call reconstructs `mt19937(seed+9999)`, so the 10 warm-ups and 100 records repeat one fixed logical chunk selection and replacement-value sequence, may reflect warmed/reused state, and do not sample heterogeneous edit contents. Batched/perchunk is a whole-update-path comparison isolated from rendering integration.
+- Describe the fixed top-down camera as a high-visibility overview. Recorded `visible_chunks` can be slightly below total chunks, so do not label the recorded configurations universally all-visible.
 - Treat C1 and C2 as formal-matrix observations. Treat C3 cache interpretation and its supplementary sweep as separately labelled evidence. Treat C4 as a standalone whole-update-path comparison, not an isolated submission or wait effect.
 - Record both within-execution frame variation and execution-level variation where available. Do not use selected independent process executions as repetitions for the formal matrix.
 
 ## Evaluation Method checkpoint
 
 - Chapter completed: `# 4. Evaluation Method` on 2026-07-21.
-- External manuscript SHA-256: `B93653BB524F6A6D3CA7747A91B5652B43DDA562E3CD5823BDE251BEB5E8CA68`.
+- External manuscript SHA-256: `E247117A32D47D898C2D93ED41742FE80A691C8192C355145B3A507AA9C1EB30`.
 - Dataset hierarchy: 702 formal steady-state rendering configurations; 108 standalone update configurations; 120 warm-up plus 1200 recorded frames for every formal rendering configuration; 75 independent process executions across five selected regimes.
-- Sample-unit boundary: formal frame rows quantify within-execution variation. Execution-level variation is available only for regimes A--E and cannot represent all 702 formal rows.
+- Sample-unit boundary: formal frame rows quantify within-execution variation. Execution-level variation is available only for regimes A--E and cannot represent all 702 formal rows. Standalone update records repeatedly execute one deterministic logical edit per configuration and do not vary edit content.
 - Provenance boundary: formal rendering, update, and repeat raw files share `407efde`/`dirty=true`/`e415726b9b02c3e5`; weight-sweep raw files share that identity but remain supplementary; percolation raw files use `e945014`/`dirty=true`/`e72c6eedf521222c`; cache binaries embed none of commit, dirty state, or executable hash.
 
 ## Design and Implementation checkpoint
