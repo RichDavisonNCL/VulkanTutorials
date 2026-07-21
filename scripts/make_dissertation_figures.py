@@ -354,7 +354,7 @@ def fig_c2(rows: list[dict[str, str]]) -> plt.Figure:
 
 
 def fig_c3(rows: list[dict[str, str]], triangles: dict[int, int]) -> plt.Figure:
-    fig, axis = plt.subplots(figsize=(8.0, 5.1))
+    fig, axis = plt.subplots(figsize=(8.6, 5.5))
     for row in rows:
         seed = int(row["seed"])
         x = triangles[seed] / 1_000_000
@@ -382,7 +382,7 @@ def fig_c3(rows: list[dict[str, str]], triangles: dict[int, int]) -> plt.Figure:
         frameon=False,
         loc="upper left",
     )
-    zoom = axis.inset_axes([0.10, 0.34, 0.42, 0.30])
+    zoom = axis.inset_axes([0.11, 0.28, 0.56, 0.42])
     for row in rows:
         seed = int(row["seed"])
         if seed == 9999:
@@ -398,10 +398,10 @@ def fig_c3(rows: list[dict[str, str]], triangles: dict[int, int]) -> plt.Figure:
     zoom.set_xticks([183.21, 183.22, 183.23])
     zoom.set_yticks([52.88, 52.90, 52.92])
     zoom.ticklabel_format(axis="x", style="plain", useOffset=False)
-    zoom.tick_params(labelsize=6)
-    zoom.set_title("Faithful zoom: seeds 42 and 1337", fontsize=7)
-    zoom.set_xlabel("Supplementary triangles (M)", fontsize=6)
-    zoom.set_ylabel("Formal GPU time (ms)", fontsize=6)
+    zoom.tick_params(labelsize=7)
+    zoom.set_title("Faithful zoom: seeds 42 and 1337", fontsize=8)
+    zoom.set_xlabel("Total triangle count from\nsupplementary cache histogram (millions)", fontsize=7)
+    zoom.set_ylabel("GPU elapsed time from\ntimestamp queries (ms)", fontsize=7)
     zoom.grid(color="#D9D9D9", linewidth=0.4)
     axis.text(0.98, 0.04, "No pooled fit or cross-tier summary.", transform=axis.transAxes, ha="right", va="bottom", fontsize=8)
     finish_axis(axis)
@@ -442,14 +442,33 @@ def fig_c4(rows: list[dict[str, str]], claim: dict[str, float]) -> plt.Figure:
     return fig
 
 
+def descendant_axes(axis: plt.Axes):
+    yield axis
+    for child in axis.child_axes:
+        yield from descendant_axes(child)
+
+
 def figure_texts(figures: list[plt.Figure]) -> list[str]:
     texts: list[str] = []
     for figure in figures:
-        for axis in figure.axes:
-            texts.extend((axis.get_title(), axis.get_xlabel(), axis.get_ylabel()))
-            legend = axis.get_legend()
-            if legend:
-                texts.extend(item.get_text() for item in legend.get_texts())
+        texts.extend(text.get_text() for text in figure.texts)
+        for legend in figure.legends:
+            texts.extend((legend.get_title().get_text(), *(item.get_text() for item in legend.get_texts())))
+        for root_axis in figure.axes:
+            for axis in descendant_axes(root_axis):
+                texts.extend((
+                    axis.get_title(loc="left"),
+                    axis.get_title(loc="center"),
+                    axis.get_title(loc="right"),
+                    axis.get_xlabel(),
+                    axis.get_ylabel(),
+                ))
+                texts.extend(text.get_text() for text in axis.texts)
+                texts.extend(text.get_text() for text in axis.get_xticklabels())
+                texts.extend(text.get_text() for text in axis.get_yticklabels())
+                legend = axis.get_legend()
+                if legend:
+                    texts.extend((legend.get_title().get_text(), *(item.get_text() for item in legend.get_texts())))
     return texts
 
 
@@ -488,6 +507,16 @@ def run_validation_self_test(aggregate: list[dict[str, str]], updates: list[dict
     wrong_c4_dimension[0]["grid"] = "129"
     assert_rejected("wrong C4 grid", lambda: c4_rows(wrong_c4_dimension))
 
+    scene = c3_rows(aggregate)
+    triangles = {seed: triangle_count(cache_histogram(seed, 80)) for seed in (42, 1337, 9999)}
+    figure = fig_c3(scene, triangles)
+    inset = figure.axes[0].child_axes[0]
+    inset.set_xlabel("GPU execution time")
+    try:
+        assert_rejected("banned label in C3 child inset", lambda: banned_label_scan([figure]))
+    finally:
+        plt.close(figure)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -500,7 +529,7 @@ def main() -> int:
     updates = read_csv(UPDATE_AGGREGATE)
     if args.self_test:
         run_validation_self_test(aggregate, updates)
-        print("self-test: duplicate C1 key, wrong C2/C3 update, and wrong C4 dimension were rejected without input writes")
+        print("self-test: duplicate C1 key, wrong C2/C3 update, wrong C4 dimension, and banned C3 child-inset label were rejected without input writes")
         return 0
     claims = json.loads(LOCKED_CLAIMS.read_text(encoding="utf-8"))["claims"]
     data = validate(aggregate, updates, claims)
