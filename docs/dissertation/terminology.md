@@ -8,7 +8,9 @@ Use these terms throughout the Chinese master manuscript. Existing code, CLI, an
 | scheme 1/2/3 | rendering path S1/S2/S3; use `scheme` only for code, CLI, or CSV fields |
 | CPU frame time | CPU preparation-and-command-recording time (`cpu_record`, a project-defined composite metric) |
 | GPU execution time | GPU elapsed time measured with timestamp queries (`gpu_exec`) |
+| `frame_wall` | project wall-clock diagnostic (`frame_wall`, recorded frame wall-clock span) |
 | fixed-length indirect records | non-compacted indirect draw buffer with a fixed 2N-record layout |
+| multi-draw indirect / MDI | multi-draw indirect (MDI) at first use; MDI thereafter |
 | two draw calls | two recorded `vkCmdDrawIndexedIndirect` commands; each command executes N indirect draws |
 | one workgroup per chunk | one invocation per chunk; 64 invocations per workgroup |
 | atomic write | ordinary store to an exclusive indirect-command record |
@@ -26,5 +28,6 @@ Use these terms throughout the Chinese master manuscript. Existing code, CLI, an
 
 - A tile-weight preset is an input label. It does not state the observed non-empty-tile proportion.
 - `occupancy` remains reserved for GPU occupancy contexts.
-- S1 is the CPU-frustum-culling direct-draw path; S2 is the CPU-frustum-culling MDI path; S3 is the compute-frustum-culling MDI path.
+- `frame_wall` is a project wall-clock diagnostic with a partial measurement boundary. It is not complete end-to-end frame time and must not support a complete throughput claim.
+- Expand multi-draw indirect (MDI) at first use. S1 is the CPU-frustum-culling direct-draw path; S2 is the CPU-frustum-culling MDI path; S3 is the compute-frustum-culling MDI path.
 - The formal matrix, selected independent process executions, and supplementary sweeps are separate datasets and must retain separate labels in prose, tables, and figures.

@@ -11,7 +11,7 @@
 
 # Source map
 
-Anchors were checked against the current worktree at baseline `001b215159709490b7d1beec1a631d282351df93`. The source has local unstaged modifications, so these anchors describe the current source and must be rechecked before manuscript claims cite them.
+Anchors were checked against the current worktree at baseline `001b215159709490b7d1beec1a631d282351df93`. `GPUDrivenRendering/GPUSceneManagement.cpp` had unstaged modifications that pre-existed the Task 1 control-layer commit `c68017a5997563fbd34b9a6461d19bcdc779f8e3`. These anchors describe that current source and must be rechecked before manuscript claims cite them.
 
 ## Measurement controls
 

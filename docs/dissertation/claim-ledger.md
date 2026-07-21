@@ -14,5 +14,6 @@ This ledger locks the direct observations used by the dissertation. Later work m
 - Refer to S1, S2, and S3 as rendering paths. Reserve `scheme` for source code, CLI, or CSV fields.
 - Name `cpu_record` as CPU preparation-and-command-recording time. It is a project-defined accumulated CPU metric.
 - Name `gpu_exec` as GPU elapsed time measured with timestamp queries. It supports no single-stage attribution.
+- Name `frame_wall` as a project wall-clock diagnostic. Its partial boundary excludes work outside the recorded span, so it is not complete end-to-end frame time and must not support a complete throughput claim.
 - Treat C1 and C2 as formal-matrix observations. Treat C3 cache interpretation and its supplementary sweep as separately labelled evidence. Treat C4 as a standalone buffer-update microbenchmark observation.
 - Record both within-execution frame variation and execution-level variation where available. Do not use selected independent process executions as repetitions for the formal matrix.
