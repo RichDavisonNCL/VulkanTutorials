@@ -61,6 +61,24 @@ The registered range is 0.0135%–0.5726% across 15 selected regime/path cells. 
 - §7.3 records personal scope and measurement lessons, including why GPU-assisted WFC remained outside the implemented evaluation.
 - §7.4 maps each future-work direction to a current evidence gap: stage timestamps and full CPU timing; replayable visibility paths; compacted/count/device-local indirect paths; cross-hardware and richer workloads; integrated update paths; GPU-assisted WFC; and provenance-aware PCG feedback.
 
+## Front-matter and research-question alignment checkpoint
+
+- Front matter and Introduction completed on 2026-07-21.
+- External manuscript SHA-256: `FFB5AF8189726145A8BA1ABDE8A8CEF422543F59CE537036EC7A14119E604C80`.
+- Working title: `Evaluating CPU- and GPU-Driven Rendering Paths for WFC-Generated Modular Scenes in Vulkan`.
+- The primary question asks how the implemented CPU- and GPU-driven paths differ in CPU preparation-and-command-recording time and timestamp-query GPU elapsed time in WFC-generated modular scenes. Grid size, chunk size and scene mesh composition are analysis dimensions; the standalone update path is a separate subquestion.
+- The abstract uses C1--C4 headline observations and approved method metadata without merging rendering, update or repeat evidence. Selected-regime process executions remain in the method and results chapters.
+
+| Question or objective | Introduction | Evaluation Method | Results | Discussion | Conclusion |
+|---|---|---|---|---|---|
+| Complete S1/S2 and S2/S3 rendering-path timing comparisons | §1.2; Objective 3 | §4.1 | §5.2--§5.3 | §6.1--§6.2 | §7.1 |
+| Variation with grid size, chunk size and scene mesh composition | §1.2; Objective 3 | §4.1--§4.2 | §5.2--§5.4 | §6.2--§6.3 | §7.1 |
+| Batched versus per-chunk standalone update paths | §1.2 subquestion; Objective 4 | §4.1; §4.4 | §5.5 | §6.4 | §7.1 |
+| Metric, repetition, artifact and external-validity boundaries | Objectives 2 and 4 | §4.3--§4.6 | §5.1; §5.6--§5.7 | §6.5 | §7.2--§7.4 |
+
+- The title is followed by a technical-video URL placeholder; the submission version must replace it with the real hosted URL.
+- GPU-assisted WFC is identified as an unimplemented contingent extension and appears only in scope, reflection and future work.
+
 ## Evaluation Method checkpoint
 
 - Chapter completed: `# 4. Evaluation Method` on 2026-07-21.
