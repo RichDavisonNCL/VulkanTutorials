@@ -2,7 +2,7 @@
 
 Audit date: 2026-07-21  
 Audited artifact: `D:\D-Code\Code-Essay\thesis.md`  
-Audited manuscript SHA-256: `505A71E1B7CEFE6C6E5ABF71EC58CA1200FF71AF19D076772222CFEA49A22772`
+Audited manuscript SHA-256: `7DDFB4E751C7A8F1BA6DF76C699B40B98E7CEFB2661D9B3490451A1AE018BBAC`
 Rewrite scope: Chapter 2 and the reference list  
 Source policy: primary papers, publisher or institutional records, Khronos documentation, and the original WFC repository
 
@@ -10,7 +10,7 @@ Source policy: primary papers, publisher or institutional records, Khronos docum
 
 The rewritten Chapter 2 uses six sections and 17 reference keys. The reference list contains the same 17 keys. Chapter-2-to-reference exact-key closure reports zero orphan citations and zero unused references. A separate whole-manuscript scan finds two legacy year-only forms in unchanged chapters: Unterguggenberger et al. `[2021]` and Haar and Aaltonen `[2015]`. Their full sources are present in the reference list, but the bracket strings are not full citation keys; Task 8 must normalise them. RayBench, RenderBench, and GPU Zen 3 were removed because they did not directly support the revised argument. All source-register rows below end in `verified`, `reworded`, or `removed`.
 
-The audit corrects the earlier Vulkan version error, the Aokana venue, the Xylem compute-route description, the Gonakhchyan evidence boundary, and the configured-versus-observed proportions in Unterguggenberger et al. The second review pass also corrects indirect-count semantics, consolidates the whole-path inference boundary, and pins the WFC repository to an identified revision. A third prose pass moves low-level project details to Chapters 3 and 4, shortens the positioning statement, and retains only the implementation facts needed to define the comparison. It removes literature-exclusivity claims and uses official sources for direct drawing, indirect drawing, indirect-count drawing, compute dispatch, timestamp queries, Vulkan 1.3 core promotions, and the Khronos MDI sample.
+The audit corrects the earlier Vulkan version error, the Aokana venue, the Xylem compute-route description, the Gonakhchyan evidence boundary, and the configured-versus-observed proportions in Unterguggenberger et al. The second review pass also corrects indirect-count semantics, consolidates the whole-path inference boundary, and pins the WFC repository to an identified revision. Later prose passes move low-level project details to Chapters 3 and 4, shorten the positioning statement, localize ordinary technical concepts, and retain only the implementation facts needed to define the comparison. The chapter makes no literature-exclusivity claim and uses official sources for direct drawing, indirect drawing, indirect-count drawing, compute dispatch, timestamp queries, Vulkan 1.3 core promotions, and the Khronos MDI sample.
 
 ## Final source register
 
