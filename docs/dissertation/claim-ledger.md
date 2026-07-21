@@ -17,3 +17,10 @@ This ledger locks the direct observations used by the dissertation. Later work m
 - Name `frame_wall` as a project wall-clock diagnostic. Its partial boundary excludes work outside the recorded span, so it is not complete end-to-end frame time and must not support a complete throughput claim.
 - Treat C1 and C2 as formal-matrix observations. Treat C3 cache interpretation and its supplementary sweep as separately labelled evidence. Treat C4 as a standalone buffer-update microbenchmark observation.
 - Record both within-execution frame variation and execution-level variation where available. Do not use selected independent process executions as repetitions for the formal matrix.
+
+## Design and Implementation checkpoint
+
+- Chapter completed: `# 3. Design and Implementation` on 2026-07-21.
+- External manuscript SHA-256: `50727D4A807F4069BB26AF8E1E7FC2DC4E4B6811721F8688A24D62C2B100A4A7`.
+- Mechanism anchors and conservative ownership boundaries are recorded in `docs/dissertation/source-map.md` under “Design and implementation mechanisms” and “Contribution ownership boundary.”
+- Chapter 3 introduces no empirical observation. C1–C4 and their required limitations remain unchanged and govern later results-oriented prose.
