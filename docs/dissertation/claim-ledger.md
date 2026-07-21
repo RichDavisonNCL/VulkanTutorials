@@ -24,10 +24,10 @@ This ledger locks the direct observations used by the dissertation. Later work m
 ## Evaluation Method checkpoint
 
 - Chapter completed: `# 4. Evaluation Method` on 2026-07-21.
-- External manuscript SHA-256: `E247117A32D47D898C2D93ED41742FE80A691C8192C355145B3A507AA9C1EB30`.
+- External manuscript SHA-256: `CAA47DBFC91902602A245AA339DF92105BF6CF34C4BB71F529B4F2DF91C527DF`.
 - Dataset hierarchy: 702 formal steady-state rendering configurations; 108 standalone update configurations; 120 warm-up plus 1200 recorded frames for every formal rendering configuration; 75 independent process executions across five selected regimes.
 - Sample-unit boundary: formal frame rows quantify within-execution variation. Execution-level variation is available only for regimes A--E and cannot represent all 702 formal rows. Standalone update records repeatedly execute one deterministic logical edit per configuration and do not vary edit content.
-- Provenance boundary: formal rendering, update, and repeat raw files share `407efde`/`dirty=true`/`e415726b9b02c3e5`; weight-sweep raw files share that identity but remain supplementary; percolation raw files use `e945014`/`dirty=true`/`e72c6eedf521222c`; cache binaries embed none of commit, dirty state, or executable hash.
+- Provenance boundary: formal rendering, update, and repeat raw files share `407efde`/`dirty=true`/`e415726b9b02c3e5`; weight-sweep raw files share that identity but remain supplementary; percolation raw files use `e945014`/`dirty=true`/`e72c6eedf521222c`; cache binaries embed none of commit, dirty state, or executable hash. Each dirty flag proves only that whole-worktree `git status --porcelain` was non-empty at build time. It does not identify a specific uncommitted file that affected the executable. The exact non-clean state was not archived; the hash identifies the recorded artifact and cannot recover its source state.
 
 ## Design and Implementation checkpoint
 
