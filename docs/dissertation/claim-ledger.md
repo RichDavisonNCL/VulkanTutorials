@@ -43,6 +43,24 @@ The registered range is 0.0135%–0.5726% across 15 selected regime/path cells. 
 - Section 5.6 uses one mean from each of five independent process executions per selected regime/path cell. Its CV calculation and all 15 displayed values are registered under RV1 above; it supplies no repetition claim for the 702-row formal matrix.
 - Formal timing and update captions carry `407efde`/`dirty=true`/`e415726b9b02c3e5`. F5.3 separately states that its cache binaries lack embedded commit, dirty-state, and executable-hash metadata; the percolation direction check remains a separate `e945014`/`dirty=true`/`e72c6eedf521222c` supplementary tier.
 
+## Discussion and conclusion checkpoint
+
+- Chapters completed: `# 6. Discussion` and `# 7. Conclusion and Critical Reflection` on 2026-07-21.
+- External manuscript SHA-256: `7B667C75A4625D0DA1234BB3E30B506325A399B67EAFD3DD9389E2D82784EED4`.
+- No benchmark was run and no new observation was added. Chapters 6--7 interpret C1--C4 and approved implementation or method metadata only.
+
+| Claim | Results location | Discussion location | Conclusion location | Retained inference boundary |
+|---|---|---|---|---|
+| C1 | §5.2 / F5.1 | §6.1 | §7.1 | S1/S2 is a complete-rendering-path comparison; no isolated MDI effect. |
+| C2 | §5.3 / F5.2 | §6.2 | §7.1 | One observed stress-test configuration; combined GPU timestamp span and partial CPU metric. |
+| C3 | §5.4 / F5.3 | §6.3 | §7.1 | Formal timing and cache composition are associated; no single-factor cause, universal locking, or probability claim. |
+| C4 | §5.5 / F5.4 | §6.4 | §7.1 | Batched and per-chunk are complete standalone update arms; no isolated submit or wait effect. |
+
+- §6.5 consolidates metric, repetition, artifact and external-validity boundaries. It identifies the camera as a high-visibility top-down overview rather than an all-visible condition.
+- §7.2 retains the single-GPU, coupled-path, partial-timing, provenance and simplified-WFC limitations.
+- §7.3 records personal scope and measurement lessons, including why GPU-assisted WFC remained outside the implemented evaluation.
+- §7.4 maps each future-work direction to a current evidence gap: stage timestamps and full CPU timing; replayable visibility paths; compacted/count/device-local indirect paths; cross-hardware and richer workloads; integrated update paths; GPU-assisted WFC; and provenance-aware PCG feedback.
+
 ## Evaluation Method checkpoint
 
 - Chapter completed: `# 4. Evaluation Method` on 2026-07-21.
