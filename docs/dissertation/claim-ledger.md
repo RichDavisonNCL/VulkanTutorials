@@ -2,12 +2,26 @@
 
 This ledger locks the direct observations used by the dissertation. Later work must update this document before changing a numerical claim, its evidence, or its limitation.
 
-| ID | Direct observation | Evidence | Required limitation |
-|---|---|---|---|
-| C1 | 135 matched configurations at grid≥256 give S1/S2 `cpu_record_avg` ratios of 1.7366–9.9405× | `results/_aggregate.csv`; key = grid, chunk, density, seed | whole-path comparison; no isolated MDI causal attribution |
-| C2 | grid4096/chunk4/preset50/seed42 gives S3 CPU time 44.745µs and GPU elapsed time 236,173µs | `results/_aggregate.csv` | timestamp span combines fill, barriers, dispatch, indirect processing and graphics; readback is outside `cpu_record` |
-| C3 | grid4096/chunk16/preset80/S3 gives seed9999 600,999µs versus seed42/1337 52,879.3/52,910.9µs | formal CSV plus cache histogram and separately labelled supplementary sweep | association with scene mesh composition; no single-stage attribution |
-| C4 | 32-chunk update gives batched 87.07µs, per-chunk 1,898.44µs and ratio 21.80× | `results/_aggregate_update.csv` | standalone whole-update-path comparison; arms differ in command-buffer creation, staging lifetime/disposal, submission and wait counts; no isolated submit/wait attribution or full dynamic-frame claim |
+| ID | Manuscript subsection | Figure ID | Exact direct-observation sentence | Evidence and exact filter | Limitation present in subsection |
+|---|---|---|---|---|---|
+| C1 | 5.2 S1→S2 CPU Preparation-and-Command-Recording Time | F5.1 | “在 135 对 grid≥256 且 grid、chunk、tile-weight preset 与 seed 相同的匹配配置中，S2 相对 S1 的 CPU preparation-and-command-recording time 下降 1.74–9.94×。” | `results/_aggregate.csv`; `update=0`, `grid>=256`; match `grid`, `chunk`, `density`, `seed`; n=135 pairs | Present: complete S1/S2 rendering paths are compared; mapping, ten-field writes, barrier recording, and direct/MDI command recording differ, so no isolated MDI attribution is made. |
+| C2 | 5.3 CPU–GPU Timing Trade-off in the 236.2ms Stress-Test Configuration | F5.2 | “S1、S2、S3 的 CPU preparation-and-command-recording time 分别为 44,540.6 µs、7,422.7 µs 和 44.745 µs；相应 GPU elapsed time measured with timestamp queries 分别为 38,723.6 µs、44,730.5 µs 和 236,173 µs（236.2 ms）。” | `results/_aggregate.csv`; `grid=4096`, `chunk=4`, `density=50`, `seed=42`, `update=0`, S1/S2/S3 | Present: one observed stress-test configuration; timestamp span combines fill, barriers, dispatch, indirect processing and graphics; S3 visibility readback is outside `cpu_record`; no stage attribution or complete CPU-frame claim. |
+| C3 | 5.4 Scene Mesh Composition and GPU Workload | F5.3 | “三条 formal S3 GPU elapsed times 分别为 seed42 52,879.3 µs、seed1337 52,910.9 µs 和 seed9999 600,999 µs。seed9999 相对 seed42 为 11.37×，相对 seed1337 为 11.36×。” | Formal timing: `results/_aggregate.csv`, `grid=4096`, `chunk=16`, `density=80`, `scheme=3`, `update=0`, seeds 42/1337/9999. Supplementary composition: `cache/wfc_4096_{42,1337,9999}_80.bin`. | Present: association language only; seed-paired cross-artifact display has no pooled fit or causal/stage attribution; cache binaries embed no commit/dirty/hash identity; no universal family-locking claim. |
+| C4 | 5.5 Standalone Buffer-Update Submission Granularity | F5.4 | “在 32-chunk filter 下，全 seed、全 path-label 算术均值为 batched 87.07 µs、per-chunk 1,898.44 µs，whole-arm ratio 为 21.80×。只取 seed42 并跨三个 path labels 平均时，该 ratio 为 21.93×；按 path label 分别跨三个 seeds 汇总时，ratio 范围为 20.93–23.24×。” | `results/_aggregate_update.csv`; `grid=128`, `chunk=8`, `density=50`, `update_size=32`, all three seeds and path labels, both modes | Present: standalone whole-update arms differ in allocations, command-buffer behavior, submissions, waits, and disposal; CPU selection/data modification precedes the timer; samples repeat a fixed logical update; no dynamic-frame or isolated submit/wait inference. |
+
+## Execution-level numeric summary
+
+RV1 is a descriptive result in Section 5.6 and is not promoted into C1--C4. Its only source is the 75 raw files matching `results_repeatvalidation/regime{A--E}_grid*_chunk*_dens*_scheme*_seed*_run*.csv`. For every regime/path cell, each of the five independent process executions is reduced to the arithmetic mean of its 1200 `gpu_exec_us` frame rows. Execution-level CV is the sample standard deviation of those five execution means, using denominator n-1, divided by their arithmetic mean and multiplied by 100.
+
+| Regime | S1 CV (%) | S2 CV (%) | S3 CV (%) |
+|---|---:|---:|---:|
+| A: 4096/4/preset50/seed42 | 0.0167 | 0.0135 | 0.5726 |
+| B: 1024/4/preset50/seed42 | 0.0372 | 0.0451 | 0.1103 |
+| C: 16/4/preset50/seed42 | 0.2606 | 0.1438 | 0.2059 |
+| D: 4096/16/preset80/seed9999 | 0.1247 | 0.0138 | 0.3542 |
+| E: 1024/16/preset50/seed42 | 0.2561 | 0.1168 | 0.1297 |
+
+The registered range is 0.0135%–0.5726% across 15 selected regime/path cells. All 75 raw headers record commit `407efde`, `dirty=true`, and executable hash `e415726b9b02c3e5`. This summary does not use 1200 frames as independent process repetitions, does not cover the remaining formal configurations, and supports no significance or confidence-interval claim.
 
 ## Claim-use controls
 
@@ -20,6 +34,14 @@ This ledger locks the direct observations used by the dissertation. Later work m
 - Describe the fixed top-down camera as a high-visibility overview. Recorded `visible_chunks` can be slightly below total chunks, so do not label the recorded configurations universally all-visible.
 - Treat C1 and C2 as formal-matrix observations. Treat C3 cache interpretation and its supplementary sweep as separately labelled evidence. Treat C4 as a standalone whole-update-path comparison, not an isolated submission or wait effect.
 - Record both within-execution frame variation and execution-level variation where available. Do not use selected independent process executions as repetitions for the formal matrix.
+
+## Results checkpoint
+
+- Chapter completed: `# 5. Results \& Analysis` on 2026-07-21.
+- External manuscript SHA-256: `BD2C8CC429C7F62F47C0A4A24F6B25ED66A91C636DC1524C759F134EC0939ACE`.
+- C1--C4 appear in Sections 5.2--5.5 with F5.1--F5.4 respectively. Every subsection states the evaluation question, exact data/filter, direct observation, supported interpretation, and unresolved mechanism or inference limit.
+- Section 5.6 uses one mean from each of five independent process executions per selected regime/path cell. Its CV calculation and all 15 displayed values are registered under RV1 above; it supplies no repetition claim for the 702-row formal matrix.
+- Formal timing and update captions carry `407efde`/`dirty=true`/`e415726b9b02c3e5`. F5.3 separately states that its cache binaries lack embedded commit, dirty-state, and executable-hash metadata; the percolation direction check remains a separate `e945014`/`dirty=true`/`e72c6eedf521222c` supplementary tier.
 
 ## Evaluation Method checkpoint
 
