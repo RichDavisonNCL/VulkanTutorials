@@ -86,15 +86,15 @@ void BenchmarkPanel::RenderGenerationSection(GPUSceneManagement* app) {
 				std::vector<uint32_t> loadedGrid;
 				uint32_t loadedSize = 0;
 				if (WFCCache::Load(loadedGrid, loadedSize, m_genGridSize, m_genSeed, m_genDensity)) {
+					// Cache hit: grid ready immediately. Hand it to RunFrame for a
+					// frame-boundary GPU rebuild rather than rebuilding here in the
+					// ImGui callback -- a mid-frame rebuild frees resources the
+					// current command buffer still references (device-lost -> abort).
 					m_partialTileGrid = std::move(loadedGrid);
-					app->SetSceneParams(m_genGridSize, m_genChunkSize, m_genSeed, m_genDensity);
-					app->GenerateScene(m_partialTileGrid);
-					app->CreateBuffers();
-					app->CreateDescriptorSets();
-					app->CreateQueryPool();
 					m_totalCells = m_genGridSize * m_genGridSize;
 					m_genProgress = m_totalCells;
-					m_state = PanelState::Ready;
+					m_pendingRebuild = true;
+					m_state = PanelState::Loading;
 					loaded = true;
 				}
 			}
@@ -110,13 +110,13 @@ void BenchmarkPanel::RenderGenerationSection(GPUSceneManagement* app) {
     }
 
     if (m_generationReady && m_state == PanelState::Generating) {
+        // Background WFC finished. Join the worker and hand the grid to
+        // RunFrame for a frame-boundary rebuild -- never rebuild GPU
+        // resources from inside this ImGui Render callback (see the
+        // PanelState::Loading rationale in BenchmarkPanel.h).
         if (m_genThread.joinable()) m_genThread.join();
-		app->SetSceneParams(m_genGridSize, m_genChunkSize, m_genSeed, m_genDensity);
-        app->GenerateScene(m_partialTileGrid);
-        app->CreateBuffers();
-        app->CreateDescriptorSets();
-        app->CreateQueryPool();
-        m_state = PanelState::Ready;
+        m_pendingRebuild = true;
+        m_state = PanelState::Loading;
     }
 
 	if (m_state == PanelState::Ready || m_state == PanelState::Results) {
@@ -131,6 +131,7 @@ void BenchmarkPanel::RenderGenerationSection(GPUSceneManagement* app) {
     switch (m_state) {
         case PanelState::Idle:       ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Status: Idle"); break;
         case PanelState::Generating: ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Status: Generating..."); break;
+        case PanelState::Loading:    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Status: Loading (building GPU scene)..."); break;
         case PanelState::Ready:      ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Status: Ready"); break;
         case PanelState::Recording:  ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.0f, 1.0f), "Status: Recording..."); break;
         case PanelState::Results:    ImGui::TextColored(ImVec4(0.3f, 0.8f, 0.3f, 1.0f), "Status: Results"); break;
@@ -143,9 +144,25 @@ void BenchmarkPanel::RenderBenchmarkSection(GPUSceneManagement* app) {
     bool canRun = (m_state == PanelState::Ready || m_state == PanelState::Results);
     bool isRecording = (m_state == PanelState::Recording);
     if (!isRecording) {
-        ImGui::RadioButton("Scheme 1 (CPU instanced)", &m_scheme, 1);
-        ImGui::RadioButton("Scheme 2 (CPU cull+indirect)", &m_scheme, 2);
-        ImGui::RadioButton("Scheme 3 (GPU cull+indirect)", &m_scheme, 3);
+        // Radio clicks hot-switch the live render scheme. SetScheme only writes
+        // an enum that RunFrame's scheme switch reads next frame — no buffer or
+        // descriptor rebuild — so this is safe to call from the ImGui callback,
+        // unlike the scene rebuild path. Independent of the NUM1/2/3 shortcuts.
+        bool schemeChanged = false;
+        schemeChanged |= ImGui::RadioButton("Scheme 1 (CPU instanced)", &m_scheme, 1);
+        schemeChanged |= ImGui::RadioButton("Scheme 2 (CPU cull+indirect)", &m_scheme, 2);
+        schemeChanged |= ImGui::RadioButton("Scheme 3 (GPU cull+indirect)", &m_scheme, 3);
+        if (schemeChanged) app->SetScheme((RenderScheme)m_scheme);
+
+        // Live confirmation the switch actually took effect: read the ENGINE's
+        // active scheme (not the radio) plus the real recorded draw-call count.
+        // Draw calls make the switch unambiguous even though the picture looks
+        // identical — scheme 1 records one draw per visible chunk (large), while
+        // schemes 2/3 record exactly 2 indirect draws.
+        uint32_t activeScheme = (uint32_t)app->GetBenchmarkConfig().scheme;
+        ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f),
+            "Active: Scheme %u  |  draw calls: %u", activeScheme, app->GetLastDrawCalls());
+
         ImGui::InputInt("Warmup frames", &m_warmupFrames, 10, 60);
         ImGui::InputInt("Record frames", &m_recordFrames, 50, 200);
         if (m_warmupFrames < 0) m_warmupFrames = 0;
@@ -167,6 +184,10 @@ void BenchmarkPanel::RenderBenchmarkSection(GPUSceneManagement* app) {
 			app->SetBenchmarkEnabled(false);
             m_lastResults.assign(stats.begin(), stats.end());
             m_lastScheme = m_scheme;
+            // gpuExecUs is still 0 in this copy - the GPU timestamp readback
+            // runs at the end of THIS frame, after the panel renders. Re-copy
+            // next frame once IsBenchmarkComplete() reports the readback done.
+            m_pendingResultCopy = true;
             auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
             std::ostringstream csvName;
             csvName << "results/benchmark_"
@@ -187,42 +208,105 @@ void BenchmarkPanel::RenderBenchmarkSection(GPUSceneManagement* app) {
 void BenchmarkPanel::RenderResultsSection(GPUSceneManagement* app) {
     ImGui::TextColored(ImVec4(0.3f, 0.8f, 0.3f, 1.0f), "Results");
     ImGui::Separator();
-    if (m_lastResults.empty()) {
+    // Deferred re-copy: the completion copy captured gpuExecUs == 0 because the
+    // GPU timestamp readback happens at end-of-frame, after the panel renders.
+    // Once the app reports the readback done, re-copy so the GPU chart is real,
+    // then finalize this run: roll current -> previous and snapshot the new one.
+    if (m_pendingResultCopy && app->IsBenchmarkComplete()) {
+        const auto& s = app->GetFrameStats();
+        if (!s.empty()) m_lastResults.assign(s.begin(), s.end());
+        m_pendingResultCopy = false;
+
+        auto statTriple = [&](double FrameStats::* field, double& avg, double& p1, double& p99) {
+            std::vector<double> v;
+            v.reserve(m_lastResults.size());
+            for (auto& r : m_lastResults) v.push_back(r.*field);
+            std::sort(v.begin(), v.end());
+            size_t m = v.size();
+            avg = m ? std::accumulate(v.begin(), v.end(), 0.0) / m : 0.0;
+            p1  = m ? v[m / 100] : 0.0;
+            p99 = m ? v[m * 99 / 100] : 0.0;
+        };
+        RunSummary sum;
+        sum.valid     = true;
+        sum.scheme    = m_lastScheme;
+        sum.frames    = m_lastResults.size();
+        sum.drawCalls = m_lastResults.empty() ? 0 : m_lastResults[0].drawCalls;
+        statTriple(&FrameStats::cpuRecordUs, sum.cpuAvg, sum.cpuP1, sum.cpuP99);
+        statTriple(&FrameStats::gpuExecUs,   sum.gpuAvg, sum.gpuP1, sum.gpuP99);
+        m_prevSummary = m_curSummary;   // previous finalized run (may be invalid)
+        m_curSummary  = sum;
+    }
+
+    if (!m_curSummary.valid) {
         ImGui::TextDisabled("No results yet. Run a benchmark.");
         return;
     }
-    std::vector<double> totals;
-    for (auto& s : m_lastResults) totals.push_back(s.cpuRecordUs);
-    std::sort(totals.begin(), totals.end());
-    size_t n = totals.size();
-    double avg = std::accumulate(totals.begin(), totals.end(), 0.0) / n;
-    double p1 = totals[n / 100];
-    double p99 = totals[n * 99 / 100];
-    ImGui::Text("Scheme %d | Frames: %zu | Draw calls: %u",
-                m_lastScheme, n, m_lastResults[0].drawCalls);
-    ImGui::Text("Total: avg=%.1f us  P1=%.1f  P99=%.1f", avg, p1, p99);
+
+    const RunSummary& cur  = m_curSummary;
+    const RunSummary& prev = m_prevSummary;
+
+    ImGui::Text("This run:  Scheme %d | Frames: %zu | Draw calls: %u",
+                cur.scheme, cur.frames, cur.drawCalls);
+    ImGui::Text("  CPU record: avg=%.1f us  P1=%.1f  P99=%.1f", cur.cpuAvg, cur.cpuP1, cur.cpuP99);
+    ImGui::Text("  GPU exec:   avg=%.1f us  P1=%.1f  P99=%.1f", cur.gpuAvg, cur.gpuP1, cur.gpuP99);
+    if (prev.valid) {
+        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f),
+            "Prev run:  Scheme %d | CPU avg=%.1f us | GPU avg=%.1f us",
+            prev.scheme, prev.cpuAvg, prev.gpuAvg);
+    } else {
+        ImGui::TextDisabled("Prev run:  (run another benchmark to compare)");
+    }
     if (!m_csvPath.empty())
         ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "CSV: %s", m_csvPath.c_str());
 
-    if (ImPlot::BeginPlot("##FrameTimeChart", ImVec2(-1, 200),
-                          ImPlotFlags_NoTitle | ImPlotFlags_NoLegend)) {
-        ImPlot::SetupAxes("Frame", "us", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
-        ImPlot::PlotLine("Total", m_frameTimes.data(), (int)m_frameTimes.size());
+    // Per-frame CPU-record timeline for the current run.
+    if (ImPlot::BeginPlot("CPU record per frame", ImVec2(-1, 180),
+                          ImPlotFlags_NoLegend)) {
+        ImPlot::SetupAxes("frame", "CPU record (us)",
+                          ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+        ImPlot::PlotLine("cpu_record", m_frameTimes.data(), (int)m_frameTimes.size());
         ImPlot::EndPlot();
     }
 
-    if (ImPlot::BeginPlot("##CPUGPUBar", ImVec2(-1, 150), ImPlotFlags_NoTitle)) {
-        double gpuAvg = 0.0;
-        if (n > 0) {
-            double sum = 0.0;
-            for (auto& s : m_lastResults) sum += s.gpuExecUs;
-            gpuAvg = sum / n;
-        }
-        ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_NoDecorations);
-        ImPlot::SetupAxesLimits(0, 3, 0, avg * 1.2, ImGuiCond_Always);
-        ImPlot::PlotBars("GPU", &gpuAvg, 1, 0.4, 1.0);
-        double cpuAvg = avg - gpuAvg;
-        ImPlot::PlotBars("CPU", &cpuAvg, 1, 0.4, 2.0);
+    // Cross-run comparison: previous vs current, grouped by metric. CPU and GPU
+    // are independent parallel timelines with very different magnitudes, so each
+    // gets its own auto-scaled, labeled chart. Legend labels carry the scheme so
+    // "scheme 1 vs scheme 3" is readable directly off the bars.
+    static const double kPositions[3] = { 0.0, 1.0, 2.0 };
+    static const char*  kLabels[3]    = { "avg", "P1", "P99" };
+
+    // PlotBarGroups (ImPlot 0.17) reads values item-major: values[item*groups + g].
+    // items = {prev, cur}; groups = {avg, P1, P99}. Prev bars are zero/hidden
+    // until a second run exists.
+    char prevId[32], curId[32];
+    snprintf(prevId, sizeof(prevId), "prev (S%d)", prev.valid ? prev.scheme : 0);
+    snprintf(curId,  sizeof(curId),  "this (S%d)", cur.scheme);
+    const char* barIds[2] = { prevId, curId };
+
+    const double cpuGroups[6] = {
+        prev.valid ? prev.cpuAvg : 0.0, prev.valid ? prev.cpuP1 : 0.0, prev.valid ? prev.cpuP99 : 0.0,
+        cur.cpuAvg, cur.cpuP1, cur.cpuP99 };
+    const double gpuGroups[6] = {
+        prev.valid ? prev.gpuAvg : 0.0, prev.valid ? prev.gpuP1 : 0.0, prev.valid ? prev.gpuP99 : 0.0,
+        cur.gpuAvg, cur.gpuP1, cur.gpuP99 };
+
+    float half = ImGui::GetContentRegionAvail().x * 0.5f - 4.0f;
+    if (ImPlot::BeginPlot("CPU record", ImVec2(half, 190))) {
+        ImPlot::SetupLegend(ImPlotLocation_NorthEast, ImPlotLegendFlags_Outside);
+        ImPlot::SetupAxes(nullptr, "us", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+        ImPlot::SetupAxisTicks(ImAxis_X1, kPositions, 3, kLabels);
+        ImPlot::SetupAxisLimits(ImAxis_X1, -0.5, 2.5, ImGuiCond_Always);
+        ImPlot::PlotBarGroups(barIds, cpuGroups, 2, 3, 0.67);
+        ImPlot::EndPlot();
+    }
+    ImGui::SameLine();
+    if (ImPlot::BeginPlot("GPU exec", ImVec2(half, 190))) {
+        ImPlot::SetupLegend(ImPlotLocation_NorthEast, ImPlotLegendFlags_Outside);
+        ImPlot::SetupAxes(nullptr, "us", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+        ImPlot::SetupAxisTicks(ImAxis_X1, kPositions, 3, kLabels);
+        ImPlot::SetupAxisLimits(ImAxis_X1, -0.5, 2.5, ImGuiCond_Always);
+        ImPlot::PlotBarGroups(barIds, gpuGroups, 2, 3, 0.67);
         ImPlot::EndPlot();
     }
 }

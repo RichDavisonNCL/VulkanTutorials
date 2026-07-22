@@ -72,6 +72,7 @@ int main(int argc, char* argv[]) {
 		else if (arg == "-updatebatched")  { benchConfig.updateBatched = std::stoi(argv[++i]) != 0; }
 		else if (arg == "-cubeweight")     { benchConfig.cubeWeightOverride   = std::stof(argv[++i]); }
 		else if (arg == "-sphereweight")   { benchConfig.sphereWeightOverride = std::stof(argv[++i]); }
+		else if (arg == "-emptyweight")    { benchConfig.emptyWeightOverride  = std::stof(argv[++i]); }
 		else if (arg == "-w")              { winInit.width             = std::stoi(argv[++i]); }
 		else if (arg == "-h")              { winInit.height            = std::stoi(argv[++i]); }
 		else if (arg == "-lockcursor")     { lockCursor = true; }

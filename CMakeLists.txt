@@ -22,6 +22,12 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 find_package(Vulkan REQUIRED)
 
+option(COMPILE_WITH_IMGUI "Build interactive ImGui/ImPlot interfaces" ON)
+set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/third_party/imgui" CACHE PATH "Dear ImGui source directory")
+if(COMPILE_WITH_IMGUI AND NOT EXISTS "${IMGUI_DIR}/imgui.h")
+    message(FATAL_ERROR "Dear ImGui was not found at IMGUI_DIR='${IMGUI_DIR}'. Use the vendored third_party/imgui directory or set -DIMGUI_DIR=<path>.")
+endif()
+
 set(ASSET_ROOT "${CMAKE_SOURCE_DIR}/Assets/" CACHE STRING "" FORCE)
 add_compile_definitions(ASSETROOTLOCATION="${ASSET_ROOT}") 
 

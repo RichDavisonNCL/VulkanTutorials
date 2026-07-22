@@ -1,12 +1,16 @@
 # MSc Computer Graphics Programming - Vulkan
 
+## CSC8599 project artifact
+
+The dissertation project in this repository is `GPUDrivenRendering`. Build, demonstration, benchmark and verification instructions are in [`GPUDrivenRendering/RUNME.md`](GPUDrivenRendering/RUNME.md).
+
 ## Building the project
 
 You'll need CMake, or an IDE that has integrated CMake support. Visual Studio 2022 is recommended. 
 
 From Command line:
 ```
-mk dir build
+mkdir build
 cd build
 cmake ..
 ```

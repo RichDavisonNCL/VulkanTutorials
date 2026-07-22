@@ -360,15 +360,15 @@ def fig_c3(rows: list[dict[str, str]], triangles: dict[int, int]) -> plt.Figure:
         x = triangles[seed] / 1_000_000
         y = float(row["gpu_exec_avg"]) / 1000
         # One composite glyph encodes a seed-paired pair of artifacts: the open
-        # triangle supplies x from the supplementary cache and the filled circle
-        # supplies y from the formal timing matrix. No pooled statistic is drawn.
+        # triangle supplies x from the matched WFC cache artifact and the filled
+        # circle supplies y from the main rendering matrix. No pooled model is fit.
         axis.scatter(x, y, s=280, marker="^", facecolors="none", edgecolors=ORANGE, linewidths=1.7, zorder=2)
         axis.scatter(x, y, s=75, marker="o", color=BLUE, edgecolors=BLACK, linewidths=0.7, zorder=3)
         if seed == 9999:
             axis.annotate("seed 9999", (x, y), xytext=(8, 8), textcoords="offset points", fontsize=8)
-    axis.set_xlabel("Total triangle count from supplementary cache histogram (millions)")
-    axis.set_ylabel("Formal GPU elapsed time from timestamp queries (ms)")
-    axis.set_title("GPU elapsed time against scene mesh composition\nGrid 4096, chunk size 16, tile-weight preset 80, S3")
+    axis.set_xlabel("Cache-derived triangle-count proxy (millions)")
+    axis.set_ylabel("GPU timestamp span (ms)")
+    axis.set_title("GPU timestamp span against triangle-count proxy\nGrid 4096, chunk size 16, tile-weight preset 80, S3")
     axis.set_xlim(0, 12_000)
     axis.set_ylim(0, 650)
     axis.set_yticks(np.arange(0, 601, 100))
@@ -376,9 +376,9 @@ def fig_c3(rows: list[dict[str, str]], triangles: dict[int, int]) -> plt.Figure:
     circle_handle = Line2D([0], [0], color=BLUE, marker="o", markeredgecolor=BLACK, linestyle="", markersize=7)
     axis.legend(
         handles=[(triangle_handle, circle_handle)],
-        labels=["x: supplementary cache histogram\ny: formal timing matrix\nseed pairs the artifacts"],
+        labels=["x: WFC tile-grid cache set\ny: main rendering matrix\nseed identifies the pair"],
         handler_map={tuple: HandlerTuple(ndivide=1)},
-        title="Composite paired glyph",
+        title="Same-seed pairing",
         frameon=False,
         loc="upper left",
     )
@@ -399,11 +399,11 @@ def fig_c3(rows: list[dict[str, str]], triangles: dict[int, int]) -> plt.Figure:
     zoom.set_yticks([52.88, 52.90, 52.92])
     zoom.ticklabel_format(axis="x", style="plain", useOffset=False)
     zoom.tick_params(labelsize=7)
-    zoom.set_title("Faithful zoom: seeds 42 and 1337", fontsize=8)
-    zoom.set_xlabel("Total triangle count from\nsupplementary cache histogram (millions)", fontsize=7)
-    zoom.set_ylabel("GPU elapsed time from\ntimestamp queries (ms)", fontsize=7)
+    zoom.set_title("Inset: seeds 42 and 1337", fontsize=8)
+    zoom.set_xlabel("Cache-derived triangle-count proxy\n(millions)", fontsize=7)
+    zoom.set_ylabel("GPU timestamp span (ms)", fontsize=7)
     zoom.grid(color="#D9D9D9", linewidth=0.4)
-    axis.text(0.98, 0.04, "No pooled fit or cross-tier summary.", transform=axis.transAxes, ha="right", va="bottom", fontsize=8)
+    axis.text(0.98, 0.04, "Descriptive three-seed comparison; no fitted trend.", transform=axis.transAxes, ha="right", va="bottom", fontsize=8)
     finish_axis(axis)
     fig.tight_layout()
     return fig
@@ -422,12 +422,13 @@ def fig_c4(rows: list[dict[str, str]], claim: dict[str, float]) -> plt.Figure:
             jitter = np.linspace(-0.035, 0.035, len(values))
             axis.scatter(position + offsets[mode] + jitter, values, color=color, marker=marker, edgecolor=BLACK, linewidth=0.5, s=35, alpha=0.8, zorder=3)
             means[mode].append(float(np.mean(values)))
-        axis.plot(np.arange(len(update_sizes)) + offsets[mode], means[mode], color=color, marker=marker, markeredgecolor=BLACK, linewidth=1.5, linestyle=line_style, label=f"{mode.replace('perchunk', 'per-chunk')} mean (n=9)", zorder=4)
+        legend_label = "batched path: mean (n=9)" if mode == "batched" else "per-chunk submission path: mean (n=9)"
+        axis.plot(np.arange(len(update_sizes)) + offsets[mode], means[mode], color=color, marker=marker, markeredgecolor=BLACK, linewidth=1.5, linestyle=line_style, label=legend_label, zorder=4)
     axis.set_yscale("log")
     axis.set_xticks(np.arange(len(update_sizes)), [str(size) for size in update_sizes])
     axis.set_xlabel("Update size (chunks)")
     axis.set_ylabel("Standalone buffer-update time (µs)")
-    axis.set_title("Standalone buffer-update microbenchmark by update size\nIndividual configuration aggregates and mean paths")
+    axis.set_title("Standalone buffer-update microbenchmark by update size\nConfiguration means and across-configuration means")
     axis.annotate(
         f"32 chunks: {claim['ratio']:.2f}×\n{claim['batched_mean_us']:.2f} vs {claim['perchunk_mean_us']:,.2f} µs",
         xy=(5 + offsets["perchunk"], means["perchunk"][-1]),

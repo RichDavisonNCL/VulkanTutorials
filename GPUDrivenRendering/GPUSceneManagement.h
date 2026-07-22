@@ -105,6 +105,11 @@ struct BenchmarkConfig {
 	// path is for the small weight-ratio sweep, not the cached formal matrix).
 	float cubeWeightOverride   = -1.0f;
 	float sphereWeightOverride = -1.0f;
+	// Empty-weight override for the percolation sweep: raising emptyWeight above
+	// the density-derived value breaks the cube/sphere family-lock (the two
+	// families can only neighbour via EMPTY), enabling continuous mixed
+	// compositions. Unset (<0) keeps the density-derived emptyWeight.
+	float emptyWeightOverride  = -1.0f;
 };
 
 class GPUSceneManagement {
@@ -119,7 +124,18 @@ public:
 	bool IsBenchmarkComplete() const { return m_benchmarkComplete; }
 	VulkanRenderer* GetRenderer() { return m_renderer; }
 	const BenchmarkConfig& GetBenchmarkConfig() const { return m_benchConfig; }
-	void SetScheme(RenderScheme s) { m_benchConfig.scheme = s; }
+	// Hot-switch the render scheme. Logs only on an actual change so the console
+	// isn't spammed when called every frame from the panel/keyboard. Both the
+	// ImGui radios and the NUM1/2/3 shortcuts route through here.
+	void SetScheme(RenderScheme s) {
+		if (m_benchConfig.scheme == s) return;
+		m_benchConfig.scheme = s;
+		std::cout << "[GPUDriven] Render scheme -> " << (int)s << " ("
+		          << (s == RenderScheme::CPU_Instanced    ? "CPU instanced"     :
+		              s == RenderScheme::CPU_CullIndirect  ? "CPU cull+indirect" :
+		                                                     "GPU cull+indirect") << ")\n";
+	}
+	uint32_t GetLastDrawCalls() const { return m_drawCallCount; }
 	void SetBenchmarkEnabled(bool on) { m_benchmarkEnabled = on; }
 	void ResetBenchmarkState(RenderScheme scheme, uint32_t warmup, uint32_t record, const std::string& outputPath) {
 		m_benchConfig.scheme = scheme;

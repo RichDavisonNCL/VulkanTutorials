@@ -214,7 +214,8 @@ void GPUSceneManagement::SetBenchmarkConfig(const BenchmarkConfig& config) {
 	// runs (cube/sphere weight sweep) bypass the cache entirely: density no
 	// longer determines the tile weights in that mode, so the (grid,seed,
 	// density) cache key would collide with the formal matrix's cached scenes.
-	bool usingWeightOverride = config.cubeWeightOverride >= 0.0f || config.sphereWeightOverride >= 0.0f;
+	bool usingWeightOverride = config.cubeWeightOverride >= 0.0f || config.sphereWeightOverride >= 0.0f
+		|| config.emptyWeightOverride >= 0.0f;
 	std::vector<uint32_t> cachedGrid;
 	uint32_t cachedSize = 0;
 	if (!usingWeightOverride && WFCCache::Load(cachedGrid, cachedSize, config.gridSize, config.seed, config.density)) {
@@ -301,6 +302,25 @@ void GPUSceneManagement::RunFrame(float dt) {
 			}
 		}
 	}
+
+#ifdef USE_IMGUI
+	// Frame-boundary scene rebuild. The panel only *requests* a rebuild (from
+	// its ImGui callback); the actual GPU work runs HERE, before BeginFrame(),
+	// while no command buffer is recording and the previous frame is already
+	// submitted+presented. Doing it inside the panel's Render() (mid-frame)
+	// frees buffers/descriptors the just-recorded draw commands still reference,
+	// causing VK_ERROR_DEVICE_LOST -> abort(). CreateBuffers() waitIdle()s, so
+	// the prior frame's GPU work is guaranteed complete before we discard.
+	if (m_benchPanel && m_benchPanel->HasPendingRebuild()) {
+		SetSceneParams(m_benchPanel->GetGenGridSize(), m_benchPanel->GetGenChunkSize(),
+			m_benchPanel->GetGenSeed(), m_benchPanel->GetGenDensity());
+		GenerateScene(m_benchPanel->GetRebuildGrid());
+		CreateBuffers();
+		CreateDescriptorSets();
+		CreateQueryPool();
+		m_benchPanel->RebuildConsumed();
+	}
+#endif
 
 	m_renderer->BeginFrame();
 
@@ -417,6 +437,8 @@ void GPUSceneManagement::GenerateScene() {
 	}
 	wfcCfg.cubeWeight   = m_benchConfig.cubeWeightOverride;
 	wfcCfg.sphereWeight = m_benchConfig.sphereWeightOverride;
+	if (m_benchConfig.emptyWeightOverride >= 0.0f)
+		wfcCfg.emptyWeight = m_benchConfig.emptyWeightOverride;
 
 	m_tileGrid = gen.Generate(wfcCfg);
 	GenerateScene(m_tileGrid);
@@ -930,6 +952,11 @@ void GPUSceneManagement::WriteCSVSummary() {
 	file << "# grid=" << m_benchConfig.gridSize << " chunk=" << m_benchConfig.chunkSize
 	     << " density=" << m_benchConfig.density << " scheme=" << (int)m_benchConfig.scheme
 	     << " seed=" << m_benchConfig.seed << "\n";
+	// Weight overrides: -1 means unset (density-derived weights used, formal matrix).
+	// Any value >=0 means the percolation/ratio sweep bypassed the density switch.
+	file << "# cube_weight_override=" << m_benchConfig.cubeWeightOverride
+	     << " sphere_weight_override=" << m_benchConfig.sphereWeightOverride
+	     << " empty_weight_override=" << m_benchConfig.emptyWeightOverride << "\n";
 	file << "# warmup=" << m_benchConfig.warmupFrames << " record=" << m_benchConfig.recordFrames << "\n";
 	file << "# present_mode=mailbox\n";
 	file << "frame,cpu_record_us,cpu_wait_us,gpu_exec_us,frame_wall_us,draw_calls,visible_chunks\n";

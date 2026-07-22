@@ -4,8 +4,9 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/*.h
 )
-# Exclude test files from main target
+# Exclude test files and standalone tools (each has its own main()) from main target
 list(FILTER SOURCES EXCLUDE REGEX ".*/Tests/.*")
+list(FILTER SOURCES EXCLUDE REGEX ".*/Tools/.*")
 
 add_executable(${TARGET_NAME} ${SOURCES})
 
@@ -100,5 +101,37 @@ target_include_directories(${TEST_TARGET} PRIVATE
 target_compile_features(${TEST_TARGET} PRIVATE cxx_std_20)
 target_link_libraries(${TEST_TARGET} PRIVATE NCLCoreClasses)
 set_target_properties(${TEST_TARGET} PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+# ── Offline WFC histogram tool (no Vulkan, reproduces weight-sweep tile grids) ──
+set(HIST_TARGET WeightSweepHistogram)
+add_executable(${HIST_TARGET}
+    Tools/WeightSweepHistogram.cpp
+    WFCGenerator.cpp
+)
+target_include_directories(${HIST_TARGET} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/NCLCoreClasses
+)
+target_compile_features(${HIST_TARGET} PRIVATE cxx_std_20)
+target_link_libraries(${HIST_TARGET} PRIVATE NCLCoreClasses)
+set_target_properties(${HIST_TARGET} PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+# ── WFC probe (no Vulkan, tests whether emptyWeight breaks family-lock) ──
+set(PROBE_TARGET WFCProbe)
+add_executable(${PROBE_TARGET}
+    Tools/WFCProbe.cpp
+    WFCGenerator.cpp
+)
+target_include_directories(${PROBE_TARGET} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/NCLCoreClasses
+)
+target_compile_features(${PROBE_TARGET} PRIVATE cxx_std_20)
+target_link_libraries(${PROBE_TARGET} PRIVATE NCLCoreClasses)
+set_target_properties(${PROBE_TARGET} PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )

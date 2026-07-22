@@ -399,3 +399,6 @@ cache/
 /results_weightsweep/
 /results_repeatvalidation/
 /archive_20260720/
+
+# Only allow root README.md in the repository
+!/README.md
