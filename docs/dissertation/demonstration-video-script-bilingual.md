@@ -2,6 +2,8 @@
 
 Target duration: approximately 2 minutes 30 seconds. Record at 1920×1080 and 30 fps. The English narration contains 317 words, corresponding to roughly 127 words per minute.
 
+The final voice-over will use the Minimax Speech-2.8-hd model.
+
 ## English narration
 
 ### 0:00–0:10 — Research question
@@ -100,8 +102,9 @@ Get-Content .\video_demo_scheme2.csv | Select-Object -First 18
 - Remove inactive waiting time with direct cuts while retaining benchmark startup and completion.
 - Import `../Figures/fig5_1_cpu_record_bar.png` and `../Figures/fig5_2_content_sensitivity_bar.png` directly into the editor; avoid screen-capturing them from a PDF viewer.
 - Crop terminal output so personal paths, unrelated windows, notifications, and account details are absent.
-- Record or synthesize narration after the picture edit so pauses can follow the visible actions.
+- Generate the narration with the Minimax Speech-2.8-hd model after the picture edit so pauses can follow the visible actions.
 - Export the film as 1920×1080 H.264 video with AAC audio in an MP4 container.
 - Upload with access settings that allow assessors to open the link without requesting permission.
-- Add the hosted link beneath the dissertation title only after the upload is available.
-- If AI speech synthesis is used, record the service name and update the generative-AI declaration after producing and reviewing the voice-over.
+- Do not rebuild the submission PDFs until the hosted film link is available.
+- Add the hosted film link immediately below the dissertation title in both PDF variants, as required by the project brief.
+- Confirm that the generative-AI declaration names the Minimax Speech-2.8-hd model before building the PDFs.
